@@ -45,13 +45,11 @@ jobs:
                           # uploading, so real commit rate stays under 128.
     strategy:
       fail-fast: false
-      max-parallel: 16    # Sweet spot: 12 was overcorrection, observed only
-                          # ~80 commits/hr (way under 128 cap). 16 shards x 2
-                          # accounts x ~6 cycles/hr = ~190/hr theoretical, but
-                          # most iters dedup-skip uploads and the 5x retry-
-                          # backoff on the central uploader handles bursty 429.
+      max-parallel: 20    # FULL FREE-TIER CAP — 5-dataset distribution gives
+                          # us 640 commits/hr aggregate, no need to throttle
+                          # anymore. Burst max.
       matrix:
-        shard_id: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        shard_id: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -71,7 +69,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
-          SHARD_TOTAL: ${{ inputs.shard_total || '16' }}
+          SHARD_TOTAL: ${{ inputs.shard_total || '20' }}
           INGEST_RUNNER: github-actions
           MATRIX_SHARD: ${{ matrix.shard_id }}
         # Each runner ingests continuously until its time budget runs out.
