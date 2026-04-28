@@ -16,14 +16,15 @@ name: bulk-ingest
 
 on:
   schedule:
-    # Every 30 minutes — give each cycle 25 min to run + 5 min buffer.
-    - cron: '*/30 * * * *'
+    # Every 15 minutes — packs 4 cycles/hr per repo. With 2 repos active,
+    # that's 8 cycles/hr x 20 shards = 160 ingest passes per hour.
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       shard_total:
-        description: 'Number of shards (default 16)'
+        description: 'Number of shards (default 20 — free-tier concurrency cap)'
         required: false
-        default: '16'
+        default: '20'
 
 permissions:
   contents: read
@@ -38,12 +39,12 @@ concurrency:
 jobs:
   shard:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 13   # cron is */15 — 13 min job + 2 min slack < next tick
     strategy:
       fail-fast: false
-      max-parallel: 16
+      max-parallel: 20    # GitHub Free plan concurrency cap
       matrix:
-        shard_id: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        shard_id: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -64,7 +65,7 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
           SHARD_ID: ${{ matrix.shard_id }}
-          SHARD_TOTAL: ${{ inputs.shard_total || '16' }}
+          SHARD_TOTAL: ${{ inputs.shard_total || '20' }}
           INGEST_RUNNER: github-actions
         run: |
           set -e
