@@ -37,11 +37,11 @@ permissions:
 jobs:
   shard:
     runs-on: ubuntu-latest
-    timeout-minutes: 25   # Short enough that the 20 free-tier slots cycle
-                          # back every 25 min, allowing cron-fired runs to
-                          # actually start instead of queueing for hours.
-                          # Loop below still does ~10-12 ingest passes per
-                          # runner — plenty to amortize the pip install cost.
+    timeout-minutes: 8    # Short bursts so the 20 free-tier slots cycle
+                          # ~7-8x per hour. Combined with HF Space's
+                          # gh-actions-ticker daemon firing dispatches every
+                          # 60s, the queue stays full and slots are saturated.
+                          # 6 min loop budget = 4-6 ingest passes per runner.
     strategy:
       fail-fast: false
       max-parallel: 20    # GitHub Free plan concurrency cap
@@ -94,10 +94,11 @@ jobs:
               echo "  dynamic-datasets fetch failed — running with static list only"
           fi
 
-          # 22-min budget — 3 min slack before the 25 min hard timeout.
-          # Each ingest pass is ~30-60s (most time is parquet stream/dedup),
-          # so 22 min gives ~10-15 SHARD_ID rotations per runner.
-          end_at=$((SECONDS + 1320))
+          # 6-min budget — 2 min slack before 8 min hard timeout. Each
+          # ingest pass is 30-90s, so 6 min = ~4-8 SHARD_ID rotations per
+          # runner. With ticker dispatching every 60s, throughput is
+          # bounded by GitHub's 20-concurrent cap, not by per-runner duration.
+          end_at=$((SECONDS + 360))
           iter=0
           while [[ $SECONDS -lt $end_at ]]; do
               # Rotate shard slice each iteration to dodge local dedup cache
