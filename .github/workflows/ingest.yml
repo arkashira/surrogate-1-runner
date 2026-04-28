@@ -37,10 +37,11 @@ permissions:
 jobs:
   shard:
     runs-on: ubuntu-latest
-    timeout-minutes: 350  # GitHub Actions max-per-job is 360 min on public-repo
-                          # free tier; we use 350 so the runner can stream
-                          # ingest passes for ~6 hours per workflow run before
-                          # fresh cron-or-dispatch fire takes over.
+    timeout-minutes: 25   # Short enough that the 20 free-tier slots cycle
+                          # back every 25 min, allowing cron-fired runs to
+                          # actually start instead of queueing for hours.
+                          # Loop below still does ~10-12 ingest passes per
+                          # runner — plenty to amortize the pip install cost.
     strategy:
       fail-fast: false
       max-parallel: 20    # GitHub Free plan concurrency cap
@@ -81,10 +82,10 @@ jobs:
           cp bin/lib/dedup.py "$HOME/.surrogate/bin/lib/dedup.py"
           chmod +x bin/dataset-enrich.sh
 
-          # ~5h45m budget — slack before the workflow's 350-min hard timeout.
-          # That's ~80-100 ingest iterations per runner before next cron/dispatch
-          # spins up a fresh batch.
-          end_at=$((SECONDS + 20700))
+          # 22-min budget — 3 min slack before the 25 min hard timeout.
+          # Each ingest pass is ~30-60s (most time is parquet stream/dedup),
+          # so 22 min gives ~10-15 SHARD_ID rotations per runner.
+          end_at=$((SECONDS + 1320))
           iter=0
           while [[ $SECONDS -lt $end_at ]]; do
               # Rotate shard slice each iteration to dodge local dedup cache
