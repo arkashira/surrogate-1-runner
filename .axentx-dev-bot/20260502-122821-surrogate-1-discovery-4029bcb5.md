@@ -129,21 +129,22 @@ def stream_cdn_files(manifest_path: Path, max_files: int | None = None) -> Itera
         url = cdn_url(repo_id, f)
         resp = requests.get(url, ti
 
-## review — reviewer @ 2026-05-02T12:28:29.622238Z
+## review — reviewer @ 2026-05-02T12:33:32.929654Z
 
-APPROVE: This is a workable discovery-stage artifact that establishes a clear pattern (CDN-only manifests, sibling sharding, Lightning Studio reuse) and is implementable; it can be iterated in attempts 2–3.
+APPROVE: The manifest approach, CDN-only consumption, and sibling-sharding strategy are a workable first step toward discovery; it exposes clear next actions (error handling, imports, credential-free CDN access) without blocking incremental progress.
 
-Acceptance criteria (downstream tester can check):
-- `train_manifest.py` parses and saves a JSON manifest with keys: repo_id, date_folder, generated_at, files (sorted list).
-- `cdn_url()` produces valid URLs of the form `https://huggingface.co/datasets/<repo_id>/resolve/main/<file_path>`.
-- `pick_sibling_repo(slug)` deterministically selects one of the five sibling repos for a given slug.
-- `get_or_create_studio()` reuses a running studio when present and status=="running"; otherwise starts a new one.
-- `stream_cdn_files()` yields (url, bytes) for each file listed in the manifest without authenticated HF API calls (can be verified by network inspection or mocking).
+Acceptance criteria (for downstream tester / follow-up work):
+- `build_filelist` can list files for a given repo/date and write a valid `filelist.json` manifest (non-recursive, sorted).
+- `cdn_url` produces valid HTTPS URLs that resolve to file content without requiring HF API tokens.
+- `pick_sibling_repo` deterministically maps a slug to one of the five sibling repos (same slug → same repo).
+- `get_or_create_studio` reuses a running studio when present; otherwise starts one (idempotent behavior).
+- `stream_cdn_files` yields `(url, bytes)` pairs for files listed in the manifest and raises on non-2xx HTTP status.
+- Missing import (`requests`) and truncated CLI/function are noted as next steps (non-blocking for discovery).
 
-## security — axentx-security @ 2026-05-02T12:28:35.735076Z
+## security — axentx-security @ 2026-05-02T12:33:40.179664Z
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN URL construction and streaming from arbitrary repo_id/file_path enables SSRF via malicious repo_id or path traversal.", "mitigation": "Validate repo_id and file_path against strict allowlists and normalize paths to prevent traversal before CDN fetch."}, {"severity": "low", "class": "other", "detail": "Deterministic sibling selection could be abused to concentrate load or probe internal behavior if attacker controls slug.", "mitigation": "Rate-limit and monitor sibling selection and CDN fetch patterns; treat slug as untrusted input."}], "summary": "No critical or high issues; medium SSRF risk from CDN URL generation is manageable with input validation and path normalization."}
+{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN URL construction and fetching from arbitrary repo/date inputs can trigger SSRF if hostname/path is not strictly validated.", "mitigation": "Whitelist allowed CDN hostnames and enforce strict path sanitization before fetching."}, {"severity": "low", "class": "other", "detail": "Missing input validation on repo/date/slug may allow path traversal or manifest injection via malicious filenames.", "mitigation": "Validate and sanitize repo, date, and slug inputs and restrict manifest writes to intended directories."}], "summary": "Design is acceptable for discovery; main risk is SSRF from CDN fetching and path manipulation via unchecked inputs."}
 
-## qa — security @ 2026-05-02T12:28:35.735116Z
+## qa — security @ 2026-05-02T12:33:40.179714Z
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN URL construction and streaming from arbitrary repo_id/file_path enables SSRF via malicious repo_id or path traversal.", "mitigation": "Validate repo_id and file_path against strict allowlists and normalize paths to prevent traversal before CDN fetch."}, {"severity": "low", "class": "other", "detail": "Deterministic sibling selection could be abused to concentrate load or probe internal behavior if attacker controls slug.", "mitigation": "Rate-limit and monitor sibling selection and CDN fetch patterns; treat slug as untrusted input."}], "summary": "No critical or high issues; medium SSRF risk from CDN URL generation is manageable with input validation and path normalization."}
+{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN URL construction and fetching from arbitrary repo/date inputs can trigger SSRF if hostname/path is not strictly validated.", "mitigation": "Whitelist allowed CDN hostnames and enforce strict path sanitization before fetching."}, {"severity": "low", "class": "other", "detail": "Missing input validation on repo/date/slug may allow path traversal or manifest injection via malicious filenames.", "mitigation": "Validate and sanitize repo, date, and slug inputs and restrict manifest writes to intended directories."}], "summary": "Design is acceptable for discovery; main risk is SSRF from CDN fetching and path manipulation via unchecked inputs."}
