@@ -100,21 +100,21 @@ def main_cli():
         if not args.slug:
             parser.error("--appe
 
-## review — reviewer @ 2026-05-02T13:24:10.003696Z
+## review — reviewer @ 2026-05-02T13:23:51.504801Z
 
-APPROVE: identifies a real duplicate-ingestion problem and proposes a concrete, low-risk CDN-based cross-run dedup index that can be implemented and tested within the 2-hour window; acceptance criteria below provide a clear path to verify correctness without blocking on style or exhaustive edge cases.
+APPROVE: implements a clear, low-risk cross-run dedup mechanism using CDN reads and per-shard append-only files; provides a functional CLI and integration hook that a downstream tester can validate without touching auth/Space/training code.
 
-Acceptance criteria (downstream tester can check):
-- `bin/cross_run_dedup.py` is executable (`chmod +x`) and runs `python3 bin/cross_run_dedup.py --list` without error (returns 0 and empty output when index missing, or newline-separated slugs when present).
-- Cross-run dedup check works via CDN: when `index/processed_slugs.txt` exists in the HF dataset repo, `--list` returns its contents; when absent, returns empty set (404 handled gracefully).
-- Append-and-upload path works in a dry-run mode (or with a test repo): `python3 bin/cross_run_dedup.py --append --slug owner/repo --shard 1 --ts test123` creates `index/processed_slugs_shard1-test123.txt` locally and attempts upload (HF_TOKEN required for real upload; CI can gate on token presence).
-- `bin/dataset-enrich.sh` (or equivalent ingestion driver) skips already-processed slugs: for a slug present in the CDN index, the ingestion job does not produce a new `batches/public-merged/...` file for that slug in that shard run.
-- No regressions in existing SQLite intra-run/source dedup: local dedup still prevents duplicates within the same shard run even when CDN index is empty or unavailable.
+Acceptance criteria:
+- `python3 bin/cross_run_dedup.py --list` returns 0 and prints slugs (or nothing) when the CDN file exists or 404s; non-404 failures exit non-zero.
+- `python3 bin/cross_run_dedup.py --append --slug owner/repo --shard 1 --ts 20240101-000000` appends locally and uploads `index/processed_slugs_shard1-20240101-000000.txt` to HF_DATASET using HF_TOKEN.
+- `bin/dataset-enrich.sh` skips slugs present in the preloaded `PROCESSED` list (exact match) before enrichment steps.
+- No regressions in existing SQLite intra-run/source dedup behavior (same output row count for unique slugs within a shard).
+- HF_TOKEN is only used for uploads (not required for `--list`), and CDN URLs remain publicly readable without tokens.
 
-## security — axentx-security @ 2026-05-02T13:24:18.618995Z
+## security — axentx-security @ 2026-05-02T13:24:53.996854Z
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN-backed index fetch from Hugging Face can be abused via SSRF if URL construction permits attacker-controlled hostnames or redirects.", "mitigation": "Pin the CDN hostname, disable redirects, and validate/whitelist responses to Hugging Face dataset paths only."}, {"severity": "med", "class": "broken-auth", "detail": "HF_TOKEN usage for uploads may leak via logs or environment inspection if not carefully guarded.", "mitigation": "Mask HF_TOKEN in logs, require short-lived tokens where possible, and restrict upload scope to the minimal dataset repo."}, {"severity": "low", "class": "race", "detail": "Concurrent append-and-upload across runners could produce lost updates or duplicate entries in processed_slugs files.", "mitigation": "Use atomic compare-and-swap (ETag/If-Match) or a locking mechanism when updating the remote index file."}], "summary": "No critical or high-severity issues; medium SSRF and auth handling risks plus a low race condition are noted and can be mitigated without blocking the change."}
+{"verdict": "OK", "findings": [{"severity": "low", "class": "secret-leak", "detail": "The HF_TOKEN is used for uploads and could potentially be exposed if not properly secured.", "mitigation": "Ensure that the HF_TOKEN is stored securely and only accessible to authorized users and services."}, {"severity": "med", "class": "other", "detail": "The use of a publicly readable CDN without authentication or authorization could lead to unauthorized access to the uploaded files.", "mitigation": "Consider implementing authentication or authorization mechanisms for the CDN to restrict access to authorized users and services."}], "summary": "The proposed change implements a cross-run dedup mechanism with a low-risk design, but has some potential security concerns related to token storage and CDN access that should be addressed."}
 
-## qa — security @ 2026-05-02T13:24:18.619049Z
+## qa — security @ 2026-05-02T13:24:53.996881Z
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN-backed index fetch from Hugging Face can be abused via SSRF if URL construction permits attacker-controlled hostnames or redirects.", "mitigation": "Pin the CDN hostname, disable redirects, and validate/whitelist responses to Hugging Face dataset paths only."}, {"severity": "med", "class": "broken-auth", "detail": "HF_TOKEN usage for uploads may leak via logs or environment inspection if not carefully guarded.", "mitigation": "Mask HF_TOKEN in logs, require short-lived tokens where possible, and restrict upload scope to the minimal dataset repo."}, {"severity": "low", "class": "race", "detail": "Concurrent append-and-upload across runners could produce lost updates or duplicate entries in processed_slugs files.", "mitigation": "Use atomic compare-and-swap (ETag/If-Match) or a locking mechanism when updating the remote index file."}], "summary": "No critical or high-severity issues; medium SSRF and auth handling risks plus a low race condition are noted and can be mitigated without blocking the change."}
+{"verdict": "OK", "findings": [{"severity": "low", "class": "secret-leak", "detail": "The HF_TOKEN is used for uploads and could potentially be exposed if not properly secured.", "mitigation": "Ensure that the HF_TOKEN is stored securely and only accessible to authorized users and services."}, {"severity": "med", "class": "other", "detail": "The use of a publicly readable CDN without authentication or authorization could lead to unauthorized access to the uploaded files.", "mitigation": "Consider implementing authentication or authorization mechanisms for the CDN to restrict access to authorized users and services."}], "summary": "The proposed change implements a cross-run dedup mechanism with a low-risk design, but has some potential security concerns related to token storage and CDN access that should be addressed."}
