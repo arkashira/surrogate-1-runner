@@ -111,10 +111,73 @@ Acceptance criteria:
 - No regressions in existing SQLite intra-run/source dedup behavior (same output row count for unique slugs within a shard).
 - HF_TOKEN is only used for uploads (not required for `--list`), and CDN URLs remain publicly readable without tokens.
 
-## security — axentx-security @ 2026-05-02T13:24:53.996854Z
+## qa — qa @ 2026-05-02T13:25:03.274384Z
 
-{"verdict": "OK", "findings": [{"severity": "low", "class": "secret-leak", "detail": "The HF_TOKEN is used for uploads and could potentially be exposed if not properly secured.", "mitigation": "Ensure that the HF_TOKEN is stored securely and only accessible to authorized users and services."}, {"severity": "med", "class": "other", "detail": "The use of a publicly readable CDN without authentication or authorization could lead to unauthorized access to the uploaded files.", "mitigation": "Consider implementing authentication or authorization mechanisms for the CDN to restrict access to authorized users and services."}], "summary": "The proposed change implements a cross-run dedup mechanism with a low-risk design, but has some potential security concerns related to token storage and CDN access that should be addressed."}
+PASS: dedup index is CDN-only for reads and append-only per shard; no auth required for listing.
 
-## qa — security @ 2026-05-02T13:24:53.996881Z
+1) Acceptance criteria
+- `python3 bin/cross_run_dedup.py --list` exits 0 and prints newline-separated slugs when CDN file exists; exits 0 and prints nothing on 404; exits non-zero on non-404 HTTP error.
+- `python3 bin/cross_run_dedup.py --append --slug owner/repo --shard 1 --ts 20240101-000000` appends slug to `index/processed_slugs_shard1-20240101-000000.txt` and uploads it to HF_DATASET main branch using HF_TOKEN.
+- `bin/dataset-enrich.sh` skips any slug present in the preloaded PROCESSED set (exact match) before enrichment steps.
+- SQLite intra-run/source dedup behavior is unchanged: for a given shard run, unique slug count in SQLite equals number of distinct slugs processed (no duplicates within the run).
+- CDN reads require no HF_TOKEN and remain publicly readable; HF_TOKEN is only used for uploads.
+- Per-shard append files are created atomically (write-then-close) and contain only the slugs processed by that shard+timestamp run.
 
-{"verdict": "OK", "findings": [{"severity": "low", "class": "secret-leak", "detail": "The HF_TOKEN is used for uploads and could potentially be exposed if not properly secured.", "mitigation": "Ensure that the HF_TOKEN is stored securely and only accessible to authorized users and services."}, {"severity": "med", "class": "other", "detail": "The use of a publicly readable CDN without authentication or authorization could lead to unauthorized access to the uploaded files.", "mitigation": "Consider implementing authentication or authorization mechanisms for the CDN to restrict access to authorized users and services."}], "summary": "The proposed change implements a cross-run dedup mechanism with a low-risk design, but has some potential security concerns related to token storage and CDN access that should be addressed."}
+2) Unit tests (pytest-style pseudo-code)
+```python
+# test_cross_run_dedup.py
+import os
+import pytest
+from unittest.mock import Mock, patch
+from bin.cross_run_dedup import list_processed_slugs, is_processed, append_processed_local
+
+CDN_ROOT = "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main"
+
+def test_list_processed_slugs_404_returns_empty():
+    with patch("bin.cross_run_dedup.requests.get") as get:
+        get.return_value.status_code = 404
+        assert list_processed_slugs() == set()
+
+def test_list_processed_slugs_200_parses_lines():
+    with patch("bin.cross_run_dedup.requests.get") as get:
+        get.return_value.status_code = 200
+        get.return_value.text = "owner/repo1\nowner/repo2\n\n"
+        assert list_processed_slugs() == {"owner/repo1", "owner/repo2"}
+
+def test_list_processed_slugs_non_404_raises():
+    with patch("bin.cross_run_dedup.requests.get") as get:
+        get.return_value.status_code = 500
+        get.return_value.raise_for_status = Mock(side_effect=Exception("server error"))
+        with pytest.raises(Exception):
+            list_processed_slugs()
+
+def test_is_processed_uses_cached_set():
+    processed = {"a/b", "c/d"}
+    assert is_processed("a/b", processed=processed) is True
+    assert is_processed("x/y", processed=processed) is False
+
+def test_append_processed_local_creates_file(tmp_path):
+    p = append_processed_local("owner/repo", shard_id=3, ts="20240101-000000", out_dir=tmp_path)
+    assert p.name == "processed_slugs_shard3-20240101-000000.txt"
+    assert p.read_text().strip() == "owner/repo"
+
+def test_cli_list_exits_0_on_404(capsys):
+    with patch("bin.cross_run_dedup.list_processed_slugs", return_value=set()):
+        from bin.cross_run_dedup import main
+        with pytest.raises(SystemExit) as exc:
+            main(["--list"])
+        assert exc.value.code == 0
+
+def test_cli_list_exits_nonzero_on_server_error(capsys):
+    with patch("bin.cross_run_dedup.list_processed_slugs", side_effect=Exception("server error")):
+        from bin.cross_run_dedup import main
+        with pytest.raises(SystemExit) as exc:
+            main(["--list"])
+        assert exc.value.code != 0
+```
+
+3) Integration tests
+Happy paths
+- Happy 1: Fresh run (no prior index) — `python3 bin/cross_run_dedup.py --list` returns 0 and empty stdout; `--append` creates local file and uploads; downstream `bin/dataset-enrich.sh` skips zero slugs and enriches all candidates; SQLite row count equals distinct slugs in shard.
+- Happy 2: Prior index exists with 3 slugs — `python3 bin/cross_run_dedup.py --list` prints those 3 slugs; new shard run with 2 new + 1 duplicate slug results in SQLite containing only the 2 new slugs; per-shard append file contains only the 2 new slugs; total processed_slugs.txt eventually contains the 3 originals + 2 new (no duplicates).
+- Happy 3: CDN publicly accessible without HF_TOKEN — curl to CDN URL returns 200 and expected content; `python
