@@ -152,10 +152,90 @@ APPROVE: The proposed change addresses the issue of hitting the HF API limit and
 
 Note: Some minor improvements could be suggested, such as adding more error handling and logging, but these are not blockers for approval.
 
-## perf — axentx-perf @ 2026-05-02T13:13:07.730842Z
+## qa — qa @ 2026-05-02T13:13:09.620430Z
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "unbounded-query", "detail": "Pre-listing public/ via HF API shifts load from per-runner re-listing to a scheduled job, but the list can grow unbounded as public/ accumulates files. Without pagination limits or TTL-based pruning, memory and transfer costs scale linearly with total file count over time.", "mitigation": "Add pagination/cursor limits to list script, prune stale entries, and store only deltas or checksums instead of full path lists when possible."}, {"severity": "low", "class": "other", "detail": "CDN-only ingestion reduces egress and latency per file, but deterministic shard assignment based on file path can create hot shards if path distribution is skewed (e.g., common prefixes). This may cause uneven runner load and longer tail latency.", "mitigation": "Monitor shard sizes; consider salting or consistent-hashing with virtual nodes to smooth distribution if skew is observed."}], "summary": "The change improves performance by eliminating redundant HF API calls and leveraging CDN ingestion, with deterministic sharding to avoid conflicts. Main perf risk is unbounded growth of the pre-listed file set, which could increase memory/transfer overhead in the prepare job over time."}
+PASS: surrogate-1 approved — no blockers.
 
-## qa — perf @ 2026-05-02T13:13:07.730924Z
+---
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "unbounded-query", "detail": "Pre-listing public/ via HF API shifts load from per-runner re-listing to a scheduled job, but the list can grow unbounded as public/ accumulates files. Without pagination limits or TTL-based pruning, memory and transfer costs scale linearly with total file count over time.", "mitigation": "Add pagination/cursor limits to list script, prune stale entries, and store only deltas or checksums instead of full path lists when possible."}, {"severity": "low", "class": "other", "detail": "CDN-only ingestion reduces egress and latency per file, but deterministic shard assignment based on file path can create hot shards if path distribution is skewed (e.g., common prefixes). This may cause uneven runner load and longer tail latency.", "mitigation": "Monitor shard sizes; consider salting or consistent-hashing with virtual nodes to smooth distribution if skew is observed."}], "summary": "The change improves performance by eliminating redundant HF API calls and leveraging CDN ingestion, with deterministic sharding to avoid conflicts. Main perf risk is unbounded growth of the pre-listed file set, which could increase memory/transfer overhead in the prepare job over time."}
+## 1. Acceptance criteria
+
+- File list generation produces valid `file-list.json` with ≥1 entry and each entry includes `path`, `slug`, `size_bytes`, and `raw_cdn_url`.
+- Deterministic shard assignment: for any slug, `hash(slug) % 16` is stable across runs and across workers (same input → same shard).
+- Worker ingestion downloads only files assigned to its `SHARD_ID` and skips all others; total downloaded bytes ≤ sum of sizes for assigned files + 5% tolerance.
+- Worker output produces exactly one file matching `batches/public-merged/YYYY-MM-DD/shard-<SHARD_ID>-<HHMMSS>.jsonl` per run; filename contains correct shard and timestamp.
+- No Authorization header is sent during CDN downloads; HTTP request headers contain no `Authorization` or HuggingFace token fields.
+- Deduplication: if duplicate slugs appear in the file list, only one record per slug is emitted to the output shard.
+- End-to-end run completes with exit code 0 and emits ≥1 record to at least one shard when file list is non-empty.
+
+---
+
+## 2. Unit tests (pseudo-code, pytest style)
+
+```python
+# test_list_public_files.py
+def test_list_public_files_returns_valid_json(tmp_path):
+    out = tmp_path / "file-list.json"
+    run_script("bin/list-public-files.sh", out)
+    data = json.loads(out.read_text())
+    assert isinstance(data, list) and len(data) >= 1
+    for item in data:
+        assert "path" in item and isinstance(item["path"], str)
+        assert "slug" in item and isinstance(item["slug"], str)
+        assert "size_bytes" in item and isinstance(item["size_bytes"], int) and item["size_bytes"] >= 0
+        assert "raw_cdn_url" in item and item["raw_cdn_url"].startswith("https://huggingface.co/datasets/")
+
+# test_shard_assignment.py
+def test_assign_shard_is_stable():
+    slug = "example-file"
+    shard_ids = {assign_shard(slug) for _ in range(100)}
+    assert len(shard_ids) == 1
+    assert 0 <= assign_shard(slug) <= 15
+
+def test_assign_shard_uniform_coverage(file_list_sample):
+    counts = Counter(assign_shard(item["slug"]) for item in file_list_sample)
+    # rough uniformity: no shard should have 0 files unless sample is tiny
+    if len(file_list_sample) > 32:
+        assert all(c > 0 for c in counts.values())
+
+# test_worker_ingest.py
+def test_worker_filters_by_shard():
+    file_list = [
+        {"path": "a.txt", "slug": "a", "size_bytes": 100, "raw_cdn_url": "https://cdn/a.txt"},
+        {"path": "b.txt", "slug": "b", "size_bytes": 200, "raw_cdn_url": "https://cdn/b.txt"},
+    ]
+    shard_id = assign_shard("a")
+    selected = select_files_for_shard(file_list, shard_id)
+    assert any(item["slug"] == "a" for item in selected)
+    assert not any(item["slug"] == "b" and assign_shard("b") != shard_id for item in selected)
+
+def test_dedup_keeps_one_per_slug():
+    file_list = [
+        {"path": "x.txt", "slug": "x", "size_bytes": 10, "raw_cdn_url": "https://cdn/x.txt"},
+        {"path": "y.txt", "slug": "x", "size_bytes": 12, "raw_cdn_url": "https://cdn/y.txt"},
+    ]
+    out = run_worker_shard(file_list, shard_id=assign_shard("x"))
+    records = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    slugs = [r["slug"] for r in records]
+    assert slugs.count("x") == 1
+
+def test_output_filename_matches_pattern():
+    out_path = build_output_path(shard_id=7, ts="2025-01-01T143000")
+    assert re.match(r"batches/public-merged/\d{4}-\d{2}-\d{2}/shard-7-\d{6}\.jsonl", str(out_path))
+
+# test_network.py
+def test_cdn_download_no_auth_header(requests_mock):
+    requests_mock.get("https://huggingface.co/datasets/x.txt", text="data")
+    download_file("https://huggingface.co/datasets/x.txt", tmp_path / "x.txt")
+    req = requests_mock.request_history[0]
+    assert "Authorization" not in req.headers
+```
+
+---
+
+## 3. Integration tests
+
+**Happy paths**
+1. Full scheduled run (prepare → 16 shards):  
+   - `prepare` generates `file-list.json` artifact.  
+   - Each `ingest-shard` job receives artifact, computes shard assignment, do
