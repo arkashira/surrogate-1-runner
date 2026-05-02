@@ -124,82 +124,83 @@ Acceptance criteria (for downstream tester):
 - Transient HTTP errors (429/5xx) or curl failures trigger retries up to MAX_RETRIES with increasing backoff; after exhaustion the shard run exits non-zero and logs the failure.
 - HF API calls (list_repo_tree) are made at most once per RUN_ID; subsequent shard workers read the cached FILE_LIST and do not call the API again.
 
-## qa — qa @ 2026-05-02T18:58:29.827085Z
+## qa — qa @ 2026-05-02T18:59:00.982610Z
 
 PASS: criteria clear and implementable
 
 1. **Acceptance criteria**
-- Running the script on two different UTC calendar days produces outputs under distinct `batches/public-merged/YYYY/MM/DD/` directories; no file overwrites across days (measurable by path prefix equality checks).
-- Within a single RUN_ID, repeated invocations with the same SHARD_ID produce identical shard filenames (excluding timestamp collisions) and do not invoke `list_repo_tree` more than once (measurable by API call counts and FILE_LIST mtime).
-- Every non-empty shard file contains only `{prompt,response}` fields (or is empty) and is valid JSONL (measurable by JSONL schema validation and field enumeration).
-- Transient HTTP 429/5xx or fetch failures trigger retries up to MAX_RETRIES with increasing backoff; after exhaustion the script exits non-zero and logs failure (measurable by exit codes, log assertions, and retry counters).
-- HF API `list_repo_tree` is invoked at most once per RUN_ID; subsequent shard workers read the cached FILE_LIST (measurable by network interception or mock call counts).
-- Output directory structure matches `batches/public-merged/YYYY/MM/DD/shardN-RUNID-TS.jsonl` and filenames are unique per (RUN_ID, SHARD_ID, TS) (measurable by regex and uniqueness checks).
-- Script fails fast on unrecoverable errors (e.g., missing FILE_LIST generation) with non-zero exit and clear log message (measurable by exit codes and log content).
+- Output path uniqueness: running the script on UTC day D1 vs D2 produces distinct `batches/public-merged/YYYY/MM/DD/` folders (no file overwrites across days).
+- Idempotent shard filename: within a single RUN_ID, repeated invocations with the same SHARD_ID produce identical shard filenames and do not re-create FILE_LIST.
+- FILE_LIST single-call guarantee: HF API `list_repo_tree` is invoked at most once per RUN_ID; subsequent runs read cached FILE_LIST (verified by call count).
+- JSONL validity: each non-empty shard file contains valid JSONL records where every line is a JSON object; if projection is applied, records contain only allowed fields (e.g., `{prompt,response}`).
+- Retry/backoff behavior: transient HTTP 429/5xx or network failures trigger retries up to MAX_RETRIES with exponential-ish backoff; after exhaustion the script exits non-zero and logs failure.
+- CDN-only fetch enforcement: data-fetching commands (curl/wget) use CDN-resolved URLs and do not hit HF API content endpoints; verified by request host allowlist.
+- Deterministic RUN_ID: RUN_ID equals UTC `YYYYMMDD` and is used consistently in FILE_LIST and shard filenames.
 
-2. **Unit tests** (pytest-style pseudo-code)
+2. **Unit tests** (pseudo-code, Bash + Python style)
 ```python
-# test_dataset_enrich.py
-import os, json, tempfile, subprocess, time, re
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+# test_dataset_enrich_unit.py (pytest-style pseudo)
 
-DATE_RE = re.compile(r"batches/public-merged/\d{4}/\d{2}/\d{2}/")
-SHARD_RE = re.compile(r"shard(\d+)-(\d{8})-(\d{6})\.jsonl")
+def test_date_partition_is_utc_yyyy_mm_dd(monkeypatch):
+    monkeypatch.setenv("TZ", "UTC")
+    out = run_script_capture("bin/dataset-enrich.sh", env={"SHARD_ID": "0"})
+    assert re.search(r"batches/public-merged/\d{4}/\d{2}/\d{2}/", out)
 
-def test_date_partition_changes_daily():
-    with patch("dataset_enrich.date") as mock_date:
-        mock_date.utcnow.return_value.strftime.side_effect = lambda f: {
-            "%Y/%m/%d": "2023/01/01", "%Y%m%d": "20230101", "%H%M%S": "120000"
-        }[f]
-        out = dataset_enrich.build_paths()
-        assert out["OUT_DIR"] == "batches/public-merged/2023/01/01"
+def test_run_id_matches_utc_yyyymmdd(monkeypatch):
+    monkeypatch.setenv("TZ", "UTC")
+    ts = datetime.utcnow().strftime("%Y%m%d")
+    out = run_script_capture("bin/dataset-enrich.sh", env={"SHARD_ID": "0"})
+    assert f"RUN_ID={ts}" in out or f"shard0-{ts}-" in out
 
-        mock_date.utcnow.return_value.strftime.side_effect = lambda f: {
-            "%Y/%m/%d": "2023/01/02", "%Y%m%d": "20230102", "%H%M%S": "120000"
-        }[f]
-        out2 = dataset_enrich.build_paths()
-        assert out2["OUT_DIR"] == "batches/public-merged/2023/01/02"
-        assert out["OUT_DIR"] != out2["OUT_DIR"]
-
-def test_file_list_cached_per_run_id(tmp_path):
-    cache = tmp_path / ".cache"
-    cache.mkdir()
-    run_id = "20230101"
-    file_list = cache / f"file-list-{run_id}.json"
-    file_list.write_text(json.dumps(["a.jsonl", "b.jsonl"]))
-
-    with patch("dataset_enrich.os.environ", {"RUN_ID": run_id}), \
-         patch("dataset_enrich.Path") as MockPath, \
-         patch("dataset_enrich.HfApi") as MockApi:
-        MockPath.return_value.exists.return_value = True
-        MockPath.return_value.__truediv__.return_value = file_list
-        dataset_enrich.ensure_file_list()
-        assert MockApi.call_count == 0
-
-def test_retry_backoff_increases():
-    calls = []
-    def failing():
-        calls.append(1)
-        raise RuntimeError("nope")
-    try:
-        dataset_enrich.retry(failing, max_retries=3, backoff=1)
-    except RuntimeError:
-        pass
-    assert len(calls) == 3
+def test_file_list_created_once_per_run_id(tmp_path, monkeypatch):
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / ".cache"))
+    run_script("bin/dataset-enrich.sh", env={"SHARD_ID": "0"})
+    fl = tmp_path / ".cache" / f"file-list-{datetime.utcnow():%Y%m%d}.json"
+    assert fl.exists()
+    first_mtime = fl.stat().st_mtime
+    run_script("bin/dataset-enrich.sh", env={"SHARD_ID": "1"})
+    assert fl.stat().st_mtime == first_mtime  # not regenerated
 
 def test_shard_filename_pattern():
-    with patch("dataset_enrich.date") as mock_date:
-        mock_date.utcnow.return_value.strftime.side_effect = lambda f: {
-            "%Y/%m/%d": "2023/01/01", "%Y%m%d": "20230101", "%H%M%S": "123456"
-        }[f]
-        out = dataset_enrich.build_paths(shard_id=5)
-        assert SHARD_RE.search(out["OUT_FILE"]) is not None
-        m = SHARD_RE.search(out["OUT_FILE"])
-        assert int(m.group(1)) == 5
-        assert m.group(2) == "20230101"
+    out = run_script_capture("bin/dataset-enrich.sh", env={"SHARD_ID": "3", "TOTAL_SHARDS": "16"})
+    assert re.search(r"shard3-\d{8}-\d{6}\.jsonl", out)
 
-def test_jsonl_valid_and_limited_fields(tmp_path):
-    p = tmp_path / "shard.jsonl"
-    p.write_text('{"prompt":"hi","response":"ok"}\n{"prompt":"q"}\n')
-    lines = data
+def test_retry_exhaustion_returns_nonzero_and_logs(monkeypatch):
+    monkeypatch.setenv("MAX_RETRIES", "2")
+    monkeypatch.setenv("RETRY_BACKOFF", "1")
+    # mock curl to always fail
+    result = run_script("bin/dataset-enrich.sh", env={"SHARD_ID": "0"}, inject_failing_curl=True)
+    assert result.returncode != 0
+    assert "failed after 2 attempts" in result.stderr
+
+def test_jsonl_valid_when_present(tmp_path):
+    shard = tmp_path / "shard0-20250101-120000.jsonl"
+    shard.write_text('{"prompt":"x","response":"y"}\n{"prompt":"a","response":"b"}\n')
+    records = [json.loads(l) for l in shard.read_text().strip().splitlines() if l.strip()]
+    for r in records:
+        assert set(r.keys()).issubset({"prompt", "response"})
+```
+
+```bash
+# shell-focused unit checks (can be implemented with bats)
+# bats test_filename.bats
+@test "date partition uses UTC" {
+  TZ=UTC run ./bin/dataset-enrich.sh
+  [[ "$output" =~ batches/public-merged/[0-9]{4}/[0-9]{2}/[0-9]{2}/ ]]
+}
+
+@test "file list reused within same RUN_ID" {
+  export RUN_ID=20250101
+  run ./bin/dataset-enrich.sh
+  [ -f .cache/file-list-20250101.json ]
+  mtime1=$(stat -c %Y .cache/file-list-20250101.json)
+  run ./bin/dataset-enrich.sh
+  mtime2=$(stat -c %Y .cache/file-list-20250101.json)
+  [ "$mtime1" -eq "$mtime2" ]
+}
+```
+
+3. **Integration tests** (3 happy + 3 edge)
+
+Happy paths:
+- Happy 1 — Fresh run across two UTC days (simulated TZ
