@@ -123,10 +123,70 @@ APPROVE: workable step forward that addresses core ingestion/training inefficien
 - Launcher implements Lightning Studio reuse (prefer running instance) and includes an idle/restart guard before `.run()` to avoid quota burn from repeated recreation.  
 - Acceptance tests: run `build_manifest.py` for a known date and verify JSON schema + non-zero files; run a small training job with `TRAIN_DATE` set and confirm zero HF API calls (monitor logs/metrics) and correct column projection; start launcher twice and confirm second run reuses existing studio when running.
 
-## security — axentx-security @ 2026-05-02T11:40:06.362644Z
+## qa — qa @ 2026-05-02T11:40:46.632331Z
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDNParquetIterable fetching arbitrary URLs from a manifest could allow SSRF if an attacker controls filelist.json or repo content.", "mitigation": "Restrict CDN fetches to an allow-listed domain and validate/normalize URLs before request."}, {"severity": "low", "class": "other", "detail": "Manifest reuse across training jobs means integrity of manifests/{date}/filelist.json is trusted; tampering could alter training data or cause unsafe column projection.", "mitigation": "Sign manifests and verify signatures before use; enforce read-only storage and access controls."}], "summary": "No critical or high issues; medium SSRF risk from CDN fetches and low integrity risk from reusable manifests."}
+PASS: proposal is workable and acceptance criteria are measurable.
 
-## qa — security @ 2026-05-02T11:40:06.362679Z
+1. **Acceptance criteria**
+- `build_manifest.py` invoked for a date produces `manifests/{date}/filelist.json` with required keys (`repo`, `date`, `generated_utc`, `files`) and `files` is a non-empty sorted list of strings.
+- Training loader (`CDNParquetIterable`) consumes only the manifest and makes zero authenticated HF API calls during training (verified by request logs/metrics).
+- Training loader projects rows to exactly `{prompt: str, response: str}` and drops extra/mixed columns; corrupt parquet files are skipped without crashing the iterable.
+- Launcher reuses a running Lightning Studio instance when available (second `.run()` call does not create a new studio) and returns the existing instance ID.
+- Launcher idle/restart guard checks studio liveness before `.run()`; if studio is stopped/idle it restarts or raises a clear error instead of blindly recreating and burning quota.
+- Manifest builder can be run once per date and reused across multiple training jobs without re-listing the repo tree (manifest file is the single source of file list).
+- CDN fetch URLs are valid and return 200 for files listed in the manifest (no 404/403 for accessible files).
 
-{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDNParquetIterable fetching arbitrary URLs from a manifest could allow SSRF if an attacker controls filelist.json or repo content.", "mitigation": "Restrict CDN fetches to an allow-listed domain and validate/normalize URLs before request."}, {"severity": "low", "class": "other", "detail": "Manifest reuse across training jobs means integrity of manifests/{date}/filelist.json is trusted; tampering could alter training data or cause unsafe column projection.", "mitigation": "Sign manifests and verify signatures before use; enforce read-only storage and access controls."}], "summary": "No critical or high issues; medium SSRF risk from CDN fetches and low integrity risk from reusable manifests."}
+2. **Unit tests** (pytest-style pseudo-code)
+```python
+# tests/unit/test_build_manifest.py
+def test_manifest_keys_and_sorted(tmp_path, monkeypatch):
+    monkeypatch.setenv("HF_DATASET_REPO", "test/repo")
+    monkeypatch.setattr("huggingface_hub.HfApi.list_repo_tree", lambda *a, **k: [
+        type("f", (), {"rfilename": "2024-01-01/a.parquet"})(),
+        type("f", (), {"rfilename": "2024-01-01/b.parquet"})(),
+    ])
+    from backend.build_manifest import main
+    out = tmp_path / "manifests" / "2024-01-01" / "filelist.json"
+    monkeypatch.setattr("backend.build_manifest.OUT_DIR", tmp_path / "manifests" / "2024-01-01")
+    main()
+    manifest = json.loads(out.read_text())
+    assert set(manifest.keys()) == {"repo", "date", "generated_utc", "files"}
+    assert manifest["files"] == ["2024-01-01/a.parquet", "2024-01-01/b.parquet"]
+    assert manifest["files"] == sorted(manifest["files"])
+
+# tests/unit/test_cdn_loader.py
+def test_projection_strict_prompt_response():
+    table = pa.table({"prompt": ["p1"], "response": ["r1"], "extra": ["x"]})
+    buf = pa.BufferOutputStream()
+    pq.write_table(table, buf)
+    data = buf.getvalue().to_pybytes()
+    with patch("requests.get", return_value=type("r", (), {"status_code": 200, "content": data})()):
+        rows = list(CDNParquetIterable(manifest={"files": ["x.parquet"], "repo": "test/repo"}))
+        assert len(rows) == 1
+        assert set(rows[0].keys()) == {"prompt", "response"}
+        assert "extra" not in rows[0]
+
+def test_skips_corrupt_parquet_without_crash(caplog):
+    with patch("requests.get", return_value=type("r", (), {"status_code": 200, "content": b"corrupt"})()):
+        rows = list(CDNParquetIterable(manifest={"files": ["bad.parquet"], "repo": "test/repo"}))
+        assert len(rows) == 0
+        assert any("corrupt" in rec.message.lower() or "error" in rec.message.lower() for rec in caplog.records)
+
+# tests/unit/test_launcher.py
+def test_reuse_running_studio(launcher, mock_studio_api):
+    mock_studio_api.running_instance = {"id": "st-123", "status": "running"}
+    first = launcher.run()
+    second = launcher.run()
+    assert first == second == "st-123"
+    assert mock_studio_api.create_count == 1  # only one creation
+
+def test_idle_guard_restarts_stopped_studio(launcher, mock_studio_api):
+    mock_studio_api.running_instance = {"id": "st-999", "status": "stopped"}
+    mock_studio_api.restart = lambda i: {"id": i, "status": "running"}
+    result = launcher.run()
+    assert result == "st-999"
+    assert mock_studio_api.restart.called
+```
+
+3. **Integration tests** (3 happy + 3 edge)
+- Happy 1 — Manifest-to-training flow: run `build_manifest.py` for a known date; start training with `TRAIN_DATE`; assert training completes, manifest is read, zero HF API c
