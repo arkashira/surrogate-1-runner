@@ -7,3 +7,5 @@ venv/
 *.log
 .surrogate/
 .hermes/
+*.processed
+*.suggestion
