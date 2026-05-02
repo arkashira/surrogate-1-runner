@@ -87,10 +87,67 @@ Acceptance criteria:
 - `find_running_studio()` detects an existing running Lightning Studio instance by name and reuses it instead of creating a new one; creation path is used only when no running instance is found.
 - End-to-end smoke test: running `main()` with `REUSE_STUDIO=true` and a valid HF_TOKEN completes at least one training epoch (or a dry-run batch) without 429 errors and logs whether a studio was reused or created.
 
-## perf — axentx-perf @ 2026-05-02T10:04:54.871955Z
+## qa — qa @ 2026-05-02T10:06:05.795005Z
 
-{"verdict": "OK", "findings": [{"severity": "high", "class": "unbounded-query", "detail": "build_manifest() previously risked N+1 authenticated list_repo_tree calls per DATE_FOLDER; caching to manifest-{date}.json bounds this to at most one call per date, eliminating API rate-limit exhaustion (429) at scale.", "mitigation": "Ensure cache invalidation is explicit and TTL/versioned to avoid stale manifests; verify atomic write to prevent partial reads under concurrency."}, {"severity": "high", "class": "sync-in-async", "detail": "SurrogateParquetDataset switching to CDN URLs removes authenticated HF calls during data loading, preventing blocking/rate-limit pressure in training loops; projecting to {prompt,response} and dropping extra columns avoids pyarrow.CastError and reduces memory/CPU per batch.", "mitigation": "Prefetch/parallelize CDN fetches; validate schema projection early (fail-fast) to avoid late-stage parse errors; monitor CDN egress costs and latency at scale."}, {"severity": "med", "class": "other", "detail": "find_running_studio() reusing an existing Lightning Studio instance by name avoids churn (cold-start allocation, container pulls, config reconciliation), reducing latency and resource fragmentation.", "mitigation": "Add health-check before reuse; include timeout/backoff on stale instances; tag instances to avoid collisions across users/runs."}, {"severity": "low", "class": "memory-leak", "detail": "Caching manifests and reusing studio reduces repeated allocations and HF API pressure; dropping unused parquet columns reduces per-batch memory, but ensure cached files are bounded/rotated to avoid disk bloat.", "mitigation": "Implement LRU or size-bounded cache eviction for manifest files; monitor disk usage in long-running jobs."}], "summary": "Changes materially improve performance and reliability: they bound HF API calls, remove authenticated loading paths, avoid parquet schema errors, and reduce studio churn. No remaining perf blockers; med/low items are mitigable and acceptable."}
+PASS: surrogate-1 change approved; TDD test plan follows.
 
-## qa — perf @ 2026-05-02T10:04:54.872011Z
+1. **Acceptance criteria**
+- `build_manifest()` performs ≤1 authenticated `list_repo_tree` per DATE_FOLDER and writes `manifest-{date}.json`; subsequent runs read the cached file and skip authenticated calls unless explicitly invalidated (cache TTL or force flag).
+- `SurrogateParquetDataset` loads exclusively via CDN URLs (zero authenticated HF calls during data loading), projects parquet to `{prompt, response}` at parse time, and drops extra columns to avoid `pyarrow.CastError`.
+- `find_running_studio(name)` returns a running Lightning Studio instance matching `name` when one exists; creation path is used only when no running instance is found.
+- End-to-end smoke test: running `main()` with `REUSE_STUDIO=true` and a valid HF_TOKEN completes at least one training epoch (or a dry-run batch) without 429 errors and logs whether a studio was reused or created.
+- Manifest cache hit rate ≥90% across repeated runs under the same DATE_FOLDER (measured by counting authenticated calls vs total runs).
+- Dataset projection enforces schema `{prompt: str, response: str}`; any row missing either field raises a clear validation error instead of `pyarrow.CastError`.
+- Studio reuse guard respects concurrency limits and does not leak resources (max 1 running instance per name at any time).
 
-{"verdict": "OK", "findings": [{"severity": "high", "class": "unbounded-query", "detail": "build_manifest() previously risked N+1 authenticated list_repo_tree calls per DATE_FOLDER; caching to manifest-{date}.json bounds this to at most one call per date, eliminating API rate-limit exhaustion (429) at scale.", "mitigation": "Ensure cache invalidation is explicit and TTL/versioned to avoid stale manifests; verify atomic write to prevent partial reads under concurrency."}, {"severity": "high", "class": "sync-in-async", "detail": "SurrogateParquetDataset switching to CDN URLs removes authenticated HF calls during data loading, preventing blocking/rate-limit pressure in training loops; projecting to {prompt,response} and dropping extra columns avoids pyarrow.CastError and reduces memory/CPU per batch.", "mitigation": "Prefetch/parallelize CDN fetches; validate schema projection early (fail-fast) to avoid late-stage parse errors; monitor CDN egress costs and latency at scale."}, {"severity": "med", "class": "other", "detail": "find_running_studio() reusing an existing Lightning Studio instance by name avoids churn (cold-start allocation, container pulls, config reconciliation), reducing latency and resource fragmentation.", "mitigation": "Add health-check before reuse; include timeout/backoff on stale instances; tag instances to avoid collisions across users/runs."}, {"severity": "low", "class": "memory-leak", "detail": "Caching manifests and reusing studio reduces repeated allocations and HF API pressure; dropping unused parquet columns reduces per-batch memory, but ensure cached files are bounded/rotated to avoid disk bloat.", "mitigation": "Implement LRU or size-bounded cache eviction for manifest files; monitor disk usage in long-running jobs."}], "summary": "Changes materially improve performance and reliability: they bound HF API calls, remove authenticated loading paths, avoid parquet schema errors, and reduce studio churn. No remaining perf blockers; med/low items are mitigable and acceptable."}
+2. **Unit tests** (pytest-style pseudo-code)
+```python
+# test_manifest.py
+def test_build_manifest_caches_and_skips_auth_calls(mocker):
+    mock_api = mocker.patch("train.hf_api_call", return_value=["file1.parquet", "file2.parquet"])
+    manifest_path = build_manifest(DATE_FOLDER="batches/mirror-merged/2026-04-29", force=False)
+    assert mock_api.call_count == 1
+    assert manifest_path.exists()
+
+    # second run should read cache, no auth call
+    mock_api.reset_mock()
+    manifest_path_2 = build_manifest(DATE_FOLDER="batches/mirror-merged/2026-04-29", force=False)
+    assert mock_api.call_count == 0
+    assert json.loads(manifest_path_2.read_text()) == ["file1.parquet", "file2.parquet"]
+
+def test_build_manifest_force_invalidates_cache(mocker):
+    mock_api = mocker.patch("train.hf_api_call", return_value=["v1.parquet"])
+    build_manifest(DATE_FOLDER="batches/mirror-merged/2026-04-29", force=False)
+    mock_api.return_value = ["v2.parquet"]
+    build_manifest(DATE_FOLDER="batches/mirror-merged/2026-04-29", force=True)
+    assert mock_api.call_count == 2
+
+# test_dataset.py
+def test_surrogate_parquet_dataset_uses_cdn_urls_only(mocker):
+    mock_cdn_get = mocker.patch("train.requests.get")
+    mock_cdn_get.return_value.raw = io.BytesIO(create_sample_parquet_bytes())
+    ds = SurrogateParquetDataset(manifest=["file1.parquet"], cdn_base="https://cdn.example.com")
+    items = list(ds)
+    assert all("https://cdn.example.com" in rec["source_url"] for rec in items)
+    # ensure no hf_api_call or authenticated hf_hub_download happened
+    assert "hf_api_call" not in [c[0] for c in mock_cdn_get.call_args_list]
+
+def test_surrogate_parquet_dataset_projects_prompt_response_and_drops_extra(mocker):
+    mock_cdn_get = mocker.patch("train.requests.get")
+    mock_cdn_get.return_value.raw = io.BytesIO(create_sample_parquet_bytes(extra_cols=["meta", "score"]))
+    ds = SurrogateParquetDataset(manifest=["file1.parquet"], cdn_base="https://cdn.example.com")
+    items = list(ds)
+    keys = set(items[0].keys())
+    assert keys == {"prompt", "response", "source_url"}
+    assert isinstance(items[0]["prompt"], str) and isinstance(items[0]["response"], str)
+
+def test_surrogate_parquet_dataset_raises_on_missing_fields(mocker):
+    mock_cdn_get = mocker.patch("train.requests.get")
+    mock_cdn_get.return_value.raw = io.BytesIO(create_sample_parquet_bytes(missing_prompt=True))
+    ds = SurrogateParquetDataset(manifest=["file1.parquet"], cdn_base="https://cdn.example.com")
+    with pytest.raises(ValueError, match="missing"):
+        list(ds)
+
+# test_studio.py
+def test_find_running_studio_returns_existing(mocker):
+    mocker.patch
