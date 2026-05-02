@@ -120,10 +120,91 @@ Acceptance criteria (downstream tester can check):
 - Script exits with code 0 on success and non-zero on hard failure; logs include timestamps and level labels suitable for cron capture.
 - If Lightning is available and LIGHTNING_USE=1, the script checks for an existing Studio by STUDIO_NAME and avoids launching a duplicate idle-stop cycle (or logs the decision clearly).
 
-## perf — axentx-perf @ 2026-05-02T12:04:24.518319Z
+## qa — qa @ 2026-05-02T12:04:34.067122Z
 
-{"verdict": "OK", "findings": [{"severity": "low", "class": "unbounded-query", "detail": "Manifest generation for DATE_FOLDER may list all repo files without pagination/limit; if folder contains many assets this could increase latency and memory during cron runs.", "mitigation": "Cap file count or stream entries; add timeout and size budget for manifest writes."}, {"severity": "low", "class": "sync-in-async", "detail": "If called from async contexts, HF hub calls and filesystem writes are likely blocking; could stall event loop under load.", "mitigation": "Run I/O in threadpool or use async-native hf client and aiofiles."}, {"severity": "low", "class": "memory-leak", "detail": "Manifest kept in memory and logged in full; large manifests may bloat cron logs and process RSS.", "mitigation": "Log summary only; stream JSON to disk and avoid retaining full object post-write."}], "summary": "No high-risk perf issues; acceptable for production with low-severity caveats around unbounded listing, blocking I/O, and log/memory footprint."}
+PASS: criteria clear and implementable
 
-## qa — perf @ 2026-05-02T12:04:24.518355Z
+1. **Acceptance criteria**
+- Running with `HF_TOKEN` and `DATE_FOLDER` set produces a valid JSON file at `MANIFEST_PATH` containing a non-empty list of repo files for `DATE_FOLDER`, or logs a clear error and exits non-zero if HF unavailable.
+- Manifest entries include CDN-capable URLs (e.g., `https://cdn-lfs.huggingface.co/...` or `hf_hub_url`-style references) and contain no bearer tokens or secrets in file content or stdout/stderr.
+- `pick_sibling(slug)` returns one of the configured `SIBLING_REPOS` deterministically for any slug and never raises `IndexError` (empty repo list handled).
+- Script exits with code 0 on success and non-zero on hard failure; logs include ISO timestamps and level labels (`INFO`, `ERROR`, etc.) suitable for cron capture.
+- If `LIGHTNING_USE=1` and Lightning is available, the script checks for an existing Studio by `STUDIO_NAME` and avoids launching a duplicate idle-stop cycle (logs decision clearly).
+- Script enforces a timeout/network retry policy for HF API calls and surfaces failures as non-zero exit codes.
+- Manifest file is written atomically (temp + rename) to avoid partial/corrupt reads by downstream training jobs.
 
-{"verdict": "OK", "findings": [{"severity": "low", "class": "unbounded-query", "detail": "Manifest generation for DATE_FOLDER may list all repo files without pagination/limit; if folder contains many assets this could increase latency and memory during cron runs.", "mitigation": "Cap file count or stream entries; add timeout and size budget for manifest writes."}, {"severity": "low", "class": "sync-in-async", "detail": "If called from async contexts, HF hub calls and filesystem writes are likely blocking; could stall event loop under load.", "mitigation": "Run I/O in threadpool or use async-native hf client and aiofiles."}, {"severity": "low", "class": "memory-leak", "detail": "Manifest kept in memory and logged in full; large manifests may bloat cron logs and process RSS.", "mitigation": "Log summary only; stream JSON to disk and avoid retaining full object post-write."}], "summary": "No high-risk perf issues; acceptable for production with low-severity caveats around unbounded listing, blocking I/O, and log/memory footprint."}
+2. **Unit tests** (pytest-style pseudo-code)
+```python
+# test_discovery.py
+import json
+import os
+import tempfile
+from pathlib import Path
+from unittest import mock
+
+import pytest
+
+import sys
+sys.modules["lightning"] = mock.MagicMock()  # optional dep
+
+from discovery_001 import pick_sibling, build_manifest, write_manifest_atomic, main
+
+def test_pick_sibling_deterministic():
+    repos = ["a/one", "a/two", "a/three"]
+    assert pick_sibling("xyz", repos) == pick_sibling("xyz", repos)
+    assert pick_sibling("xyz", repos) in repos
+
+def test_pick_sibling_never_index_error_empty():
+    assert pick_sibling("any", []) is None
+
+def test_pick_sibling_never_index_error_none():
+    assert pick_sibling("any", None) is None
+
+def test_build_manifest_filters_by_date_folder():
+    tree = {
+        "entries": [
+            {"path": "2023-10-01/file1.json", "type": "file"},
+            {"path": "2023-10-02/file2.json", "type": "file"},
+            {"path": "README.md", "type": "file"},
+        ]
+    }
+    manifest = build_manifest(tree, "2023-10-01", "owner/repo")
+    paths = [e["path"] for e in manifest["files"]]
+    assert "2023-10-01/file1.json" in paths
+    assert "2023-10-02/file2.json" not in paths
+    assert len(manifest["files"]) >= 1
+
+def test_build_manifest_includes_cdn_urls_no_tokens():
+    tree = {"entries": [{"path": "2023-10-01/file1.json", "type": "file"}]}
+    manifest = build_manifest(tree, "2023-10-01", "owner/repo")
+    for f in manifest["files"]:
+        assert "cdn" in f["url"].lower() or "hf.co" in f["url"]
+        assert "token" not in f["url"].lower()
+        assert "HF_TOKEN" not in f["url"]
+
+def test_write_manifest_atomic_creates_valid_json():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "manifest.json"
+        data = {"files": [{"path": "a", "url": "https://cdn.example/a"}]}
+        write_manifest_atomic(p, data)
+        assert p.exists()
+        loaded = json.loads(p.read_text())
+        assert loaded == data
+
+def test_write_manifest_atomic_tempfile_removed_on_success():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "manifest.json"
+        data = {"files": []}
+        write_manifest_atomic(p, data)
+        temps = list(Path(td).glob("*.tmp*"))
+        assert len(temps) == 0
+
+@mock.patch("discovery_001.fetch_repo_tree")
+@mock.patch("discovery_001.write_manifest_atomic")
+@mock.patch("discovery_001.check_studio_and_reuse")
+def test_main_success_exit0(mock_studio, mock_write, mock_fetch):
+    mock_fetch.return_value = {"entries": [{"path": "2023-10-01/f.json", "type": "file"}]}
+    mock_write.return_value = None
+    mock_studio.return_value = None
+    with mock.patch.dict(os.environ, {"HF_TOKEN": "x", "DATE_FOLDER": "2023-10-01", "MANIFEST_DIR": tempfile.mkdtemp()}):
+        with pytest.rai
