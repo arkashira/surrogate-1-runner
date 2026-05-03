@@ -1,113 +1,125 @@
 #!/usr/bin/env bash
-# CDN-only ingestion; no HF API auth during streaming
 set -euo pipefail
 
-REPO="${REPO:-axentx/surrogate-1-training-pairs}"
-DATE="${DATE:-$(date +%Y-%m-%d)}"
-SHARD_ID="${SHARD_ID:-0}"
+# Config
+REPO="${HF_DATASET_REPO:-axentx/surrogate-1-training-pairs}"
 TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
-MANIFEST="${MANIFEST:-manifest-${DATE}.json}"
-OUT_DIR="${OUT_DIR:-output}"
-TMP_DIR="${TMP_DIR:-/tmp/surrogate-ingest}"
+SHARD_ID="${SHARD_ID:-0}"
+MANIFEST="${MANIFEST_JSON:-manifest.json}"
+DATEFOLDER="${DATEFOLDER:-$(date +%Y-%m-%d)}"
+OUTDIR="batches/public-merged/${DATEFOLDER}"
+TIMESTAMP=$(date +%H%M%S)
+OUTFILE="${OUTDIR}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
 
-mkdir -p "$OUT_DIR" "$TMP_DIR"
+mkdir -p "$(dirname "$OUTFILE")"
 
-# Validate manifest
+# Compute shard assignment from path
+should_process() {
+  local path="$1"
+  local hash
+  hash=$(echo -n "$path" | md5sum | cut -c1-8)
+  local shard=$(( 0x$hash % TOTAL_SHARDS ))
+  [[ $shard -eq $SHARD_ID ]]
+}
+
+# Project record to {prompt, response} (best-effort)
+project_record() {
+  local line="$1"
+  local prompt response slug
+  # Try common keys; fallback to raw fields
+  prompt=$(echo "$line" | python3 -c "
+import sys, json
+r=json.loads(sys.stdin.read())
+print(json.dumps(r.get('prompt') or r.get('input') or r.get('text') or ''))
+" 2>/dev/null || echo '""')
+  response=$(echo "$line" | python3 -c "
+import sys, json
+r=json.loads(sys.stdin.read())
+print(json.dumps(r.get('response') or r.get('output') or r.get('completion') or ''))
+" 2>/dev/null || echo '""')
+  slug=$(echo "$line" | python3 -c "
+import sys, json, hashlib
+r=json.loads(sys.stdin.read())
+print(hashlib.md5((r.get('prompt','')+r.get('response','')).encode()).hexdigest()[:12])
+" 2>/dev/null || echo 'unknown')
+  echo "{\"prompt\":${prompt},\"response\":${response},\"slug\":\"${slug}\",\"shard\":${SHARD_ID}}"
+}
+
+# Process manifest entries
 if [[ ! -f "$MANIFEST" ]]; then
-  echo "ERROR: Manifest $MANIFEST not found. Generate with bin/gen-manifest.sh"
+  echo "MANIFEST not found: $MANIFEST" >&2
   exit 1
 fi
 
-# Load file list from manifest (deterministic)
-mapfile -t ALL_FILES < <(
-  python3 -c "
+# Read paths from manifest (supports both list and object with 'paths')
+paths=$(python3 -c "
 import json, sys
 with open(sys.argv[1]) as f:
-    data = json.load(f)
-for fn in sorted(data['files']):
-    print(fn)
-" "$MANIFEST"
-)
+    data=json.load(f)
+if isinstance(data, list):
+    for p in data: print(p)
+elif isinstance(data, dict) and 'paths' in data:
+    for p in data['paths']: print(p)
+else:
+    # fallback: try to iterate keys
+    for p in data: print(p)
+" "$MANIFEST")
 
-TOTAL_FILES="${#ALL_FILES[@]}"
-if [[ "$TOTAL_FILES" -eq 0 ]]; then
-  echo "No files in manifest for $DATE"
-  exit 0
-fi
-
-# Deterministic shard assignment (stable by filename)
-mapfile -t MY_FILES < <(
-  for f in "${ALL_FILES[@]}"; do
-    HASH=$(echo -n "$f" | md5sum | awk '{print $1}')
-    SHARD=$(( 0x${HASH:0:8} % TOTAL_SHARDS ))
-    if [[ "$SHARD" -eq "$SHARD_ID" ]]; then
-      echo "$f"
-    fi
-  done
-)
-
-echo "Shard $SHARD_ID/$TOTAL_SHARDS processing ${#MY_FILES[@]} files (out of $TOTAL_FILES total)"
-
-# Process via CDN only
-for REL_PATH in "${MY_FILES[@]}"; do
-  FILENAME=$(basename "$REL_PATH")
-  CDN_URL="https://huggingface.co/datasets/${REPO}/resolve/main/${REL_PATH}"
-  TMP_FILE="${TMP_DIR}/${FILENAME}.dl"
-
-  echo "Downloading ${REL_PATH} via CDN..."
-  curl -fsSL --retry 3 --retry-delay 5 -o "$TMP_FILE" "$CDN_URL"
-
-  # Project to {prompt,response} at parse time
-  OUT_TMP="${TMP_DIR}/${FILENAME}.projected.jsonl"
-  python3 - "$TMP_FILE" "$OUT_TMP" <<'PY'
-import sys, json, pyarrow.parquet as pq
-
-src, dst = sys.argv[1], sys.argv[2]
-
-def normalize(obj):
-    prompt = obj.get("prompt") or obj.get("input") or obj.get("text") or ""
-    response = obj.get("response") or obj.get("output") or obj.get("completion") or ""
-    if not prompt and not response:
-        return None
-    return {"prompt": str(prompt), "response": str(response)}
-
-rows = []
-if src.endswith(".parquet"):
-    tbl = pq.read_table(src)
-    schema_names = [f.name for f in tbl.schema]
-    # Read all rows; normalize will pick fields
-    for batch in tbl.to_batches():
-        for row in batch.to_pylist():
-            rows.append(normalize(row))
-elif src.endswith(".jsonl"):
-    with open(src, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(normalize(json.loads(line)))
-            except Exception:
-                continue
-elif src.endswith(".json"):
-    with open(src, encoding="utf-8") as f:
-        data = json.load(f)
-    if isinstance(data, list):
-        rows = [normalize(obj) for obj in data]
-    else:
-        rows = [normalize(data)]
-
-rows = [r for r in rows if r is not None]
-with open(dst, "w", encoding="utf-8") as f:
-    for r in rows:
-        f.write(json.dumps(r, ensure_ascii=False) + "\n")
-PY
-
-  if [[ -s "$OUT_TMP" ]]; then
-    cat "$OUT_TMP" >> "${OUT_DIR}/shard${SHARD_ID}-projected.jsonl"
+processed=0
+while IFS= read -r relpath; do
+  [[ -z "$relpath" ]] && continue
+  if ! should_process "$relpath"; then
+    continue
   fi
 
-  rm -f "$TMP_FILE" "$OUT_TMP"
-done
+  url="https://huggingface.co/datasets/${REPO}/resolve/main/${relpath}"
+  echo "Processing shard ${SHARD_ID}: ${relpath}" >&2
 
-echo "Shard $SHARD_ID complete"
+  # Stream download and parse line-by-line (assumes jsonl/parquet handled via python)
+  # For parquet files we use python to convert to jsonl projection.
+  case "$relpath" in
+    *.parquet)
+      python3 -c "
+import pyarrow.parquet as pq
+import sys, json, io, urllib.request
+url = sys.argv[1]
+import tempfile, os
+with tempfile.NamedTemporaryFile(delete=False, suffix='.parquet') as tmp:
+    tmp_path = tmp.name
+try:
+    import urllib.request
+    urllib.request.urlretrieve(url, tmp_path)
+    table = pq.read_table(tmp_path, columns=['prompt','response'] if set(['prompt','response']).issubset(pq.read_schema(tmp_path).names) else None)
+    for batch in table.to_batches(max_chunksize=8192):
+        df = batch.to_pandas()
+        for _, row in df.iterrows():
+            rec = row.to_dict()
+            prompt = rec.get('prompt') or rec.get('input') or ''
+            response = rec.get('response') or rec.get('output') or ''
+            print(json.dumps({'prompt': prompt, 'response': response}))
+finally:
+    try: os.unlink(tmp_path)
+    except: pass
+" "$url" 2>/dev/null | while IFS= read -r line; do
+        [[ -n "$line" ]] && echo "$line"
+      done
+      ;;
+    *.jsonl|*.json)
+      curl -fsSL "$url" | while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        project_record "$line"
+      done
+      ;;
+    *)
+      # Generic fallback: try to parse as jsonl
+      curl -fsSL "$url" | while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        project_record "$line"
+      done
+      ;;
+  esac
+
+  processed=$((processed + 1))
+done <<< "$paths"
+
+echo "Shard ${SHARD_ID} processed ${processed} files" >&2
