@@ -1,36 +1,33 @@
 import time
-import requests
-from pathlib import Path
+import urllib.request
+import urllib.error
+import hashlib
+import os
 from typing import Optional
 
-CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+def stable_hash_int(s: str) -> int:
+    return int(hashlib.sha256(s.encode()).hexdigest(), 16)
 
-def cdn_download(
-    repo: str,
-    path: str,
-    out_path: Path,
-    max_retries: int = 5,
-    backoff: float = 1.0,
-) -> Path:
-    """
-    Download a dataset file via public CDN (no auth).
-    Retries on transient failures.
-    """
-    url = CDN_TEMPLATE.format(repo=repo, path=path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    for attempt in range(1, max_retries + 1):
+def cdn_fetch(url: str, out_path: str, max_retries: int = 5, timeout: int = 30) -> bool:
+    attempt = 0
+    while attempt < max_retries:
         try:
-            resp = requests.get(url, stream=True, timeout=30)
-            resp.raise_for_status()
-            with open(out_path, "wb") as f:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            return out_path
-        except Exception as exc:
-            if attempt == max_retries:
-                raise
-            sleep_sec = backoff * (2 ** (attempt - 1))
-            print(f"Download failed ({exc}), retry {attempt}/{max_retries} in {sleep_sec}s: {url}")
-            time.sleep(sleep_sec)
-    raise RuntimeError("Unreachable")
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "training-ingest/1.0 (+https://huggingface.co/datasets)"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                with open(out_path, "wb") as f:
+                    f.write(resp.read())
+            return True
+        except urllib.error.HTTPError as e:
+            # Do not retry 4xx except 429; 404 is permanent
+            if e.code in (400, 401, 403, 404, 422):
+                return False
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+
+        attempt += 1
+        sleep_sec = min(2 ** attempt, 60)
+        time.sleep(sleep_sec)
+    return False
