@@ -108,87 +108,21 @@ def project_to_pair(raw_bytes, ext):
             for item in obj:
                 prompt = item.get(
 
-## review — reviewer @ 2026-05-03T03:58:43.723807Z
+## review — reviewer @ 2026-05-03T03:58:51.759011Z
 
-APPROVE: This code represents a good first step toward implementing a manifest-driven, CDN-bypass ingestion worker for the surrogate-1 project. 
+APPROVE: This is a workable, incremental step that replaces the shell script with a manifest-driven, shard-aware worker, adds CDN-bypass downloads, dedup via SQLite, and deterministic output filenames — all of which address quality and reliability for multi-shard ingestion.
 
-* The code is well-structured and readable, with clear comments and docstrings explaining the purpose of each function.
-* The use of a single API call to list files in the date folder and the implementation of a CDN bypass to avoid 429 errors during data load are notable improvements.
-* The code handles file projection to {prompt, response} pairs for different file extensions (JSONL, JSON, Parquet) and computes content md5 for deduplication against the central SQLite store.
-* The code writes output to a deterministic filename to prevent cross-shard collisions and logs summary counts (processed, skipped, uploaded) for monitoring purposes.
-* The code exits non-zero on fatal errors, ensuring that errors are properly propagated and handled in the workflow.
-* The use of environment variables for configuration (e.g., SHARD_ID, SHARD_TOTAL, HF_TOKEN) makes the code more flexible and easier to deploy in different environments. 
+Acceptance criteria (downstream tester can check):
+- With `SHARD_ID`/`SHARD_TOTAL` set, each worker only processes files where `hash(slug) % SHARD_TOTAL == SHARD_ID` (deterministic shard assignment).
+- A single non-recursive `list_repo_tree` call produces `file-list.json` (or equivalent) used by workers; no per-file listing API calls.
+- Downloads use CDN URLs (`https://huggingface.co/datasets/.../resolve/main/...`) with no Authorization header and succeed without 429 during data load.
+- Output is newline JSON written to `batches/public-merged/{DATE_FOLDER}/shard{N}-{HHMMSS}.jsonl` with `{prompt,response}` fields; filenames are deterministic per shard/timestamp to avoid collisions.
+- Dedup via central SQLite store prevents duplicate `md5` entries; summary logs include counts for processed/skipped/errored and exit non-zero on fatal errors.
 
-Some potential areas for improvement could be noted in the acceptance criteria, such as:
-* Adding more comprehensive tests to cover different scenarios and edge cases.
-* Implementing additional error handling and logging mechanisms to improve debuggability and monitoring.
-* Considering performance optimizations to improve the ingestion worker's throughput and efficiency.
-* Adding more documentation and comments to explain the code's assumptions and limitations.
+## security — axentx-security @ 2026-05-03T03:58:57.303979Z
 
-## qa — qa @ 2026-05-03T03:59:34.300812Z
+{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN-bypass downloads from user-controlled HuggingFace dataset paths may reach internal endpoints if hostname resolution or redirects are not constrained.", "mitigation": "Pin exact CDN domain, disable redirects, and enforce an egress allowlist/DNS rebinding protection for fetch calls."}, {"severity": "low", "class": "other", "detail": "Deterministic shard assignment via hash modulo can enable shard-targeted enumeration or bias if slug values are attacker-controlled.", "mitigation": "Use a keyed hash (HMAC with a secret) for shard assignment and validate slugs to avoid predictable partitioning attacks."}, {"severity": "low", "class": "other", "detail": "Central SQLite dedup store shared across workers may allow race conditions or integrity issues under concurrent access.", "mitigation": "Use WAL mode with proper transactions and unique constraints on md5, and enforce serialized writes or advisory locks where needed."}], "summary": "No critical or high-severity flaws; medium SSRF risk from CDN fetches and low risks around shard targeting and SQLite concurrency are noted and mitigable."}
 
-PASS: 
-## Acceptance criteria
-* The `bin/dataset-enrich.py` script accepts the required environment variables `SHARD_ID`, `SHARD_TOTAL`, and optional `DATE_FOLDER`.
-* The script uses a single API call to list files in the specified date folder and saves the file list as a JSON artifact.
-* Each shard worker loads the manifest, filters files based on the deterministic slice, and downloads assigned files via CDN bypass.
-* The script projects each file to `{prompt, response}` pairs, computes content md5 for deduplication, and streams output as newline JSON.
-* The output is written to a deterministic filename in the `batches/public-merged` directory to prevent cross-shard collisions.
-* The script logs summary counts (processed, skipped, uploaded) and exits non-zero on fatal errors.
+## qa — security @ 2026-05-03T03:58:57.304013Z
 
-## Unit tests
-```python
-import unittest
-from unittest.mock import patch, MagicMock
-from bin.dataset_enrich import slug_hash, _is_duplicate, _mark_seen
-
-class TestDatasetEnrich(unittest.TestCase):
-    @patch('bin.dataset_enrich.list_repo_tree')
-    def test_list_date_files(self, mock_list_repo_tree):
-        mock_list_repo_tree.return_value = [{'path': 'file1.json'}, {'path': 'file2.json'}]
-        files = list_date_files()
-        self.assertEqual(len(files), 2)
-
-    def test_slug_hash(self):
-        slug = 'test-slug'
-        hash_value = slug_hash(slug)
-        self.assertIsInstance(hash_value, int)
-
-    @patch('bin.dataset_enrich.sqlite3')
-    def test_is_duplicate(self, mock_sqlite3):
-        mock_conn = MagicMock()
-        mock_sqlite3.connect.return_value = mock_conn
-        mock_cur = MagicMock()
-        mock_conn.execute.return_value = mock_cur
-        mock_cur.fetchone.return_value = None
-        self.assertFalse(_is_duplicate(mock_conn, 'md5-hash'))
-
-    @patch('bin.dataset_enrich.sqlite3')
-    def test_mark_seen(self, mock_sqlite3):
-        mock_conn = MagicMock()
-        mock_sqlite3.connect.return_value = mock_conn
-        _mark_seen(mock_conn, 'md5-hash')
-        mock_conn.execute.assert_called_once()
-
-if __name__ == '__main__':
-    unittest.main()
-```
-
-## Integration tests
-Happy paths:
-1. Test the entire workflow with a sample dataset and verify the output files are generated correctly.
-2. Test the CDN bypass functionality by mocking the API call and verifying the files are downloaded correctly.
-3. Test the deduplication functionality by uploading duplicate files and verifying they are skipped correctly.
-
-Edge cases:
-1. Test the script with an invalid `SHARD_ID` or `SHARD_TOTAL` environment variable and verify it exits with a non-zero status code.
-2. Test the script with a non-existent `DATE_FOLDER` and verify it exits with a non-zero status code.
-3. Test the script with a network error during the API call and verify it exits with a non-zero status code.
-
-## Risk register
-* Risk: The script may fail due to network errors or API rate limits.
-* Mitigation: Implement retry mechanisms and error handling to handle transient errors.
-* Risk: The script may produce incorrect output due to bugs in the file projection or deduplication logic.
-* Mitigation: Implement comprehensive unit tests and integration tests to cover different scenarios and edge cases.
-* Risk: The script may have performance issues due to large datasets or high concurrency.
-* Mitigation: Implement performance optimizations, such as parallel processing or caching, to improve the script's throughput and efficiency.
+{"verdict": "OK", "findings": [{"severity": "med", "class": "ssrf", "detail": "CDN-bypass downloads from user-controlled HuggingFace dataset paths may reach internal endpoints if hostname resolution or redirects are not constrained.", "mitigation": "Pin exact CDN domain, disable redirects, and enforce an egress allowlist/DNS rebinding protection for fetch calls."}, {"severity": "low", "class": "other", "detail": "Deterministic shard assignment via hash modulo can enable shard-targeted enumeration or bias if slug values are attacker-controlled.", "mitigation": "Use a keyed hash (HMAC with a secret) for shard assignment and validate slugs to avoid predictable partitioning attacks."}, {"severity": "low", "class": "other", "detail": "Central SQLite dedup store shared across workers may allow race conditions or integrity issues under concurrent access.", "mitigation": "Use WAL mode with proper transactions and unique constraints on md5, and enforce serialized writes or advisory locks where needed."}], "summary": "No critical or high-severity flaws; medium SSRF risk from CDN fetches and low risks around shard targeting and SQLite concurrency are noted and mitigable."}
