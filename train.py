@@ -1,24 +1,20 @@
-import argparse
-import json
-import pyarrow.parquet as pq
-import pyarrow as pa
-import requests
-import io
-from typing import Iterator, Dict
+# Generate manifest for one partition
+python tools/snapshot_manifest.py \
+  --repo axentx/surrogate-1-training-pairs \
+  --date 2026-04-29 \
+  --out file_manifest.json
 
-def stream_parquet_project(cdn_url: str, columns=("prompt", "response")) -> Iterator[Dict[str, str]]:
-    # ... (rest of the code remains the same)
+# Dry-run: verify manifest + CDN fetch for a small sample
+python -c "
+import json, sys
+from train import load_cdn_parquet
 
-def iter_manifest(manifest_path: str) -> Iterator[Dict[str, str]]:
-    # ... (rest of the code remains the same)
+with open('file_manifest.json') as f:
+    m = json.load(f)
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--manifest", required=True, help="Path to file_manifest.json")
-    args = parser.parse_args()
-    for sample in iter_manifest(args.manifest):
-        # Replace with your training step / collate / dataloader logic
-        print(sample)  # demo
-
-if __name__ == "__main__":
-    main()
+sample = m['files'][0]['cdn_url']
+rows = load_cdn_parquet(sample, columns=['prompt', 'response'])
+assert len(rows) > 0, 'No rows fetched'
+assert all('prompt' in r and 'response' in r for r in rows), 'Schema mismatch'
+print('OK: manifest + CDN fetch works')
+"
