@@ -1,80 +1,35 @@
-name: surrogate-1-ingest
+- name: Compute shard matrix
+  id: matrix
+  run: |
+    FILE_LIST=$(cat file-list-${{ env.DATE }}.json)
+    TOTAL=$(echo "$FILE_LIST" | jq length)
+    SHARDS=16
+    # Produce JSON array of {shard_id, files} for each shard
+    python3 -c "
+import json, os, sys
+files = json.loads(os.environ['FILE_LIST'])
+shards = int(os.environ['SHARDS'])
+rows = []
+for i in range(shards):
+    rows.append({
+        'shard_id': i,
+        'files': [f for idx, f in enumerate(files) if idx % shards == i]
+    })
+print(json.dumps(rows))
+" > matrix.json
+    echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+  env:
+    FILE_LIST: ${{ steps.checkout.outputs.file_list }}  # injected from artifact
+    SHARDS: 16
+    DATE: ${{ env.DATE }}
 
-on:
-  schedule:
-    - cron: "*/30 * * * *"
-  workflow_dispatch:
+- uses: actions/checkout@v4
+  with:
+    repository: <owner>/surrogate-1-runner
+    path: runner
 
-env:
-  DATASET_REPO: axentx/surrogate-1-training-pairs
-  DATE_PARTITION: ${{ github.run_started_at && format('{0:yyyy}/{0:MM}/{0:dd}', github.run_started_at) || '1970/01/01' }}
-
-jobs:
-  file-list:
-    runs-on: ubuntu-latest
-    outputs:
-      date_partition: ${{ steps.date.outputs.partition }}
-      file_list_json: ${{ steps.list.outputs.file_list }}
-    steps:
-      - name: Set date partition
-        id: date
-        run: |
-          PARTITION=$(date -u +"%Y/%m/%d")
-          echo "partition=$PARTITION" >> "$GITHUB_OUTPUT"
-
-      - name: List repo tree (single API call)
-        id: list
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          # One API call to list top-level tree (non-recursive to avoid pagination blowup)
-          # If files live under a subfolder, adjust path accordingly.
-          curl -s -H "Authorization: Bearer $HF_TOKEN" \
-            "https://huggingface.co/api/datasets/${{ env.DATASET_REPO }}/tree?recursive=false" \
-            | jq -c '.' > file-list.json
-
-          # If recursive needed but repo is large, list per folder instead.
-          # For now, assume top-level or small tree.
-          echo "file_list=$(cat file-list.json | jq -c '.')" >> "$GITHUB_OUTPUT"
-
-      - name: Upload file-list artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: file-list
-          path: file-list.json
-
-  ingest-shard:
-    needs: file-list
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download file-list artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: file-list
-          path: .
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install deps
-        run: pip install -r requirements.txt
-
-      - name: Run shard worker
-        env:
-          SHARD_ID: ${{ matrix.shard_id }}
-          SHARD_TOTAL: 16
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          DATE_PARTITION: ${{ needs.file-list.outputs.date_partition }}
-        run: |
-          bash bin/dataset-enrich.sh \
-            --file-list file-list.json \
-            --shard-id "$SHARD_ID" \
-            --shard-total "$SHARD_TOTAL" \
-            --date-partition "$DATE_PARTITION"
+- name: Upload file-list artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: file-list-${{ env.DATE }}
+    path: file-list-${{ env.DATE }}.json
