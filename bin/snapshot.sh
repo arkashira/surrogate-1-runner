@@ -1,58 +1,71 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Generate a snapshot of dataset files for CDN-only ingestion.
+# Generate a file manifest for a dataset repo/date folder to enable CDN-only downloads.
 # Usage:
-#   HF_TOKEN=hf_xxx SNAPSHOT_OUT=snapshots/snapshot-2026-05-02.json \
-#     REPO=axentx/surrogate-1-training-pairs \
-#     DATE=2026-05-02 \
-#     ./bin/snapshot.sh
+#   HF_TOKEN=... ./bin/snapshot.sh \
+#     --repo axentx/surrogate-1-training-pairs \
+#     --path batches/public-merged/2026-05-02 \
+#     --out snapshot/2026-05-02/files.json
 
 set -euo pipefail
 
-: "${HF_TOKEN:?required}"
-: "${SNAPSHOT_OUT:=snapshot.json}"
-: "${REPO:=axentx/surrogate-1-training-pairs}"
-: "${DATE:=$(date +%Y-%m-%d)}"
+REPO=""
+PATH_PREFIX=""
+OUT=""
 
-# Ensure snapshots directory exists
-mkdir -p "$(dirname "$SNAPSHOT_OUT")"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --repo) REPO="$2"; shift 2 ;;
+    --path) PATH_PREFIX="$2"; shift 2 ;;
+    --out)  OUT="$2"; shift 2 ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
 
-# Use huggingface_hub to list files non-recursively for the date folder.
-python3 - "$REPO" "$DATE" "$SNAPSHOT_OUT" <<'PY'
-import os, json, sys
-from datetime import datetime, timezone
+if [[ -z "$REPO" || -z "$PATH_PREFIX" || -z "$OUT" ]]; then
+  echo "Usage: $0 --repo <owner/repo> --path <folder> --out <file.json>"
+  exit 1
+fi
+
+mkdir -p "$(dirname "$OUT")"
+
+python3 - <<PY
+import json
+import os
 from huggingface_hub import HfApi
 
-repo_id, date_folder, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
-api = HfApi(token=os.environ["HF_TOKEN"])
+api = HfApi(token=os.getenv("HF_TOKEN"))
+repo = "${REPO}"
+path_prefix = "${PATH_PREFIX}"
+out_path = "${OUT}"
 
-# List only top-level entries in the date folder (avoids recursive pagination).
-entries = api.list_repo_tree(repo_id, path=date_folder, recursive=False)
+def list_files_recursive(api, repo, root):
+    files = []
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        try:
+            entries = api.list_repo_tree(repo=repo, path=current, recursive=False)
+        except Exception as ex:
+            print(f"Warning: could not list {current}: {ex}")
+            continue
+        for e in entries:
+            if e.type == "file":
+                files.append({
+                    "path": e.path,
+                    "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{e.path}",
+                    "size": getattr(e, "size", None),
+                    "sha": getattr(e, "sha", None)
+                })
+            elif e.type == "folder":
+                stack.append(e.path)
+    return files
 
-files = []
-for e in entries:
-    if getattr(e, "type", None) == "file":
-        path = e.path
-        # CDN URL (no auth, bypasses /api/ rate limits)
-        cdn_url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{path}"
-        files.append({
-            "path": path,
-            "cdn_url": cdn_url,
-            "size": getattr(e, "size", None),
-            "lfs": getattr(e, "lfs", None) is not None,
-        })
+files = list_files_recursive(api, repo, path_prefix)
+files.sort(key=lambda x: x["path"])
 
-snapshot = {
-    "repo_id": repo_id,
-    "date": date_folder,
-    "generated_at": datetime.now(timezone.utc).isoformat(),
-    "files": files,
-    "count": len(files),
-}
-
-os.makedirs(os.path.dirname(out_path) if os.path.dirname(out_path) else ".", exist_ok=True)
 with open(out_path, "w") as f:
-    json.dump(snapshot, f, indent=2)
+    json.dump({"repo": repo, "path_prefix": path_prefix, "files": files}, f, indent=2)
 
-print(f"Snapshot written: {out_path} ({len(files)} files)")
+print(f"Wrote {len(files)} files to {out_path}")
 PY

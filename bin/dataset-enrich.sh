@@ -1,25 +1,24 @@
-# Add near top, after shebang
-SNAPSHOT_FILE="${SNAPSHOT_FILE:-}"
+# Near top of bin/dataset-enrich.sh
+MANIFEST_FILE="${MANIFEST_FILE:-}"
 
-download_with_cdn() {
-  local url="$1"
-  local out="$2"
-  # Use CDN URL directly; retry on transient failures
-  curl -fsSL --retry 3 --retry-delay 1 -o "$out" "$url"
-}
-
-process_file() {
-  local rel_path="$1"
-  local out_dir="$2"
-  if [[ -n "$SNAPSHOT_FILE" && -f "$SNAPSHOT_FILE" ]]; then
-    # Use CDN URL from snapshot
-    local cdn_url
-    cdn_url=$(jq -r --arg p "$rel_path" '.[] | select(.path==$p) | .cdn_url' "$SNAPSHOT_FILE")
-    if [[ -n "$cdn_url" && "$cdn_url" != "null" ]]; then
-      download_with_cdn "$cdn_url" "${out_dir}/$(basename "$rel_path")"
-      return 0
-    fi
-  fi
-  # Fallback to hf_hub_download
-  huggingface_hub download "$REPO" "$rel_path" --repo-type dataset -o "$out_dir/"
-}
+# Replace dataset file listing logic with:
+if [[ -n "$MANIFEST_FILE" && -f "$MANIFEST_FILE" ]]; then
+  echo "Using file list from manifest: $MANIFEST_FILE"
+  mapfile -t HF_FILES < <(python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+for item in data.get('files', []):
+    print(item['path'])
+" "$MANIFEST_FILE")
+else
+  echo "Listing repo files via API (fallback)..."
+  mapfile -t HF_FILES < <(python3 - <<PY
+from huggingface_hub import HfApi
+api = HfApi()
+files = api.list_repo_files(repo_id="${HF_REPO}", repo_type="dataset")
+for f in files:
+    print(f)
+PY
+)
+fi

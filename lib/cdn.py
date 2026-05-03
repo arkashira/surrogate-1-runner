@@ -1,29 +1,28 @@
-import time
 import requests
-from typing import Optional
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+import time
 
-CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+def cdn_fetch(path: str, repo: str, out_path: Path, max_retries: int = 3):
+    url = f"https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-def cdn_download(repo: str, path: str, timeout: int = 30, retries: int = 3) -> bytes:
-    """
-    Download public dataset file via CDN (no Authorization header).
-    CDN tier has much higher rate limits than /api/.
-    """
-    url = CDN_TEMPLATE.format(repo=repo, path=path)
-    for attempt in range(1, retries + 1):
+    for attempt in range(max_retries):
         try:
-            resp = requests.get(url, timeout=timeout, headers={})
+            resp = requests.get(url, timeout=60)
             resp.raise_for_status()
-            return resp.content
-        except requests.HTTPError as e:
-            if resp.status_code == 429:
-                wait = 360 if attempt == retries else (2 ** attempt) * 5
-                print(f"CDN 429, waiting {wait}s (attempt {attempt}/{retries})")
-                time.sleep(wait)
-                continue
-            raise
-        except requests.RequestException:
-            if attempt == retries:
+            out_path.write_bytes(resp.content)
+            return out_path
+        except Exception as e:
+            if attempt == max_retries - 1:
                 raise
-            time.sleep((2 ** attempt) * 2)
-    raise RuntimeError(f"Failed to download {url} after {retries} attempts")
+            time.sleep(2 ** attempt)
+    return out_path
+
+def fetch_file(path: str, repo: str, out_path: Path, use_cdn: bool = True):
+    if use_cdn:
+        try:
+            return cdn_fetch(path, repo, out_path)
+        except Exception:
+            pass
+    return Path(hf_hub_download(repo_id=repo, filename=path, cache_dir=out_path.parent))
