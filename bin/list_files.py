@@ -1,30 +1,28 @@
 #!/usr/bin/env python3
 """
-Generate deterministic file list + content hash for a date folder in
-axentx/surrogate-1-training-pairs.
-
 Usage (Mac orchestration):
-  python3 bin/list_files.py --date 2026-05-02 --out file-list.json
+  python bin/list_files.py \
+    --repo axentx/surrogate-1-training-pairs \
+    --date 2026-05-02 \
+    --out file_list.json
 
-Outputs JSON:
-{
-  "repo": "axentx/surrogate-1-training-pairs",
-  "date": "2026-05-02",
-  "files": [
-    "batches/public-merged/2026-05-02/part-00000.parquet",
-    ...
-  ],
-  "sha256": "e3b0c442...",
-  "cdn_base": "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main"
-}
+Produces:
+  {
+    "repo": "...",
+    "date": "...",
+    "files": [
+      "batches/public-merged/2026-05-02/file1.parquet",
+      ...
+    ],
+    "cdn_prefix": "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/"
+  }
 """
 
 import argparse
-import hashlib
 import json
 import os
 import sys
-from datetime import datetime
+from typing import List
 
 try:
     from huggingface_hub import HfApi
@@ -32,54 +30,44 @@ except ImportError:
     print("error: huggingface_hub not installed", file=sys.stderr)
     sys.exit(1)
 
-API = HfApi()
-REPO = "axentx/surrogate-1-training-pairs"
+CDN_PREFIX = "https://huggingface.co/datasets/{repo}/resolve/main/"
 
-def list_date_folder(date_str: str):
-    folder_path = f"batches/public-merged/{date_str}"
+def list_date_files(repo: str, date: str) -> List[str]:
+    api = HfApi()
+    folder = f"batches/public-merged/{date}"
     try:
-        items = API.list_repo_tree(repo_id=REPO, path=folder_path, recursive=False)
+        items = api.list_repo_tree(repo=repo, path=folder, recursive=False)
     except Exception as exc:
-        print(f"error listing {folder_path}: {exc}", file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError(f"HF list_repo_tree failed for {repo}/{folder}: {exc}") from exc
 
     files = []
     for item in items:
-        if getattr(item, "type", None) == "file" or (hasattr(item, "path") and item.path):
+        if hasattr(item, "path") and item.path:
+            # list_repo_tree may return nested objects; accept path string
             files.append(item.path)
-
-    # Deterministic ordering so all shards see same snapshot
     files.sort()
     return files
 
-def main():
-    parser = argparse.ArgumentParser(description="Generate CDN file list + hash for date folder.")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Pre-flight file listing for CDN-only ingestion")
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
     parser.add_argument("--date", required=True, help="YYYY-MM-DD folder under batches/public-merged/")
-    parser.add_argument("--out", default="file-list.json", help="Output JSON path")
+    parser.add_argument("--out", default="file_list.json", help="Output JSON path")
     args = parser.parse_args()
 
-    try:
-        datetime.strptime(args.date, "%Y-%m-%d")
-    except ValueError:
-        print("error: --date must be YYYY-MM-DD", file=sys.stderr)
-        sys.exit(1)
-
-    files = list_date_folder(args.date)
-    payload_bytes = json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
-    sha256 = hashlib.sha256(payload_bytes).hexdigest()
-
+    files = list_date_files(args.repo, args.date)
     payload = {
-        "repo": REPO,
+        "repo": args.repo,
         "date": args.date,
         "files": files,
-        "sha256": sha256,
-        "cdn_base": f"https://huggingface.co/datasets/{REPO}/resolve/main",
+        "cdn_prefix": CDN_PREFIX.format(repo=args.repo),
     }
 
     with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
+        json.dump(payload, f, indent=2)
+        f.write("\n")
 
-    print(f"wrote {len(files)} files -> {args.out}")
+    print(f"listed {len(files)} files -> {args.out}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
