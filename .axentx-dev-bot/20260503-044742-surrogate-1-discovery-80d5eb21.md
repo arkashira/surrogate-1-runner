@@ -125,109 +125,86 @@ def main() -> None:
         json.dump(manifest, f, indent=2)
     print(
 
-## review — reviewer @ 2026-05-03T04:47:47.671300Z
+## review — reviewer @ 2026-05-03T04:47:48.066182Z
 
-APPROVE — this is a workable, incremental step that replaces fragile shell ingestion with a manifest-driven Python worker, addresses CDN bypass and schema projection, and keeps the 16-shard matrix intact.
+APPROVE — this is a workable, incremental step that replaces fragile shell ingestion with a manifest-driven Python worker, eliminates HF API rate limits via CDN URLs, prevents `CastError` by projecting schema early, and preserves the 16-shard matrix. It has clear acceptance criteria a downstream tester can validate.
 
-Acceptance criteria (downstream tester can check):
+Acceptance criteria:
 - `bin/generate_manifest.py` produces valid JSON with `repo`, `date`, `folders`, and `files[].path/size` for a given date folder.
-- `bin/worker.py` deterministically assigns files to shards via `hash(path) % SHARD_TOTAL == SHARD_ID` and emits `shard<N>-<HHMMSS>.jsonl` in the existing layout.
-- Worker fetches via CDN-only URLs (e.g., `https://huggingface.co/datasets/<repo>/resolve/main/<path>`) without requiring HF API auth for downloads.
-- Worker projects each row to `{prompt, response}` and applies `lib/dedup.py` to remove duplicates before writing output.
-- Workflow `.github/workflows/ingest.yml` runs the worker with `SHARD_ID`, `SHARD_TOTAL`, and `MANIFEST_PATH` and completes without HF API rate-limit failures during data load.
+- `bin/worker.py` deterministically assigns files to shards via `hash(path) % SHARD_TOTAL == SHARD_ID` and emits `shard<N>-<HHMMSS>.jsonl` in the expected layout.
+- Worker fetches via CDN-only URLs (e.g., `https://huggingface.co/datasets/<repo>/resolve/main/<path>`) without requiring HF API auth for reads.
+- Worker projects each row to `{prompt, response}` and runs deduplication via `lib/dedup.py` before writing output.
+- Workflow `.github/workflows/ingest.yml` sets `MANIFEST_PATH`, `SHARD_ID`, `SHARD_TOTAL`, and runs `python bin/worker.py` successfully in CI.
 
-## qa — qa @ 2026-05-03T04:48:42.080684Z
+## review — qa @ 2026-05-03T04:48:06.679251Z
 
-PASS: 
+PASS: Manifest-driven ingestion plan is workable and testable.
 
 1. **Acceptance criteria**
-   - Manifest generation produces valid JSON containing `repo`, `date`, `folders`, and `files[].path/size` for a given date folder (schema validation passes).
-   - Worker shard assignment is deterministic: for any file path, `hash(path) % SHARD_TOTAL == SHARD_ID` assigns it to exactly one shard across runs.
-   - Worker emits output to `batches/public-merged/<date>/shard<N>-<HHMMSS>.jsonl` with each line being valid JSON and containing exactly `{prompt, response}` keys.
-   - Worker fetches files exclusively via CDN URLs (`https://huggingface.co/datasets/<repo>/resolve/main/<path>`) and completes downloads without HF API auth tokens.
-   - Worker applies `lib/dedup.py` and emits zero duplicate `{prompt, response}` pairs in the output shard.
-   - Workflow `.github/workflows/ingest.yml` runs the worker with `SHARD_ID`, `SHARD_TOTAL`, and `MANIFEST_PATH` and exits 0 with no HF API rate-limit errors in logs.
-   - End-to-end smoke test for a single shard completes in ≤5 minutes and produces ≥1 valid output record for a small manifest.
+- bin/generate_manifest.py exits 0 and emits valid JSON containing repo, date, folders, and files[].{path,size} for a supplied date folder.
+- bin/worker.py deterministically assigns files to shards via hash(path) % SHARD_TOTAL == SHARD_ID and produces shard<N>-<HHMMSS>.jsonl in batches/public-merged/<date>/ with one JSON object per line.
+- Worker fetches every file via CDN-only URLs (https://huggingface.co/datasets/<repo>/resolve/main/<path>) and does not require HF API auth tokens for read operations.
+- Worker projects each input row to {prompt, response} and removes duplicates via lib/dedup.py before writing; output rows strictly contain only those two keys.
+- Workflow .github/workflows/ingest.yml sets MANIFEST_PATH, SHARD_ID, SHARD_TOTAL and runs python bin/worker.py successfully (exit 0) in CI with no HF API rate-limit failures.
 
-2. **Unit tests**
+2. **Unit tests** (pytest-style pseudo-code)
 ```python
 # tests/unit/test_generate_manifest.py
-import json
-import pytest
-from bin.generate_manifest import build_manifest, validate_manifest
-
-def test_build_manifest_returns_expected_keys(mock_hf_api):
-    manifest = build_manifest("owner/repo", "2026-05-03", ["batches/public-merged/2026-05-03"])
-    assert "repo" in manifest and manifest["repo"] == "owner/repo"
+def test_manifest_schema():
+    manifest = generate_manifest(repo="axentx/surrogate-1-training-pairs", date="2026-05-03", folders=["batches/public-merged/2026-05-03"])
+    assert "repo" in manifest and isinstance(manifest["repo"], str)
     assert "date" in manifest and manifest["date"] == "2026-05-03"
+    assert "folders" in manifest and isinstance(manifest["folders"], list)
     assert "files" in manifest and isinstance(manifest["files"], list)
     for f in manifest["files"]:
-        assert "path" in f and "size" in f
-        assert isinstance(f["path"], str) and isinstance(f["size"], int)
+        assert "path" in f and isinstance(f["path"], str)
+        assert "size" in f and isinstance(f["size"], int) and f["size"] >= 0
 
-def test_validate_manifest_accepts_valid(manifest_fixture):
-    assert validate_manifest(manifest_fixture) is True
+def test_manifest_roundtrip_json(tmp_path):
+    out = tmp_path / "manifest.json"
+    main(["--repo", "axentx/surrogate-1-training-pairs", "--date", "2026-05-03", "--out", str(out)])
+    data = json.loads(out.read_text())
+    assert data["date"] == "2026-05-03"
 
-def test_validate_manifest_rejects_missing_fields():
-    assert validate_manifest({"repo": "x"}) is False
+# tests/unit/test_worker_sharding.py
+def test_shard_assignment_deterministic():
+    paths = ["batches/public-merged/2026-05-03/a.parquet", "batches/public-merged/2026-05-03/b.parquet"]
+    total = 16
+    assignments = [shard_id_for(path, total) for path in paths]
+    for path, assigned in zip(paths, assignments):
+        assert assigned == hash(path) % total
 
-# tests/unit/test_worker.py
-import hashlib
-import json
-import pytest
-from bin.worker import shard_for, project_record, cdn_url_for, run_worker
+def test_worker_filters_by_shard_id():
+    manifest = {"files": [{"path": "batches/public-merged/2026-05-03/a.parquet"}, {"path": "batches/public-merged/2026-05-03/b.parquet"}]}
+    selected = select_files_for_shard(manifest, shard_id=3, shard_total=16)
+    for f in selected:
+        assert shard_id_for(f["path"], 16) == 3
 
-def test_shard_for_deterministic():
-    paths = ["a.parquet", "b.parquet", "c.parquet"]
-    assignments = [shard_for(p, 16) for p in paths]
-    for i, p in enumerate(paths):
-        assert assignments[i] == hash(p) % 16
-        assert 0 <= assignments[i] < 16
+# tests/unit/test_schema_projection.py
+def test_project_to_prompt_response():
+    row = {"prompt": "hello", "response": "world", "extra": 123}
+    projected = project_row(row)
+    assert set(projected.keys()) == {"prompt", "response"}
+    assert projected["prompt"] == "hello"
+    assert projected["response"] == "world"
 
-def test_project_record_keeps_prompt_response():
-    row = {"prompt": "hi", "response": "ok", "extra": 1, "metadata": {"x": 1}}
-    out = project_record(row)
-    assert set(out.keys()) == {"prompt", "response"}
-    assert out["prompt"] == "hi" and out["response"] == "ok"
+# tests/unit/test_cdn_urls.py
+def test_cdn_url_generation():
+    url = cdn_url(repo="axentx/surrogate-1-training-pairs", path="batches/public-merged/2026-05-03/a.parquet")
+    assert url.startswith("https://huggingface.co/datasets/")
+    assert "/resolve/main/" in url
+    assert "huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/batches/public-merged/2026-05-03/a.parquet" in url
 
-def test_project_record_raises_on_missing():
-    with pytest.raises(ValueError):
-        project_record({"prompt": "x"})
-
-def test_cdn_url_for():
-    url = cdn_url_for("owner/repo", "batches/file.parquet")
-    assert url == "https://huggingface.co/datasets/owner/repo/resolve/main/batches/file.parquet"
-    assert "huggingface.co" in url and "/resolve/main/" in url
-
-def test_dedup_integration(tmp_path):
-    from lib.dedup import remove_duplicates
-    records = [
-        {"prompt": "a", "response": "b"},
-        {"prompt": "a", "response": "b"},
-        {"prompt": "c", "response": "d"},
-    ]
-    out = list(remove_duplicates(records))
-    assert len(out) == 2
-    assert out[0] == {"prompt": "a", "response": "b"}
-    assert out[1] == {"prompt": "c", "response": "d"}
+# tests/unit/test_dedup_integration.py
+def test_dedup_removes_identical_rows():
+    rows = [{"prompt": "x", "response": "y"}, {"prompt": "x", "response": "y"}]
+    deduped = dedup_rows(rows)
+    assert len(deduped) == 1
 ```
 
-3. **Integration tests**
-```python
-# tests/integration/test_worker_integration.py
-import json
-import tempfile
-import pytest
-from bin.worker import run_worker
-from bin.generate_manifest import build_manifest
+3. **Integration tests** (3 happy + 3 edge)
 
-# Happy paths (3–5)
-def test_worker_single_shard_with_local_parquet(mock_cdn_server, sample_parquet):
-    manifest = {
-        "repo": "owner/repo",
-        "date": "2026-05-03",
-        "files": [{"path": "batches/public-merged/2026-05-03/sample.parquet", "size": 1024}]
-    }
-    with tempfile.TemporaryDirectory() as out_dir:
-        run_worker(
-            m
+Happy cases
+- Manifest generation against real repo (read-only) produces non-empty manifest with valid file entries for a known date folder.
+- Worker run with SHARD_TOTAL=16 and SHARD_ID=0 processes assigned files, downloads via CDN URLs, projects schema, deduplicates, and writes shard0-<timestamp>.jsonl containing only {prompt,response} rows.
+- Full 16-shard local simulation (SHARD_TOTAL=16, SH
