@@ -1,42 +1,60 @@
 #!/usr/bin/env python3
 """
-Generate snapshot of dataset files for a date folder.
-Usage: python bin/lib/snapshot.py <repo> <date_folder> [output.json]
+Generate a deterministic snapshot of dataset files for a date folder.
+Usage:
+  python bin/lib/snapshot.py --repo datasets/axentx/surrogate-1-training-pairs --date 2026-04-29 --out snapshot-2026-04-29.json
 """
+import argparse
 import json
 import sys
 from datetime import datetime, timezone
 
 from huggingface_hub import HfApi
 
-def generate_snapshot(repo: str, date_folder: str):
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Create HF dataset file snapshot for a date folder.")
+    parser.add_argument("--repo", required=True, help="HF repo (e.g., datasets/owner/name)")
+    parser.add_argument("--date", required=True, help="Date folder (YYYY-MM-DD)")
+    parser.add_argument("--out", required=True, help="Output JSON path")
+    parser.add_argument("--subpath", default="", help="Optional subpath within date folder")
+    args = parser.parse_args()
+
     api = HfApi()
-    # list_repo_tree handles folder path; recursive=False lists immediate children
-    tree = api.list_repo_tree(repo=repo, path=date_folder.rstrip("/"), recursive=False)
-    files = [
-        item.path
-        for item in tree
-        if item.type == "file" and item.path.lower().endswith((".parquet", ".jsonl"))
-    ]
+    folder_path = args.date
+    if args.subpath:
+        folder_path = f"{folder_path}/{args.subpath}".rstrip("/")
+
+    try:
+        entries = api.list_repo_tree(repo_id=args.repo, path=folder_path, recursive=False)
+    except Exception as exc:
+        print(f"ERROR: failed to list repo tree {args.repo}@{folder_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    files = []
+    for entry in entries:
+        files.append({
+            "path": entry.path,
+            "type": getattr(entry, "type", "file"),
+            "size": getattr(entry, "size", None),
+            "lfs": getattr(entry, "lfs", None),
+        })
+
+    files.sort(key=lambda f: f["path"])
+
     snapshot = {
-        "repo": repo,
-        "date_folder": date_folder.rstrip("/"),
-        "snapshot_ts": datetime.now(timezone.utc).isoformat(),
-        "files": sorted(files),
+        "repo": args.repo,
+        "folder": folder_path,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "files": files,
         "count": len(files),
     }
-    return snapshot
+
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, indent=2, sort_keys=True)
+
+    print(f"Snapshot written to {args.out} ({len(files)} files)")
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: snapshot.py <repo> <date_folder> [output.json]")
-        sys.exit(1)
-    repo = sys.argv[1]
-    date_folder = sys.argv[2]
-    out_path = sys.argv[3] if len(sys.argv) > 3 else "-"
-    snapshot = generate_snapshot(repo, date_folder)
-    if out_path == "-":
-        json.dump(snapshot, sys.stdout, indent=2)
-    else:
-        with open(out_path, "w") as f:
-            json.dump(snapshot, f, indent=2)
+    main()
