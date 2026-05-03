@@ -1,55 +1,42 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Generate deterministic file-list snapshot for CDN-only ingestion.
-# Usage: HF_TOKEN=<token> bin/snapshot.sh <owner>/<dataset> <date-folder>
+# Generate a file manifest for axentx/surrogate-1-training-pairs
+# Usage: bin/snapshot.sh [--output snapshot.json]
 
 set -euo pipefail
 
-REPO="${1:-axentx/surrogate-1-training-pairs}"
-DATE="${2:-$(date +%Y-%m-%d)}"
-OUTDIR="snapshot/${DATE}"
-OUTFILE="${OUTDIR}/file-list.json"
+REPO="axentx/surrogate-1-training-pairs"
+OUTFILE="${2:-snapshot.json}"
+HF_TOKEN="${HF_TOKEN:-}"
 
-mkdir -p "${OUTDIR}"
+if [[ -n "$HF_TOKEN" ]]; then
+  AUTH_HEADER="Authorization: Bearer $HF_TOKEN"
+else
+  AUTH_HEADER=""
+fi
 
-echo "Listing ${REPO} (non-recursive) for date folder: ${DATE}..."
+# List top-level date folders (non-recursive) to avoid pagination/rate-limit
+# We only need the folder names; CDN downloads don't require auth.
+echo "Listing top-level folders in $REPO ..."
+folders=$(curl -sS -H "$AUTH_HEADER" \
+  "https://huggingface.co/api/datasets/$REPO/tree?recursive=false" | \
+  jq -r '.[] | select(.type=="directory") | .path')
 
-# Use huggingface_hub Python to list top-level folder (avoids recursive pagination)
-python3 - <<PY > "${OUTFILE}.tmp"
-import os, json
-from huggingface_hub import HfApi
+# Build manifest: for each date folder, list files via CDN tree (no auth required)
+# We use the public tree endpoint per folder (still no auth for public repos).
+manifest="[]"
+for d in $folders; do
+  echo "Scanning $d ..."
+  files=$(curl -sS \
+    "https://huggingface.co/api/datasets/$REPO/tree?path=$d&recursive=true" | \
+    jq -c '.[] | select(.type=="file") | {path: .path, sha: .sha, size: .size}')
+  while IFS= read -r f; do
+    path=$(echo "$f" | jq -r '.path')
+    slug=$(basename "$path" .parquet | sed 's/\.[^.]*$//')
+    manifest=$(echo "$manifest" | jq --arg p "$path" --argjson s "$f" --arg slug "$slug" \
+      '. + [{"path": $p, "sha": $s.sha, "size": $s.size, "slug": $slug}]')
+  done <<< "$files"
+done
 
-api = HfApi(token=os.environ.get("HF_TOKEN"))
-repo = "${REPO}"
-date_folder = "${DATE}"
-
-# List only the date folder (non-recursive)
-tree = api.list_repo_tree(repo=repo, path=date_folder, recursive=False)
-
-files = []
-for item in tree:
-    if item.type == "file":
-        # CDN URL (no auth required)
-        cdn_url = f"https://huggingface.co/datasets/{repo}/resolve/main/{date_folder}/{item.path}"
-        files.append({
-            "path": item.path,
-            "cdn_url": cdn_url,
-            "size": getattr(item, "size", None)
-        })
-
-# Deterministic ordering
-files.sort(key=lambda x: x["path"])
-
-output = {
-    "repo": repo,
-    "date": date_folder,
-    "generated_at": os.popen("date -u +%Y-%m-%dT%H:%M:%SZ").read().strip(),
-    "files": files
-}
-
-print(json.dumps(output, indent=2))
-PY
-
-mv "${OUTFILE}.tmp" "${OUTFILE}"
-echo "Snapshot written to ${OUTFILE}"
-echo "Total files: $(jq '.files | length' "${OUTFILE}")"
+echo "$manifest" | jq '{generated_at: now|todate, repo: env.REPO, files: .}' > "$OUTFILE"
+echo "Snapshot written to $OUTFILE ($(jq '.files | length' "$OUTFILE") files)"
