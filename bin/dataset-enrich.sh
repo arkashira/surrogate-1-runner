@@ -1,12 +1,23 @@
-#!/bin/bash
+name: Ingest Surrogate-1 Training Pairs
 
-# Set cache directory
-CACHE_DIR="/tmp/surrogate-1-snapshot"
+on:
+  workflow_dispatch:
+    inputs:
+      shard-id:
+        description: 'Shard ID'
+        required: true
 
-# Load file list from JSON
-file_list=$(cat "${CACHE_DIR}/file_list.json")
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-# Process file list
-for file in "${file_list[@]}"; do
-    # ... (rest of the script remains the same)
-done
+      - name: Download pre-flight snapshot
+        run: |
+          ./bin/snapshot.sh ${{ inputs.shard-id }}
+
+      - name: Ingest data
+        run: |
+          ./bin/dataset-enrich.sh ${{ inputs.shard-id }}
