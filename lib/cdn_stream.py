@@ -1,32 +1,44 @@
-import io
-import time
+import pyarrow.parquet as pq
+import pyarrow as pa
 import requests
-from typing import BinaryIO, Optional
+import io
+import os
+import time
+from typing import Iterator, Dict, Any
 
-def cdn_stream(cdn_url: str, max_retries: int = 5, timeout: int = 30) -> BinaryIO:
-    """
-    Stream a dataset file from HF CDN with exponential backoff.
-    Uses no Authorization header — CDN tier has separate (higher) rate limits.
-    """
-    headers = {}
-    for attempt in range(max_retries):
+CDN_TIMEOUT = int(os.getenv("CDN_TIMEOUT", "60"))
+MAX_RETRIES = int(os.getenv("CDN_RETRIES", "3"))
+BACKOFF_FACTOR = float(os.getenv("CDN_BACKOFF", "1.5"))
+
+def _fetch_with_retry(url: str) -> bytes:
+    for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = requests.get(cdn_url, headers=headers, timeout=timeout, stream=True)
+            resp = requests.get(url, timeout=CDN_TIMEOUT)
             resp.raise_for_status()
-            # Wrap raw bytes into file-like object
-            raw = io.BytesIO()
-            for chunk in resp.iter_content(chunk_size=8192):
-                raw.write(chunk)
-            raw.seek(0)
-            return raw
-        except requests.HTTPError as e:
-            if resp.status_code == 429:
-                wait = 360 if attempt == 0 else (2 ** attempt) * 5
-                time.sleep(wait)
-                continue
-            raise
-        except (requests.RequestException, OSError) as e:
-            if attempt == max_retries - 1:
+            return resp.content
+        except Exception as exc:
+            if attempt == MAX_RETRIES:
                 raise
-            time.sleep((2 ** attempt) * 2)
-    raise RuntimeError("Exhausted retries")
+            sleep = BACKOFF_FACTOR ** attempt
+            print(f"CDN retry {attempt}/{MAX_RETRIES} for {url}: {exc} — sleeping {sleep:.1f}s")
+            time.sleep(sleep)
+
+def cdn_parquet_reader(cdn_url: str, columns=("prompt", "response")) -> pa.Table:
+    """Download a single parquet via CDN and project columns without HF API."""
+    buf = io.BytesIO(_fetch_with_retry(cdn_url))
+    table = pq.read_table(buf, columns=columns)
+    return table
+
+def iter_cdn_shard(cdn_urls: list[str], columns=("prompt", "response")) -> Iterator[Dict[str, Any]]:
+    """Yield rows from multiple CDN parquet files."""
+    for url in cdn_urls:
+        try:
+            table = cdn_parquet_reader(url, columns=columns)
+            for batch in table.to_batches(max_chunksize=1024):
+                for i in range(batch.num_rows):
+                    row = {col: batch.column(col)[i].as_py() for col in columns}
+                    yield row
+        except Exception as exc:
+            # Log and skip bad files; don't kill entire shard
+            print(f"CDN read failed {url}: {exc}")
+            continue

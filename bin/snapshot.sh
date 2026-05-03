@@ -1,71 +1,47 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Generate a file manifest for a dataset repo/date folder to enable CDN-only downloads.
-# Usage:
-#   HF_TOKEN=... ./bin/snapshot.sh \
-#     --repo axentx/surrogate-1-training-pairs \
-#     --path batches/public-merged/2026-05-02 \
-#     --out snapshot/2026-05-02/files.json
-
+# Usage: HF_TOKEN=... ./bin/snapshot.sh --repo axentx/surrogate-1-training-pairs --date 2026-05-02 --out snapshot.json
 set -euo pipefail
 
 REPO=""
-PATH_PREFIX=""
-OUT=""
+DATE=""
+OUT="snapshot.json"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --repo) REPO="$2"; shift 2 ;;
-    --path) PATH_PREFIX="$2"; shift 2 ;;
-    --out)  OUT="$2"; shift 2 ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
+    --date) DATE="$2"; shift 2 ;;
+    --out)  OUT="$2";  shift 2 ;;
+    *) echo "Unknown option $1"; exit 1 ;;
   esac
 done
 
-if [[ -z "$REPO" || -z "$PATH_PREFIX" || -z "$OUT" ]]; then
-  echo "Usage: $0 --repo <owner/repo> --path <folder> --out <file.json>"
+if [[ -z "$REPO" || -z "$DATE" ]]; then
+  echo "Usage: $0 --repo owner/repo --date YYYY-MM-DD [--out snapshot.json]"
   exit 1
 fi
 
-mkdir -p "$(dirname "$OUT")"
-
-python3 - <<PY
-import json
-import os
+# Single API call: list top-level folder for the date (non-recursive)
+# Avoids recursive list_repo_files which paginates 100x and hits rate limits.
+echo "Listing ${REPO} for date ${DATE}..."
+FILES=$(python3 - "$REPO" "$DATE" <<'PY'
+import os, json, sys
 from huggingface_hub import HfApi
-
-api = HfApi(token=os.getenv("HF_TOKEN"))
-repo = "${REPO}"
-path_prefix = "${PATH_PREFIX}"
-out_path = "${OUT}"
-
-def list_files_recursive(api, repo, root):
-    files = []
-    stack = [root]
-    while stack:
-        current = stack.pop()
-        try:
-            entries = api.list_repo_tree(repo=repo, path=current, recursive=False)
-        except Exception as ex:
-            print(f"Warning: could not list {current}: {ex}")
-            continue
-        for e in entries:
-            if e.type == "file":
-                files.append({
-                    "path": e.path,
-                    "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{e.path}",
-                    "size": getattr(e, "size", None),
-                    "sha": getattr(e, "sha", None)
-                })
-            elif e.type == "folder":
-                stack.append(e.path)
-    return files
-
-files = list_files_recursive(api, repo, path_prefix)
-files.sort(key=lambda x: x["path"])
-
-with open(out_path, "w") as f:
-    json.dump({"repo": repo, "path_prefix": path_prefix, "files": files}, f, indent=2)
-
-print(f"Wrote {len(files)} files to {out_path}")
+api = HfApi(token=os.environ.get("HF_TOKEN"))
+repo, date = sys.argv[1], sys.argv[2]
+items = api.list_repo_tree(repo=repo, path=date, recursive=False)
+# Expecting files directly under date folder: batches/mirror-merged/2026-05-02/*.parquet
+result = []
+for item in items:
+    if item.type == "file" and item.path.endswith(".parquet"):
+        result.append({
+            "path": item.path,
+            "size": item.size,
+            "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{item.path}"
+        })
+print(json.dumps(result, indent=2))
 PY
+)
+
+echo "$FILES" > "$OUT"
+echo "Snapshot written to $OUT ($(echo "$FILES" | jq length) files)"
