@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 """
-List public dataset files for a given date folder (or latest) and emit JSON.
-Intended to run once per cron cycle on a Mac (or CI) before shard workers start.
+Generate deterministic file list for a single date folder.
+Run from Mac (or any dev machine) after rate-limit window clears.
 
 Usage:
-  python bin/list_files.py --repo axentx/surrogate-1-training-pairs \
-                           --date 2026-05-02 \
-                           --out file-list-2026-05-02.json
+  python bin/list_files.py \
+    --repo axentx/surrogate-1-training-pairs \
+    --date 2026-04-30 \
+    --out file-list.json
+
+Output format:
+{
+  "repo": "...",
+  "date": "...",
+  "files": [
+    {"path": "batches/public-raw/2026-04-30/foo.parquet", "size": 12345},
+    ...
+  ],
+  "generated_at": "2026-04-30T12:34:56Z"
+}
 """
+
 import argparse
 import json
 import os
@@ -16,54 +29,53 @@ from datetime import datetime, timezone
 
 from huggingface_hub import HfApi
 
-CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+CDN_BASE = "https://huggingface.co/datasets"
 
-def list_date_files(repo: str, date_folder: str, api: HfApi):
-    """
-    List files under <date_folder>/ recursively (shallow per folder) to avoid
-    massive recursive listing. Returns list of dicts with cdn_url and metadata.
-    """
-    base = date_folder.strip("/")
-    try:
-        tree = api.list_repo_tree(repo=repo, path=base, recursive=False)
-    except Exception as e:
-        print(f"HF API error listing {repo}/{base}: {e}", file=sys.stderr)
-        return []
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="List HF dataset folder (non-recursive).")
+    p.add_argument("--repo", required=True, help="HF dataset repo (user/name)")
+    p.add_argument("--date", required=True, help="Date folder, e.g. 2026-04-30")
+    p.add_argument("--out", default="file-list.json", help="Output JSON path")
+    p.add_argument("--prefix", help="Optional custom prefix (overrides date)")
+    return p
 
-    entries = []
-    for item in tree:
-        if item.type != "file":
-            continue
-        cdn_url = CDN_TEMPLATE.format(repo=repo, path=item.path)
-        entries.append({
-            "path": item.path,
-            "cdn_url": cdn_url,
-            "size": getattr(item, "size", None),
-            "lfs": getattr(item, "lfs", None) is not None,
-        })
-    return entries
-
-def main():
-    parser = argparse.ArgumentParser(description="List dataset files for CDN ingestion.")
-    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--date", default=datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    parser.add_argument("--out", required=True, help="Output JSON file")
-    args = parser.parse_args()
-
+def list_folder(repo: str, date: str, prefix: str | None = None) -> list[dict]:
     api = HfApi()
-    files = list_date_files(args.repo, args.date, api)
+    folder = prefix or f"batches/public-raw/{date}"
+    # recursive=False avoids paginating 100x and hitting 429
+    tree = api.list_repo_tree(repo=repo, path=folder, recursive=False)
+    files = []
+    for entry in tree:
+        if entry.type != "file":
+            continue
+        files.append({
+            "path": entry.path,
+            "size": entry.size or 0,
+            "cdn_url": f"{CDN_BASE}/{repo}/resolve/main/{entry.path}"
+        })
+    # Deterministic ordering for stable shard assignment
+    files.sort(key=lambda x: x["path"])
+    return files
+
+def main() -> None:
+    args = build_parser().parse_args()
+    try:
+        files = list_folder(args.repo, args.date, args.prefix)
+    except Exception as exc:
+        print(f"ERROR listing folder: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     payload = {
         "repo": args.repo,
         "date": args.date,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "prefix": args.prefix,
         "files": files,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+    with open(args.out, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
     print(f"Wrote {len(files)} files to {args.out}")
 
 if __name__ == "__main__":
