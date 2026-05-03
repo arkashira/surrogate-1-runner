@@ -1,66 +1,52 @@
 #!/usr/bin/env python3
 """
-Generate deterministic CDN file list for a date folder.
+List files in a date folder of axentx/surrogate-1-training-pairs
+and emit a JSON payload for CDN-only ingestion.
 
 Usage:
-  HF_TOKEN=<token> python bin/list_files.py \
-    --repo axentx/surrogate-1-training-pairs \
-    --date 2026-05-02 \
-    --out filelist/2026-05-02.json
-
-Outputs JSON lines:
-  {"path": "raw/2026-05-02/file1.parquet", "size": 12345, "etag": "abc...", "cdn_url": "https://huggingface.co/datasets/.../resolve/main/raw/2026-05-02/file1.parquet"}
+  python bin/list_files.py --date 2026-05-02 --out file-list.json
 """
-
 import argparse
 import json
-import os
 import sys
-from typing import List, Dict
+from datetime import datetime, timezone
 
 from huggingface_hub import HfApi
 
-HF_API = HfApi()
+REPO = "axentx/surrogate-1-training-pairs"
 
-def list_date_files(repo_id: str, date: str, folder_prefix: str = "raw") -> List[Dict[str, object]]:
-    """
-    List files under <folder_prefix>/<date>/ without recursion.
-    Single API call per folder to minimize rate-limit pressure.
-    """
-    prefix = f"{folder_prefix}/{date}/"
-    try:
-        tree = HF_API.list_repo_tree(repo_id=repo_id, path=prefix, recursive=False)
-    except Exception as exc:
-        print(f"ERROR listing repo tree for {repo_id}/{prefix}: {exc}", file=sys.stderr)
-        raise
+def list_date_folder(date_str: str, out_path: str) -> None:
+    api = HfApi()
+    prefix = f"batches/public-merged/{date_str}/"
+    items = api.list_repo_tree(repo_id=REPO, path=prefix, recursive=False)
 
-    entries = []
-    for item in tree:
-        if getattr(item, "type", None) == "file":
-            path = item.path
-            entries.append({
-                "path": path,
-                "size": getattr(item, "size", None),
-                "etag": getattr(item, "etag", None),
-                "cdn_url": f"https://huggingface.co/datasets/{repo_id}/resolve/main/{path}"
-            })
-    return entries
+    files = []
+    for item in items:
+        if item.type == "file":
+            files.append({"path": item.path, "size": item.size})
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate CDN-friendly file list.")
-    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder to list")
-    parser.add_argument("--out", required=True, help="Output JSON file")
-    parser.add_argument("--folder-prefix", default="raw", help="Top folder inside repo")
-    args = parser.parse_args()
+    files.sort(key=lambda x: x["path"])
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    entries = list_date_files(args.repo, args.date, args.folder_prefix)
-    with open(args.out, "w", encoding="utf-8") as f:
-        for e in entries:
-            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    payload = {
+        "repo": REPO,
+        "date": date_str,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "files": files,
+    }
 
-    print(f"Wrote {len(entries)} entries to {args.out}")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
+
+    print(f"Wrote {len(files)} files to {out_path}", file=sys.stderr)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="List files for a date folder.")
+    parser.add_argument("--date", required=True, help="YYYY-MM-DD")
+    parser.add_argument("--out", default="file-list.json")
+    args = parser.parse_args()
+
+    try:
+        list_date_folder(args.date, args.out)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
