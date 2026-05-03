@@ -1,32 +1,36 @@
-#!/usr/bin/env python3
-# Contract: read JSON from stdin; exit 0 if new (not duplicate)
-import json, hashlib, sqlite3, sys, os
+import sqlite3
+from pathlib import Path
+from contextlib import contextmanager
 
-DB = os.environ.get("DEDUP_DB", "dedup.db")
+class DedupStore:
+    def __init__(self, db_path: str = ".dedup.db"):
+        self.db_path = db_path
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        with self._conn() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS seen_pair (hash TEXT PRIMARY KEY)")
 
-def md5(s):
-    return hashlib.md5(s.encode()).hexdigest()
+    @contextmanager
+    def _conn(self):
+        conn = sqlite3.connect(self.db_path, isolation_level=None)
+        try:
+            yield conn
+        finally:
+            conn.close()
 
-def main():
-    raw = sys.stdin.read()
-    try:
-        obj = json.loads(raw)
-    except Exception:
-        sys.exit(1)
-    payload = json.dumps({"prompt": obj.get("prompt",""), "response": obj.get("response","")}, sort_keys=True)
-    key = md5(payload)
+    def add(self, pair_hash: str) -> bool:
+        """Return True if newly inserted, False if duplicate."""
+        cur = self._conn().__enter__().cursor()
+        try:
+            cur.execute("INSERT INTO seen_pair (hash) VALUES (?)", (pair_hash,))
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            cur.close()
 
-    conn = sqlite3.connect(DB)
-    conn.execute("CREATE TABLE IF NOT EXISTS seen (key TEXT PRIMARY KEY)")
-    try:
-        conn.execute("INSERT INTO seen (key) VALUES (?)", (key,))
-        conn.commit()
-        conn.close()
-        print(json.dumps(obj))
-        sys.exit(0)
-    except sqlite3.IntegrityError:
-        conn.close()
-        sys.exit(1)
-
-if __name__ == "__main__":
-    main()
+    def bulk_contains(self, hashes):
+        if not hashes:
+            return set()
+        cur = self._conn().__enter__().cursor()
+        cur.execute(f"SELECT hash FROM seen_pair WHERE hash IN ({','.join('?'*len(hashes))})", hashes)
+        return {row[0] for row in cur.fetchall()}
