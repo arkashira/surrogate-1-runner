@@ -1,81 +1,24 @@
+import { notifyQueue, StatusChangePayload } from '../queue/notifyQueue';
 
-import { validateTransition, InvalidTransitionError, RequestStatus } from '../lib/requestStateMachine';
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://app.axentx.io';
 
-export type AuditEntry = {
-  timestamp: string; // ISO
-  previousStatus: RequestStatus;
-  newStatus: RequestStatus;
-  changedBy?: string;
-  reason?: string;
-};
+/**
+ * Enqueue a notification for a request status change.
+ * Call this in your request update flow after persisting the new status.
+ */
+export async function notifyOnStatusChange(
+  requestId: string,
+  oldStatus: string,
+  newStatus: string
+): Promise<void> {
+  const publicUrl = `${PUBLIC_BASE}/requests/${requestId}`;
 
-export type Request = {
-  id: string;
-  title: string;
-  status: RequestStatus;
-  auditLog: AuditEntry[];
-  updatedAt: string;
-};
-
-// In-memory store for demo; replace with DB/ORM in production.
-const requests = new Map<string, Request>();
-
-export async function patchRequestStatus(
-  id: string,
-  nextStatus: RequestStatus,
-  changedBy?: string,
-  reason?: string
-): Promise<Request> {
-  const req = requests.get(id);
-  if (!req) {
-    const err: any = new Error('Request not found');
-    err.status = 404;
-    throw err;
-  }
-
-  const previousStatus = req.status;
-
-  // Validate transition (throws InvalidTransitionError on invalid)
-  validateTransition(previousStatus, nextStatus);
-
-  const now = new Date().toISOString();
-  const auditEntry: AuditEntry = {
-    timestamp: now,
-    previousStatus,
-    newStatus: nextStatus,
-    changedBy,
-    reason,
+  const payload: StatusChangePayload = {
+    requestId,
+    oldStatus,
+    newStatus,
+    publicUrl,
   };
 
-  const updated: Request = {
-    ...req,
-    status: nextStatus,
-    auditLog: [...req.auditLog, auditEntry],
-    updatedAt: now,
-  };
-
-  requests.set(id, updated);
-  return updated;
-}
-
-// Framework-agnostic HTTP adapter for PATCH /requests/:id/status
-export async function handlePatchRequestStatus(req: {
-  params: { id: string };
-  body: { status: RequestStatus; changedBy?: string; reason?: string };
-}) {
-  try {
-    const updated = await patchRequestStatus(req.params.id, req.body.status, req.body.changedBy, req.body.reason);
-    return { status: 200, body: updated };
-  } catch (err: any) {
-    if (err instanceof InvalidTransitionError) {
-      return {
-        status: 400,
-        body: { error: err.message, code: err.code },
-      };
-    }
-    return {
-      status: err.status || 500,
-      body: { error: err.message, code: err.code },
-    };
-  }
+  await notifyQueue.add('status-change', payload);
 }
