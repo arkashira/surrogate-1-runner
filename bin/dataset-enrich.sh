@@ -1,25 +1,23 @@
-list_files_via_snapshot() {
-  local snap_path="$1"
-  if [[ -z "$snap_path" || ! -f "$snap_path" ]]; then
-    return 1
-  fi
-  python3 -c "
-import json, sys
-try:
-    snap = json.load(open(sys.argv[1]))
-except Exception:
-    sys.exit(1)
-for f in snap.get('files', []):
-    print(f['cdn_url'])
-" "$snap_path"
-}
+# Deterministic shard selection (keep existing)
+# SHARD_ID=$(( $(echo -n "$slug" | md5sum | tr -d '\n' | od -An -tx1 | head -c8) % 16 ))
 
-# Decide source for file list
-if list_files_via_snapshot "$SNAPSHOT_FILE" > /dev/null 2>&1; then
-  echo "INFO: using snapshot $SNAPSHOT_FILE for file list (CDN-only mode)"
-  mapfile -t HF_URLS < <(list_files_via_snapshot "$SNAPSHOT_FILE")
+if [[ "${SKIP_API_LIST:-0}" == "1" ]]; then
+  SNAPSHOT="${SNAPSHOT:-./snapshots/snapshot-$(echo "$REPO" | tr '/-' '__')-${DATE}.json}"
+  if [[ ! -f "$SNAPSHOT" ]]; then
+    echo "ERROR: SKIP_API_LIST=1 but snapshot not found at $SNAPSHOT" >&2
+    exit 1
+  fi
+  # Build deterministic file list from snapshot
+  mapfile -t ALL_FILES < <(python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+for p in sorted(data['files']):
+    print(p)
+" "$SNAPSHOT")
 else
-  echo "INFO: no valid snapshot; falling back to HF API listing (rate-limit risk)"
-  # Keep existing HF API listing logic here, e.g.:
-  # mapfile -t HF_URLS < <(python3 -c "...")
+  # Fallback: runtime listing (existing logic)
+  # mapfile -t ALL_FILES < <(python3 -c "... list_repo_tree ...")
+  echo "INFO: using runtime HF API listing (SKIP_API_LIST not set)" >&2
+  # ... existing listing code ...
 fi
