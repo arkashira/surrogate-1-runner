@@ -1,69 +1,52 @@
 #!/usr/bin/env python3
 """
-Generate deterministic file listing for surrogate-1 dataset.
+Produce a deterministic file-list snapshot for one date folder.
 Usage:
-  HF_TOKEN=... python bin/list-snapshot.py \
+  HF_TOKEN=<token> python bin/list-snapshot.py \
     --repo axentx/surrogate-1-training-pairs \
-    --out snapshot-20260503.json
+    --date 2026-05-02 \
+    --out file-list.json
 """
 import argparse
 import json
 import os
 import sys
-import time
-from datetime import datetime
+from huggingface_hub import HfApi
 
-from huggingface_hub import HfApi, Repository, hf_hub_download
-from huggingface_hub.utils import HFValidationError
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", required=True)
+    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder under datasets/")
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
 
-API = HfApi()
+    token = os.environ.get("HF_TOKEN")
+    if not token:
+        print("HF_TOKEN required", file=sys.stderr)
+        sys.exit(1)
 
-def list_snapshot(repo_id: str, out_path: str, date_folder: str = "") -> None:
+    api = HfApi(token=token)
+    # Non-recursive: one API call, no pagination explosion
+    path = f"batches/public-merged/{args.date}"
     try:
-        # Single API call: non-recursive tree per folder (avoids list_repo_files pagination)
-        entries = API.list_repo_tree(repo_id=repo_id, path=date_folder, recursive=False)
+        entries = api.list_repo_tree(repo_id=args.repo, path=path, recursive=False)
     except Exception as e:
-        if "429" in str(e):
-            retry_after = 360
-            print(f"HF API 429, retry after {retry_after}s", file=sys.stderr)
-            time.sleep(retry_after)
-            return list_snapshot(repo_id, out_path, date_folder)
-        raise
+        print(f"list_repo_tree failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
-    files = []
-    for e in entries:
-        if e.type != "file":
-            continue
-        path = e.path
-        # CDN URL (no Authorization header required; bypasses /api/ rate limits)
-        cdn_url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{path}"
-        files.append({
-            "path": path,
-            "size": getattr(e, "size", None),
-            "sha": getattr(e, "sha", None),
-            "cdn_url": cdn_url,
-        })
+    files = [e.path for e in entries if e.type == "file"]
+    files.sort()  # deterministic ordering
 
     snapshot = {
-        "repo_id": repo_id,
-        "date_folder": date_folder or "root",
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "repo": args.repo,
+        "date": args.date,
+        "path_prefix": path,
         "files": files,
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
+    with open(args.out, "w", encoding="utf-8") as f:
         json.dump(snapshot, f, indent=2)
-    print(f"Wrote {len(files)} files to {out_path}")
+    print(f"Wrote {len(files)} files to {args.out}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate CDN snapshot for surrogate-1 dataset")
-    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--out", required=True, help="Output JSON path")
-    parser.add_argument("--date-folder", default="", help="Optional date subfolder (e.g. batches/public-merged/20260503)")
-    args = parser.parse_args()
-
-    if "HF_TOKEN" not in os.environ:
-        print("WARNING: HF_TOKEN not set — listing public repo only", file=sys.stderr)
-
-    list_snapshot(args.repo, args.out, args.date_folder)
+    main()
