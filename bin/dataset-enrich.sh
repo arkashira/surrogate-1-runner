@@ -3,8 +3,8 @@ name: Ingest
 on:
   workflow_dispatch:
     inputs:
-      slug:
-        description: 'Slug hash to ingest'
+      DATE:
+        description: 'Date folder to process'
         required: true
 
 jobs:
@@ -14,9 +14,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Docker
-        uses: docker/setup-docker@v1
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
 
-      - name: Run ingest script
+      - name: Install dependencies
         run: |
-          bin/dataset-enrich.sh
+          pip install -r requirements.txt
+
+      - name: Generate pre-flight snapshot
+        run: |
+          ./bin/snapshot.sh
+
+      - name: Process file list from snapshot
+        run: |
+          ./bin/dataset-enrich.sh
+        error: on-failure
+        continue-on-error: true
