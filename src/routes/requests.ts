@@ -1,87 +1,152 @@
 import { Router, Request, Response } from 'express';
-import { generatePublicUrl } from '../lib/url';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
-// In-memory store for example; replace with DB in production
-const requests: Array<{
-  id: string;
-  title: string;
-  type: string;
-  owner: string;
-  slaTarget?: string | null;
-  status: 'open' | 'in_progress' | 'closed';
-  createdAt: string;
-  updatedAt: string;
-  publicUrl: string;
-}> = [];
+const DATA_FILE = path.resolve(process.cwd(), '.axentx-requests.json');
 
-function isValidISODurationOrDate(value: string): boolean {
-  // Accept either ISO 8601 duration (PnYnMnDTnHnMnS) or date string
-  const isoDuration = /^P(?:\d+Y)?(?:\n?\d+M)?(?:\n?\d+W)?(?:\n?\d+D)?(?:T(?:\n?\d+H)?(?:\n?\d+M)?(?:\n?\d+S)?)?$/;
-  if (isoDuration.test(value)) return true;
-  // Valid date string that Date can parse and is not NaN
-  const d = new Date(value);
-  return !isNaN(d.getTime());
+type RequestStatus = 'submitted' | 'in_progress' | 'blocked' | 'done';
+
+interface StoredRequest {
+  id: string;
+  status: RequestStatus;
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+  slaTargetMinutes?: number;
+  previousStatus?: RequestStatus;
 }
 
-// POST /requests
-router.post('/', (req: Request, res: Response) => {
-  const { title, type, owner, slaTarget } = req.body;
+interface UpdateStatusBody {
+  status: RequestStatus;
+  slaTargetMinutes?: number;
+}
 
-  if (!title || typeof title !== 'string' || title.trim() === '') {
-    return res.status(400).json({ error: 'Missing or invalid title' });
+function loadRequests(): Record<string, StoredRequest> {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf8');
+      const parsed = JSON.parse(raw || '{}');
+      // Basic shape validation
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, StoredRequest>;
+    }
+  } catch {
+    // ignore corruption; start fresh
   }
-  if (!type || typeof type !== 'string' || type.trim() === '') {
-    return res.status(400).json({ error: 'Missing or invalid type' });
-  }
-  if (!owner || typeof owner !== 'string' || owner.trim() === '') {
-    return res.status(400).json({ error: 'Missing or invalid owner' });
-  }
-  if (slaTarget !== undefined && slaTarget !== null && !isValidISODurationOrDate(String(slaTarget))) {
-    return res.status(400).json({ error: 'Invalid SLA target' });
-  }
+  return {};
+}
 
-  const id = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const now = new Date().toISOString();
-  const publicUrl = generatePublicUrl(title, type, owner, slaTarget);
+function saveRequests(requests: Record<string, StoredRequest>): void {
+  try {
+    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(requests, null, 2), 'utf8');
+  } catch {
+    // best-effort persistence; caller can decide to warn/retry
+  }
+}
 
-  const newRequest = {
-    id,
-    title: title.trim(),
-    type: type.trim(),
-    owner: owner.trim(),
-    slaTarget: slaTarget ? String(slaTarget).trim() : null,
-    status: 'open' as const,
-    createdAt: now,
-    updatedAt: now,
-    publicUrl,
+const ALLOWED_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
+  submitted: ['in_progress', 'blocked'],
+  in_progress: ['blocked', 'done'],
+  blocked: ['in_progress', 'done'],
+  done: [] // terminal
+};
+
+function computeSlaElapsedMinutes(createdAt: string): number {
+  const start = new Date(createdAt).getTime();
+  if (isNaN(start)) return 0;
+  return Math.max(0, Math.floor((Date.now() - start) / 60000));
+}
+
+function isSlaBreached(req: StoredRequest): boolean {
+  if (!req.slaTargetMinutes || req.slaTargetMinutes <= 0) return false;
+  return computeSlaElapsedMinutes(req.createdAt) > req.slaTargetMinutes;
+}
+
+function buildResponse(req: StoredRequest) {
+  const slaElapsed = computeSlaElapsedMinutes(req.createdAt);
+  const breached = isSlaBreached(req);
+  return {
+    id: req.id,
+    status: req.status,
+    previousStatus: req.previousStatus,
+    createdAt: req.createdAt,
+    updatedAt: req.updatedAt,
+    slaElapsedMinutes: slaElapsed,
+    slaTargetMinutes: req.slaTargetMinutes,
+    slaBreached: breached,
+    allowedTransitions: ALLOWED_TRANSITIONS[req.status]
   };
+}
 
-  requests.push(newRequest);
+/**
+ * PUT /requests/:id/status
+ * Body: { status: RequestStatus, slaTargetMinutes?: number }
+ */
+router.put('/:id/status', (req: Request<{ id: string }, any, UpdateStatusBody>, res: Response) => {
+  const id = req.params.id;
+  const { status, slaTargetMinutes } = req.body || {};
 
-  return res.status(201).json({
-    id: newRequest.id,
-    publicUrl: newRequest.publicUrl,
-    status: newRequest.status,
-  });
+  if (!status || !['submitted', 'in_progress', 'blocked', 'done'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+
+  const requests = loadRequests();
+  let stored = requests[id];
+
+  // Create on first touch with submitted as initial state
+  if (!stored) {
+    const now = new Date().toISOString();
+    stored = { id, status: 'submitted', createdAt: now, updatedAt: now };
+    requests[id] = stored;
+  }
+
+  // Apply SLA target if provided
+  if (slaTargetMinutes !== undefined) {
+    stored.slaTargetMinutes = slaTargetMinutes;
+  }
+
+  // Terminal reject
+  if (stored.status === 'done') {
+    return res.status(400).json({ error: 'Cannot transition from done', allowed: [] });
+  }
+
+  // Validate transition
+  const allowed = ALLOWED_TRANSITIONS[stored.status];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({
+      error: `Invalid transition from ${stored.status} to ${status}`,
+      allowed
+    });
+  }
+
+  // Apply intended transition
+  stored.previousStatus = stored.status;
+  stored.status = status;
+  stored.updatedAt = new Date().toISOString();
+
+  // SLA breach reflection: if breached, force blocked and preserve intent
+  if (isSlaBreached(stored)) {
+    if (stored.status !== 'blocked') {
+      stored.previousStatus = stored.status;
+      stored.status = 'blocked';
+    }
+    stored.updatedAt = new Date().toISOString();
+  }
+
+  saveRequests(requests);
+  return res.json(buildResponse(stored));
 });
 
-// GET /requests
-router.get('/', (_req: Request, res: Response) => {
-  return res.json(
-    requests.map((r) => ({
-      id: r.id,
-      title: r.title,
-      type: r.type,
-      owner: r.owner,
-      slaTarget: r.slaTarget,
-      status: r.status,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-      publicUrl: r.publicUrl,
-    }))
-  );
+/**
+ * GET /requests/:id
+ */
+router.get('/:id', (req, res) => {
+  const id = req.params.id;
+  const requests = loadRequests();
+  const stored = requests[id];
+  if (!stored) return res.status(404).json({ error: 'Request not found' });
+  return res.json(buildResponse(stored));
 });
 
 export default router;
