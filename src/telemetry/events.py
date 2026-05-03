@@ -1,0 +1,6 @@
+from src.telemetry.events import log_document_open_event
+
+def open_document(document_id, page_num=1):
+    # ... existing open logic ...
+    log_document_open_event(document_id, page_num)
+    # ... continue ...
