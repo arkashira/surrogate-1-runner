@@ -1,53 +1,48 @@
 name: ingest
+
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
-  file-list:
+  snapshot:
     runs-on: ubuntu-latest
     outputs:
-      date: ${{ steps.vars.outputs.date }}
-      file_list: ${{ steps.list.outputs.files }}
+      snapshot-file: ${{ steps.upload.outputs.snapshot-file }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install deps
-        run: pip install huggingface_hub
-      - name: Generate file list (single API call)
-        id: list
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install huggingface_hub
+      - run: ./bin/snapshot.sh axentx/surrogate-1-training-pairs $(date +%Y-%m-%d) snapshot.json
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          RUN_DATE: ""  # let script default to UTC today
-        run: |
-          bash bin/build-file-list.sh
-          echo "files=$(jq -c .files file-list.json)" >> $GITHUB_OUTPUT
-          echo "date=$(jq -r .date file-list.json)" >> $GITHUB_OUTPUT
-      - name: Upload file-list artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
+        id: upload
         with:
-          name: file-list
-          path: file-list.json
+          name: snapshot-${{ github.run_id }}
+          path: snapshot.json
 
-  ingest-shard:
-    needs: file-list
+  ingest-shards:
+    needs: snapshot
     runs-on: ubuntu-latest
     strategy:
       matrix:
         shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     steps:
       - uses: actions/checkout@v4
-      - name: Download file-list
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-python@v5
         with:
-          name: file-list
-      - name: Install deps
-        run: pip install -r requirements.txt
-      - name: Run shard worker
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: snapshot-${{ github.run_id }}
+          path: .
+      - run: pip install -r requirements.txt
+      - run: bash bin/dataset-enrich.sh
         env:
           SHARD_ID: ${{ matrix.shard_id }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          FILE_LIST: file-list.json
-          RUN_DATE: ${{ needs.file-list.outputs.date }}
-        run: |
-          bash bin/dataset-enrich.sh
+          SNAPSHOT_FILE: snapshot.json
