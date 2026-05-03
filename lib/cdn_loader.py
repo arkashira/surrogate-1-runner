@@ -1,42 +1,59 @@
-import json, hashlib, pyarrow.parquet as pq, pyarrow as pa, io, requests, time
+import json, io, time, requests
 from typing import List, Dict, Iterator
+import pyarrow.parquet as pq
 
-CDN_TIMEOUT = 30
-MAX_RETRIES = 5
+def _backoff(attempt: int, base: float = 1.0, cap: float = 60.0) -> float:
+    return min(cap, base * (2 ** attempt))
 
-def load_manifest(path: str) -> List[Dict]:
-    with open(path) as f:
-        return json.load(f)["files"]
+def load_from_snapshot(manifest_path: str, columns: List[str] = ("prompt", "response")) -> Iterator[Dict]:
+    with open(manifest_path) as f:
+        manifest = json.load(f)
 
-def shard_files(files: List[Dict], shard_id: int, total_shards: int = 16) -> List[Dict]:
-    return [f for i, f in enumerate(files) if i % total_shards == shard_id]
+    files = manifest.get("files", [])
+    if not files:
+        return
 
-def stream_cdn_parquet(url: str) -> Iterator[pa.Table]:
-    for attempt in range(MAX_RETRIES):
+    for item in files:
+        url = item.get("cdn_url") or item.get("path")
+        if not url:
+            continue
+        if not url.startswith("http"):
+            # fallback to CDN construction
+            repo = manifest.get("repo", "")
+            url = f"https://huggingface.co/datasets/{repo}/resolve/main/{item['path']}"
+
+        for attempt in range(5):
+            try:
+                resp = requests.get(url, stream=True, timeout=30)
+                resp.raise_for_status()
+                break
+            except Exception as e:
+                wait = _backoff(attempt)
+                print(f"WARN: attempt {attempt+1}/5 failed for {url}: {e}; retry in {wait:.1f}s")
+                time.sleep(wait)
+        else:
+            print(f"WARN: failed to fetch {url} after 5 attempts")
+            continue
+
+        data = resp.content
         try:
-            resp = requests.get(url, timeout=CDN_TIMEOUT, stream=True)
-            resp.raise_for_status()
-            buf = io.BytesIO(resp.content)
-            yield pq.read_table(buf, columns=["prompt", "response"])
-            break
+            if url.endswith(".parquet"):
+                table = pq.read_table(io.BytesIO(data), columns=columns)
+                for batch in table.to_batches(max_chunksize=1000):
+                    cols = {c: batch.column(c) for c in columns}
+                    for i in range(batch.num_rows):
+                        yield {c: cols[c][i].as_py() for c in columns}
+            elif url.endswith(".jsonl"):
+                for line in data.splitlines():
+                    if not line.strip():
+                        continue
+                    try:
+                        row = json.loads(line)
+                        yield {c: row.get(c) for c in columns}
+                    except Exception:
+                        continue
+            else:
+                print(f"WARN: unsupported file {url}")
         except Exception as e:
-            if attempt == MAX_RETRIES - 1:
-                raise
-            time.sleep(2 ** attempt)
-
-def normalize_table(t: pa.Table) -> Iterator[Dict]:
-    df = t.to_pandas()
-    for _, row in df.iterrows():
-        prompt = str(row.get("prompt", ""))
-        response = str(row.get("response", ""))
-        if prompt.strip() and response.strip():
-            yield {"prompt": prompt.strip(), "response": response.strip()}
-
-def process_shard(manifest_path: str, shard_id: int) -> Iterator[Dict]:
-    files = load_manifest(manifest_path)
-    for f in shard_files(files, shard_id):
-        try:
-            for tbl in stream_cdn_parquet(f["cdn_url"]):
-                yield from normalize_table(tbl)
-        except Exception as e:
-            print(f"Failed to process {f['path']}: {e}")
+            print(f"WARN: failed to decode {url}: {e}")
+            continue

@@ -1,39 +1,44 @@
 #!/usr/bin/env bash
-# bin/snapshot.sh
-# Usage: HF_TOKEN=... ./bin/snapshot.sh axentx/surrogate-1-training-pairs 2026-05-03
 set -euo pipefail
 
-REPO="${1:?repo required}"
-DATE="${2:?date required (YYYY-MM-DD)}"
-OUTDIR="snapshots/${DATE}"
-OUTFILE="${OUTDIR}/files.json"
+REPO="${1:-axentx/surrogate-1-training-pairs}"
+DATE="${2:-$(date +%Y-%m-%d)}"
+OUT="${3:-snapshot-${REPO//\//-}-${DATE}.json}"
 
-mkdir -p "${OUTDIR}"
+python3 - "$REPO" "$DATE" "$OUT" <<'PY'
+import json, sys, datetime
+from huggingface_hub import HfApi
 
-# One HF tree API call per date folder (non-recursive).
-# Rate-note: this is the only HF API call; CDN downloads do NOT count against limits.
-echo "Listing ${REPO} tree for ${DATE}..."
-TREE_JSON=$(curl -s \
-  -H "Authorization: Bearer ${HF_TOKEN:-}" \
-  -H "Content-Type: application/json" \
-  "https://huggingface.co/api/datasets/${REPO}/tree?path=${DATE}&recursive=false")
+repo, date, out = sys.argv[1], sys.argv[2], sys.argv[3]
+api = HfApi()
 
-# Extract filenames, sort for determinism, build CDN URLs.
-echo "${TREE_JSON}" \
-  | python3 -c "
-import sys, json, os
-tree = json.load(sys.stdin)
-items = sorted([item for item in tree if item.get('type') == 'file'], key=lambda x: x['path'])
-base = 'https://huggingface.co/datasets/${REPO}/resolve/main'
-out = []
-for it in items:
-    p = it['path']
-    out.append({
-        'path': p,
-        'basename': os.path.basename(p),
-        'cdn_url': f'{base}/{p}'
+try:
+    files = api.list_repo_tree(repo=repo, path=date, recursive=False)
+except Exception as e:
+    print(f"ERROR: failed to list repo tree: {e}", file=sys.stderr)
+    sys.exit(1)
+
+manifest = {
+    "repo": repo,
+    "date": date,
+    "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+    "files": []
+}
+
+for f in files:
+    if f.type != "file":
+        continue
+    path = f.rfilename
+    manifest["files"].append({
+        "path": path,
+        "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{path}"
     })
-print(json.dumps({'date': '${DATE}', 'repo': '${REPO}', 'files': out}, indent=2))
-" > "${OUTFILE}"
 
-echo "Snapshot written to ${OUTFILE}"
+if not manifest["files"]:
+    print(f"ERROR: no files found in {repo} at {date}", file=sys.stderr)
+    sys.exit(1)
+
+with open(out, "w") as fh:
+    json.dump(manifest, fh, indent=2)
+print(out)
+PY
