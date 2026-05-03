@@ -1,108 +1,70 @@
 #!/usr/bin/env python3
 """
-Generate deterministic file list for a HuggingFace dataset repo.
+Generate deterministic file list for a date folder in axentx/surrogate-1-training-pairs.
 Usage:
-  HF_TOKEN=<token> python bin/list-files.py \
-    --repo axentx/surrogate-1-training-pairs \
-    --path raw/2026-05-02 \
-    --out file-list.json
-
-Notes:
-- Uses list_repo_tree(path, recursive=False) per folder to avoid 429.
-- CDN download URLs are NOT rate-limited by /api/ endpoints.
-- Output is stable (sorted) so training scripts can embed it.
+  HF_TOKEN=<token> python bin/list-files.py --repo axentx/surrogate-1-training-pairs \
+    --folder batches/public-merged/2026-05-02 --out file-list.json
 """
 import argparse
+import hashlib
 import json
 import os
 import sys
-import time
-from typing import List, Dict
+from datetime import datetime, timezone
 
-from huggingface_hub import HfApi, RepositoryTreeEntry
+from huggingface_hub import HfApi
 
-CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
-
-def list_folder(api: HfApi, repo: str, folder: str) -> List[RepositoryTreeEntry]:
-    """Single non-recursive call per folder."""
-    target = folder if folder else "."
+def sha256_of_repo_file(api, repo_id, path):
     try:
-        entries = api.list_repo_tree(repo=repo, path=target, recursive=False)
-    except Exception as exc:
-        print(f"ERROR listing {repo}/{target}: {exc}", file=sys.stderr)
-        raise
-    return entries
-
-def build_file_list(repo: str, root: str, api: HfApi) -> List[Dict]:
-    """
-    Walk root non-recursively by known subfolders (avoids recursive list_repo_files).
-    If root contains nested folders, we expand one level only.
-    """
-    entries = list_folder(api, repo, root)
-    files = []
-
-    for entry in entries:
-        if entry.type == "file":
-            files.append(
-                {
-                    "path": entry.path,
-                    "size": getattr(entry, "size", None),
-                    "lfs": getattr(entry, "lfs", None),
-                    "cdn_url": CDN_TEMPLATE.format(repo=repo, path=entry.path),
-                }
-            )
-        elif entry.type == "folder":
-            # One-level expansion to avoid heavy recursive calls
-            sub_entries = list_folder(api, repo, entry.path)
-            for sub in sub_entries:
-                if sub.type == "file":
-                    files.append(
-                        {
-                            "path": sub.path,
-                            "size": getattr(sub, "size", None),
-                            "lfs": getattr(sub, "lfs", None),
-                            "cdn_url": CDN_TEMPLATE.format(repo=repo, path=sub.path),
-                        }
-                    )
-
-    # Deterministic ordering
-    files.sort(key=lambda x: x["path"])
-    return files
+        info = api.repo_info(repo_id=repo_id, repo_type="dataset", files_metadata=True)
+        for f in info:
+            if f.path == path and getattr(f, "sha256", None):
+                return f.sha256
+    except Exception:
+        pass
+    return None
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate CDN file list for HF dataset repo.")
-    parser.add_argument("--repo", required=True, help="HF dataset repo (user/repo)")
-    parser.add_argument("--path", default="", help="Root folder inside repo")
-    parser.add_argument("--out", required=True, help="Output JSON path")
-    parser.add_argument("--retry-wait", type=int, default=360, help="Wait seconds on 429")
+    parser = argparse.ArgumentParser(description="List repo folder for CDN-only ingestion")
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    parser.add_argument("--folder", required=True, help="Folder path in repo (e.g. batches/public-merged/2026-05-02)")
+    parser.add_argument("--out", default="file-list.json")
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN")
+    if not token:
+        print("ERROR: HF_TOKEN env var required", file=sys.stderr)
+        sys.exit(1)
+
     api = HfApi(token=token)
 
-    for attempt in range(3):
-        try:
-            files = build_file_list(args.repo, args.path, api)
-            break
-        except Exception as exc:
-            if attempt == 2:
-                print(f"FAILED after retries: {exc}", file=sys.stderr)
-                sys.exit(1)
-            print(f"Retry {attempt+1}/3 after {args.retry_wait}s: {exc}", file=sys.stderr)
-            time.sleep(args.retry_wait)
+    # Use recursive=False per folder to avoid 100x pagination on big repos.
+    entries = api.list_repo_tree(repo_id=args.repo, path=args.folder, recursive=False)
+    files = [e for e in entries if e.type == "file"]
+
+    # Sort for deterministic ordering across runs.
+    files.sort(key=lambda f: f.path)
 
     out = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "repo": args.repo,
-        "root": args.path,
-        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "files": files,
+        "folder": args.folder,
+        "strategy": "cdn-only",
+        "files": [
+            {
+                "path": f.path,
+                "size": getattr(f, "size", None),
+                "sha256": sha256_of_repo_file(api, args.repo, f.path) or "",
+            }
+            for f in files
+        ],
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(out, f, indent=2, sort_keys=True)
+    with open(args.out, "w", encoding="utf-8") as fh:
+        json.dump(out, fh, indent=2)
+        fh.write("\n")
 
-    print(f"Wrote {len(files)} files -> {args.out}")
+    print(f"Wrote {len(files)} files to {args.out}")
 
 if __name__ == "__main__":
     main()
