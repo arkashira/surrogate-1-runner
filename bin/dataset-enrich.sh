@@ -1,84 +1,94 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${SHARD_ID:?}"
-: "${DATE_PART:?}"
-: "${TIME_PART:?}"
-: "${REPO:?}"
-: "${HF_TOKEN:?}"
+# Config
+REPO="axentx/surrogate-1-training-pairs"
+HF_TOKEN="${HF_TOKEN:-}"
+SHARD_ID="${SHARD_ID:-0}"          # 0..15 via matrix
+TODAY=$(date -u +%Y-%m-%d)
+OUT_DIR="batches/public-merged/${TODAY}"
+mkdir -p "${OUT_DIR}"
+OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-$(date -u +%H%M%S).jsonl"
 
-BASE_OUT="batches/public-merged/${DATE_PART}"
-OUT_FILE="${BASE_OUT}/shard${SHARD_ID}-${TIME_PART}.jsonl"
-SUCCESS_MARKER="${BASE_OUT}/shard${SHARD_ID}-${TIME_PART}.success"
-
-mkdir -p "$(dirname "$OUT_FILE")"
-
-# Skip if this exact shard/time already completed (avoid races/repeats)
-if [[ -f "$SUCCESS_MARKER" ]]; then
-  echo "Shard ${SHARD_ID} for ${DATE_PART} ${TIME_PART} already done (success marker present). Skipping."
-  exit 0
+# 1) Pre-flight: list today's folder once (non-recursive)
+#    Uses HF API (counts toward rate limit) — run once per workflow.
+echo "Listing ${REPO} folder for ${TODAY}..."
+if [ -n "${HF_TOKEN}" ]; then
+  AUTH_HEADER="Authorization: Bearer ${HF_TOKEN}"
+else
+  AUTH_HEADER=""
 fi
 
-# Deterministic shard assignment by slug
-shard_for() {
-  local slug=$1
-  python -c "import hashlib; print(abs(int(hashlib.sha256('$slug'.encode()).hexdigest(), 16)) % 16)"
-}
+# Save file list for all shards to reuse (optional: commit to repo or pass via artifact)
+FILE_LIST="file-list-${TODAY}.json"
+if [ ! -f "${FILE_LIST}" ]; then
+  curl -sSf -H "${AUTH_HEADER}" \
+    "https://huggingface.co/api/datasets/${REPO}/tree?path=${TODAY}&recursive=false" \
+    | jq -r '[.tree[] | select(.type=="blob") | .path] | sort' > "${FILE_LIST}"
+fi
 
-python - <<PY
-import json, os, hashlib, sys, requests, tqdm
+# 2) Assign deterministic shard files
+mapfile -t ALL_FILES < <(jq -r '.[]' "${FILE_LIST}")
+SHARD_FILES=()
+for f in "${ALL_FILES[@]}"; do
+  # Deterministic hash-based shard assignment
+  HASH=$(echo -n "${f}" | sha256sum | awk '{print strtonum("0x" substr($1,1,8))}')
+  if (( HASH % 16 == SHARD_ID )); then
+    SHARD_FILES+=("${f}")
+  fi
+done
 
-SHARD_ID = int(os.getenv("SHARD_ID"))
-REPO = os.getenv("REPO")
-OUT_FILE = os.getenv("OUT_FILE")
-FILE_LIST = "file-list.json"
+echo "Shard ${SHARD_ID}: processing ${#SHARD_FILES[@]} files."
 
-with open(FILE_LIST) as f:
-    manifest = json.load(f)
+# 3) Process each assigned file via CDN (no auth header)
+for rel_path in "${SHARD_FILES[@]}"; do
+  echo "Processing ${rel_path}..."
+  CDN_URL="https://huggingface.co/datasets/${REPO}/resolve/main/${rel_path}"
 
-files = manifest["files"]
+  # Download via CDN (no Authorization header)
+  tmp=$(mktemp)
+  curl -sSf -o "${tmp}" "${CDN_URL}"
 
-def shard_for(slug: str) -> int:
-    return abs(int(hashlib.sha256(slug.encode()).hexdigest(), 16)) % 16
+  # Lightweight schema projection to {prompt,response} + md5 dedup via lib/dedup.py
+  python3 -c "
+import sys, json, hashlib, pyarrow as pa, pyarrow.parquet as pq, os
+from lib.dedup import DedupStore
 
-def download_cdn(path: str) -> bytes:
-    url = f"https://huggingface.co/datasets/{REPO}/resolve/main/{path}"
-    r = requests.get(url, timeout=30)
-    r.raise_for_status()
-    return r.content
+dedup = DedupStore()
+try:
+    table = pq.read_table('${tmp}')
+except Exception:
+    # fallback: try jsonl
+    with open('${tmp}', 'r') as f:
+        rows = [json.loads(l) for l in f if l.strip()]
+    table = pa.Table.from_pylist(rows)
 
-def parse_to_pair(raw: bytes, filename: str):
-    # Adapt to your schema. Must return dict with at least {prompt,response}.
-    text = raw.decode("utf-8", errors="replace")
-    return {"prompt": f"from {filename}", "response": text[:2000]}
+# Normalize to prompt/response (best-effort)
+def normalize(tbl):
+    cols = set(tbl.column_names)
+    prompt_col = next((c for c in ('prompt','input','question') if c in cols), None)
+    response_col = next((c for c in ('response','output','answer') if c in cols), None)
+    if prompt_col and response_col:
+        return pa.table({'prompt': tbl[prompt_col], 'response': tbl[response_col]})
+    # fallback: keep all cols but ensure prompt/response exist
+    return tbl
 
-written = 0
-with open(OUT_FILE, "w", encoding="utf-8") as out:
-    for fpath in tqdm.tqdm(files, desc="Processing"):
-        slug = os.path.splitext(os.path.basename(fpath))[0]
-        if shard_for(slug) != SHARD_ID:
-            continue
-        try:
-            raw = download_cdn(fpath)
-            pair = parse_to_pair(raw, fpath)
-            if pair is None:
-                continue
-            pair["_md5"] = hashlib.md5(raw).hexdigest()
-            pair["_source_file"] = fpath
-            out.write(json.dumps(pair, ensure_ascii=False) + "\n")
-            written += 1
-        except Exception as e:
-            print(f"WARN: failed {fpath}: {e}", file=sys.stderr)
+norm = normalize(table)
 
-print(f"Wrote {written} pairs to {OUT_FILE}")
-PY
+# Dedup by content hash
+for batch in norm.to_batches():
+    df = batch.to_pydict()
+    n = len(next(iter(df.values()))) if df else 0
+    for i in range(n):
+        row = {k: df[k][i] for k in df}
+        payload = json.dumps(row, sort_keys=True).encode()
+        md5 = hashlib.md5(payload).hexdigest()
+        if not dedup.seen(md5):
+            dedup.add(md5)
+            print(json.dumps(row, ensure_ascii=False))
+" >> "${OUT_FILE}"
 
-# Create success marker to prevent re-runs/races for this exact shard/time
-touch "$SUCCESS_MARKER"
+  rm -f "${tmp}"
+done
 
-# Push only this shard's file + marker
-git config user.name "github-actions"
-git config user.email "github-actions@github.com"
-git add "$OUT_FILE" "$SUCCESS_MARKER"
-git commit -m "shard${SHARD_ID} ${DATE_PART} ${TIME_PART}" || true
-git push "https://${HF_TOKEN}@huggingface.co/datasets/${REPO}.git" HEAD:main
+echo "Shard ${SHARD_ID} finished. Output: ${OUT_FILE}"

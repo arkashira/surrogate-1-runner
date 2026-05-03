@@ -1,39 +1,23 @@
-# Keep existing central md5 store behavior; this file is imported by the runner.
-import hashlib, json, sys, argparse, sqlite3, os
+import sqlite3
+import os
+import threading
 
-DB_PATH = os.getenv("DEDUP_DB", "/tmp/dedup_hashes.db")
+class DedupStore:
+    def __init__(self, db_path=None):
+        # Use central store path if provided by env; otherwise local temp.
+        self.db_path = db_path or os.getenv("DEDUP_DB", ":memory:")
+        self._lock = threading.Lock()
+        self._init()
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("CREATE TABLE IF NOT EXISTS hashes (md5 TEXT PRIMARY KEY)")
-    conn.commit()
-    return conn
+    def _init(self):
+        with self._lock, sqlite3.connect(self.db_path) as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS seen (md5 TEXT PRIMARY KEY)")
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--input", default=sys.stdin, type=argparse.FileType("r"))
-    ap.add_argument("--output", default=sys.stdout, type=argparse.FileType("w"))
-    args = ap.parse_args()
+    def seen(self, md5):
+        with self._lock, sqlite3.connect(self.db_path) as conn:
+            cur = conn.execute("SELECT 1 FROM seen WHERE md5=?", (md5,))
+            return cur.fetchone() is not None
 
-    conn = init_db()
-    seen = set(r[0] for r in conn.execute("SELECT md5 FROM hashes").fetchall())
-    new_hashes = []
-
-    for line in args.input:
-        line = line.strip()
-        if not line:
-            continue
-        md5 = hashlib.md5(line.encode()).hexdigest()
-        if md5 in seen:
-            continue
-        seen.add(md5)
-        new_hashes.append(md5)
-        args.output.write(line + "\n")
-
-    if new_hashes:
-        conn.executemany("INSERT OR IGNORE INTO hashes (md5) VALUES (?)", [(h,) for h in new_hashes])
-        conn.commit()
-    conn.close()
-
-if __name__ == "__main__":
-    main()
+    def add(self, md5):
+        with self._lock, sqlite3.connect(self.db_path) as conn:
+            conn.execute("INSERT OR IGNORE INTO seen (md5) VALUES (?)", (md5,))

@@ -1,69 +1,36 @@
-name: surrogate-1-ingest
+name: ingest
+
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
-  preflight:
-    runs-on: ubuntu-latest
-    outputs:
-      date: ${{ steps.date.outputs.DATE }}
-      time: ${{ steps.time.outputs.TIME }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set date/time
-        id: date
-        run: echo "DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
-
-      - name: Set time
-        id: time
-        run: echo "TIME=$(date -u +%H%M%S)" >> $GITHUB_OUTPUT
-
-      - name: List today folder (single API call)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python - <<'PY'
-          import os, json, datetime
-          from huggingface_hub import HfApi
-          api = HfApi(token=os.getenv("HF_TOKEN"))
-          today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
-          repo = "datasets/axentx/surrogate-1-training-pairs"
-          items = api.list_repo_tree(repo=repo, path=today, recursive=False)
-          files = sorted(it.rfilename for it in items if hasattr(it, "rfilename"))
-          with open("file-list.json", "w") as f:
-              json.dump({"date": today, "files": files}, f)
-          PY
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: file-list
-          path: file-list.json
-
   ingest:
-    needs: preflight
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          name: file-list
+          python-version: '3.11'
 
       - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: Run shard worker
+      - name: Run shard
         env:
-          SHARD_ID: ${{ matrix.shard_id }}
-          DATE_PART: ${{ needs.preflight.outputs.date }}
-          TIME_PART: ${{ needs.preflight.outputs.time }}
+          SHARD_ID: ${{ matrix.shard }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          REPO: "datasets/axentx/surrogate-1-training-pairs"
-        run: |
-          bash bin/dataset-enrich.sh
+          DEDUP_DB: ""   # optional: point to shared SQLite if cross-run dedup desired
+        run: bash bin/dataset-enrich.sh
+
+      - name: Upload shard output
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: batches/public-merged/
