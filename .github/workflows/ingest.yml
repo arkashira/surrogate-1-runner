@@ -1,32 +1,24 @@
 jobs:
-  snapshot:
-    runs-on: ubuntu-latest
-    outputs:
-      manifest: ${{ steps.set.outputs.manifest }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - run: pip install huggingface_hub
-      - run: bin/snapshot.sh ${{ github.event.inputs.date || format('2026-05-{0}', github.run_number) }} snapshot.json
-      - name: Set output
-        id: set
-        run: echo "manifest=snapshot.json" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v4
-        with:
-          name: snapshot
-          path: snapshot.json
-
   ingest:
-    needs: snapshot
     strategy:
       matrix:
         shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: snapshot
-      - run: bin/dataset-enrich.sh ${{ matrix.shard }} 16 MANIFEST=snapshot.json
+      - name: Fetch manifest
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          FILE_MANIFEST="data/file_manifest_${DATE}.json"
+          if [ -f "$FILE_MANIFEST" ]; then
+            echo "Using existing $FILE_MANIFEST"
+          else
+            echo "Manifest not found; runners will fallback to streaming"
+          fi
+          echo "FILE_MANIFEST=$FILE_MANIFEST" >> $GITHUB_ENV
+      - name: Run shard
         env:
+          SHARD_ID: ${{ matrix.shard }}
+          FILE_MANIFEST: ${{ env.FILE_MANIFEST }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          bash bin/dataset-enrich.sh

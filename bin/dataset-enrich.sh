@@ -1,121 +1,65 @@
 #!/usr/bin/env bash
-# bin/dataset-enrich.sh
-# Runs in GitHub Actions (16-shard matrix)
 set -euo pipefail
 
-# Config
-REPO="axentx/surrogate-1-training-pairs"
-DATE_FOLDER="${DATE_FOLDER:-$(date +%Y-%m-%d)}"
-SHARD_ID="${SHARD_ID:-0}"
-TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
 HF_TOKEN="${HF_TOKEN:-}"
-OUT_DIR="./output"
+REPO="axentx/surrogate-1-training-pairs"
+DATE="${DATE:-$(date +%Y-%m-%d)}"
+SHARD_ID="${SHARD_ID:-0}"
+FILE_MANIFEST="${FILE_MANIFEST:-}"
+OUT_DIR="batches/public-merged/${DATE}"
+TS=$(date +%H%M%S)
+OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-${TS}.jsonl"
+
 mkdir -p "$OUT_DIR"
 
-# 1. Accept pre-listed file list (embedded or downloaded)
-FILE_LIST="${FILE_LIST:-/tmp/file-list-${DATE_FOLDER}.json}"
-
-# If file list not provided, fetch once per shard start (fallback)
-if [[ ! -f "$FILE_LIST" ]]; then
-  echo "[$SHARD_ID] Fetching file list for $DATE_FOLDER..."
-  URL="https://huggingface.co/api/datasets/${REPO}/tree?path=${DATE_FOLDER}&recursive=false"
-  if [[ -n "$HF_TOKEN" ]]; then
-    curl -sL -H "Authorization: Bearer ${HF_TOKEN}" "$URL" -o "$FILE_LIST"
-  else
-    curl -sL "$URL" -o "$FILE_LIST"
-  fi
-fi
-
-# Extract file paths
-mapfile -t ALL_FILES < <(jq -r '.[] | select(.type=="file") | .path' "$FILE_LIST")
-TOTAL_FILES=${#ALL_FILES[@]}
-
-if [[ $TOTAL_FILES -eq 0 ]]; then
-  echo "[$SHARD_ID] No files found for $DATE_FOLDER, exiting."
-  exit 0
-fi
-
-# 2. Deterministic shard assignment: hash(path) mod TOTAL_SHARDS
-process_file() {
-  local filepath="$1"
-  local slug_hash
-  slug_hash=$(echo -n "$filepath" | md5sum | cut -c1-8)
-  local shard_assign=$(( 0x${slug_hash} % TOTAL_SHARDS ))
-  [[ $shard_assign -eq $SHARD_ID ]]
+shard_for() {
+  local slug="$1"
+  local hash
+  hash=$(echo -n "$slug" | sha256sum | tr -d ' -')
+  echo $(( 0x${hash:0:8} % 16 ))
 }
 
-# 3. Filter to this shard's files
-SHARD_FILES=()
-for f in "${ALL_FILES[@]}"; do
-  if process_file "$f"; then
-    SHARD_FILES+=("$f")
-  fi
-done
+if [[ -n "$FILE_MANIFEST" && -f "$FILE_MANIFEST" ]]; then
+  echo "Using CDN-bypass manifest: $FILE_MANIFEST"
+  jq -r '.[] | .path' "$FILE_MANIFEST" | while read -r relpath; do
+    slug=$(basename "$relpath" .parquet)
+    [[ $(shard_for "$slug") -eq "$SHARD_ID" ]] || continue
 
-echo "[$SHARD_ID] Processing ${#SHARD_FILES[@]}/${TOTAL_FILES} files (shard ${SHARD_ID}/${TOTAL_SHARDS})"
-
-# 4. Process each file: CDN download + schema projection
-TIMESTAMP=$(date +%H%M%S)
-OUTPUT_FILE="${OUT_DIR}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
-
-process_and_project() {
-  local filepath="$1"
-  local cdn_url="https://huggingface.co/datasets/${REPO}/resolve/main/${filepath}"
-  local tmp_file
-  tmp_file=$(mktemp)
-
-  if curl -sL -f "$cdn_url" -o "$tmp_file"; then
-    python3 -c "
-import sys, json, pyarrow.parquet as pq
+    url="https://huggingface.co/datasets/${REPO}/resolve/main/${relpath}"
+    tmp=$(mktemp)
+    if curl -fsSL "$url" -o "$tmp"; then
+      python3 -c "
+import json, pyarrow.parquet as pq, sys
 try:
-    table = pq.read_table('$tmp_file')
-    prompt = table['prompt'].to_pylist() if 'prompt' in table.column_names else [None] * len(table)
-    response = table['response'].to_pylist() if 'response' in table.column_names else [None] * len(table)
-    for p, r in zip(prompt, response):
-        if p is not None and r is not None:
-            print(json.dumps({'prompt': p, 'response': r, 'source_file': '$filepath'}))
-except Exception:
-    pass
-" >> "$OUTPUT_FILE" 2>/dev/null || true
-    rm -f "$tmp_file"
-  else
-    echo "[$SHARD_ID] CDN download failed: $filepath" >&2
-    rm -f "$tmp_file"
-  fi
-}
-
-export -f process_and_project
-export OUTPUT_FILE
-
-# Parallel within shard
-printf '%s\n' "${SHARD_FILES[@]}" | xargs -P 4 -I {} bash -c 'process_and_project "$@"' _ {}
-
-# 5. Upload to HF dataset repo (git-based, deterministic filenames)
-if [[ -s "$OUTPUT_FILE" ]]; then
-  LINES=$(wc -l < "$OUTPUT_FILE")
-  echo "[$SHARD_ID] Produced $LINES pairs -> shard${SHARD_ID}-${TIMESTAMP}.jsonl"
-
-  if [[ -n "$HF_TOKEN" ]]; then
-    git config --global user.email "runner@axentx.io"
-    git config --global user.name "surrogate-1-runner"
-
-    DATASET_DIR="/tmp/dataset-repo"
-    rm -rf "$DATASET_DIR"
-    git clone --depth 1 "https://${HF_TOKEN}@huggingface.co/datasets/${REPO}" "$DATASET_DIR"
-
-    DEST_DIR="${DATASET_DIR}/batches/public-merged/${DATE_FOLDER}"
-    mkdir -p "$DEST_DIR"
-    cp "$OUTPUT_FILE" "${DEST_DIR}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
-
-    cd "$DATASET_DIR"
-    git add "batches/public-merged/${DATE_FOLDER}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
-    git commit -m "shard${SHARD_ID}: ${TIMESTAMP} - ${LINES} pairs"
-    git push origin main
-
-    echo "[$SHARD_ID] Commit pushed successfully"
-  else
-    echo "[$SHARD_ID] No HF_TOKEN, skipping upload (dry-run)"
-  fi
+  tbl = pq.read_table('$tmp')
+  df = tbl.to_pandas()
+  prompt_col = next((c for c in df.columns if 'prompt' in c.lower()), df.columns[0])
+  response_col = next((c for c in df.columns if 'response' in c.lower() or 'completion' in c.lower()), df.columns[-1])
+  for _, row in df.iterrows():
+    out = {'prompt': str(row[prompt_col]), 'response': str(row[response_col])}
+    print(json.dumps(out, ensure_ascii=False))
+except Exception as e:
+  sys.stderr.write(f'Parse error {e} for $relpath\\n')
+" >> "$OUT_FILE"
+    else
+      echo "Download failed: $url"
+    fi
+    rm -f "$tmp"
+  done
 else
-  echo "[$SHARD_ID] No valid pairs produced"
+  echo "WARNING: FILE_MANIFEST not provided; falling back to streaming (may hit rate limits)"
+  python3 -c "
+from datasets import load_dataset
+import json
+ds = load_dataset('$REPO', split='train', streaming=True)
+for ex in ds:
+  if hash(ex.get('slug', '')) % 16 == $SHARD_ID:
+    print(json.dumps({'prompt': ex.get('prompt', ''), 'response': ex.get('response', '')}, ensure_ascii=False))
+" >> "$OUT_FILE"
+fi
+
+if [[ -n "$HF_TOKEN" ]]; then
+  huggingface-cli upload --repo-type dataset "$REPO" "$OUT_FILE" "$OUT_FILE" --token "$HF_TOKEN"
+else
+  echo "HF_TOKEN not set; skipping upload"
 fi
