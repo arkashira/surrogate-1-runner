@@ -104,97 +104,87 @@ def slug_to_shard(slug: str, total: int) -> int:
     digest = hashlib.md5(slug.encode("utf-8")).hexdigest()
     return int(digest, 1
 
-## review — reviewer @ 2026-05-03T04:00:04.448621Z
+## review — reviewer @ 2026-05-03T03:59:58.062527Z
 
-APPROVE: This change proposes a manifest-driven, CDN-bypass ingestion worker that replaces the existing shell script with a robust Python worker, addressing several issues and improving the overall data loading process.
+APPROVE
 
-* The worker uses a single pre-listed manifest to deterministically hash file paths and process only its assigned shard, reducing API rate limits and improving efficiency.
-* The code projects each file to `{prompt, response}` at parse time, avoiding pyarrow CastError from mixed schemas.
-* The worker uses a central md5 store for deduplication and writes output to a deterministic filename, avoiding collisions.
-* The code includes retry/backoff for CDN 429/5xx and HF commit 429, improving robustness.
-* The change keeps the 16-shard matrix architecture but makes it deterministic and manifest-driven, enabling zero-API data loading during training.
-* The deliverable is a single, focused Python script + small GH Actions tweak, which can be shipped in <2h.
+- Replaces fragile shell script with a manifest-driven Python worker that directly applies the HF CDN bypass insight to eliminate API rate limits during data load.
+- Fixes pyarrow CastError by projecting to {prompt, response} at parse time and avoids mixed-schema casts.
+- Keeps 16-shard matrix architecture but makes shard assignment deterministic via path hashing, enabling zero-API data loading for each worker.
+- Provides clear runbook for GH Actions matrix (SHARD_ID/SHARD_TOTAL) and deterministic output filenames to avoid collisions.
+- Includes retry/backoff for CDN 429/5xx and HF commit 429, with centralized dedup via lib/dedup.py and timestamped outputs for testability.
 
-To further improve this change, consider the following acceptance criteria:
-* Verify that the manifest-driven approach correctly assigns files to shards and processes only the assigned shard.
-* Test the retry/backoff mechanism for CDN 429/5xx and HF commit 429 to ensure it correctly handles errors and waits the specified amount of time before retrying.
-* Confirm that the central md5 store correctly deduplicates files and writes output to the expected filename.
-* Validate that the worker correctly projects files to `{prompt, response}` at parse time and avoids pyarrow CastError.
-* Review the code for any potential security vulnerabilities, such as secret leakage or broken auth, and ensure that it follows best practices for secure coding.
+Acceptance criteria (downstream tester can check):
+- Worker runs with SHARD_ID=0..15, SHARD_TOTAL=16 and produces exactly one shard-N output file under batches/public-merged/{DATE_FOLDER}/shardN-*.jsonl.
+- Each output record is valid JSON with prompt and response fields; no pyarrow CastError during parquet/JSONL projection.
+- Manifest-driven path selection assigns each file to exactly one shard (deterministic hash) and workers skip non-assigned files.
+- CDN downloads succeed without Authorization header; HF_TOKEN is only used for commit, and 429/5xx retries wait up to RETRY_WAIT with backoff.
+- Dedup integration via lib/dedup.py prevents duplicate records across shards (md5-based) and logs skipped duplicates.
 
-## qa — qa @ 2026-05-03T04:00:19.674693Z
+## review — qa @ 2026-05-03T04:00:30.638982Z
 
-PASS: Manifest-driven CDN-bypass ingestion worker is approved and testable.
+PASS: 
 
-1. **Acceptance criteria**
-- Deterministic shard assignment: for any path in the manifest, hash(path) % SHARD_TOTAL consistently maps to exactly one shard; worker with SHARD_ID=i processes only paths where hash(path) % SHARD_TOTAL == i.
-- Manifest consumption: worker fetches MANIFEST_URL (or local fallback) and parses JSON array of file paths; missing/invalid manifest fails fast with non-zero exit.
-- CDN bypass download: each file is fetched via CDN URL without Authorization header; HTTP 429/5xx trigger exponential backoff (initial 1s, max 60s) with at least 3 retries before failing.
-- Projection and schema: every downloaded file is projected to {prompt, response} at parse time; rows missing either field are dropped and logged; no pyarrow CastError propagates.
-- Deduplication and output: md5(content) is checked against central dedup store; duplicates are skipped; non-duplicate rows are appended to batches/public-merged/{DATE_FOLDER}/shard{N}-{HHMMSS}.jsonl with valid JSONL lines.
-- HF commit: on successful shard write, worker commits file via HF API using HF_TOKEN; HF 429 triggers wait 360s + retry (at least once); commit failures after retries fail the job.
-- Idempotency: running the same worker twice with same manifest and dedup store produces identical output file content and does not create duplicate HF commits (same deterministic filename).
+## Acceptance criteria
+* The worker runs with SHARD_ID=0..15, SHARD_TOTAL=16 and produces exactly one shard-N output file under batches/public-merged/{DATE_FOLDER}/shardN-*.jsonl.
+* Each output record is valid JSON with prompt and response fields; no pyarrow CastError during parquet/JSONL projection.
+* Manifest-driven path selection assigns each file to exactly one shard (deterministic hash) and workers skip non-assigned files.
+* CDN downloads succeed without Authorization header; HF_TOKEN is only used for commit, and 429/5xx retries wait up to RETRY_WAIT with backoff.
+* Dedup integration via lib/dedup.py prevents duplicate records across shards (md5-based) and logs skipped duplicates.
+* The worker commits the output files to the Hugging Face repository using the provided HF_TOKEN.
+* The worker handles errors and exceptions correctly, including retrying failed downloads and commits.
 
-2. **Unit tests** (pytest-style pseudo-code)
+## Unit tests
 ```python
-# test_shard_assignment.py
-def test_hash_path_to_shard_is_deterministic():
-    from dataset_enrich import shard_for_path
-    path = "train/abc.parquet"
-    assert shard_for_path(path, total=16) == shard_for_path(path, total=16)
+import unittest
+from unittest.mock import patch, MagicMock
+from bin.dataset_enrich import main
 
-def test_shard_coverage_is_exclusive():
-    from dataset_enrich import shard_for_path
-    paths = [f"file_{i}.parquet" for i in range(1000)]
-    assignments = [shard_for_path(p, total=16) for p in paths]
-    assert set(assignments) == set(range(16))
+class TestDatasetEnrich(unittest.TestCase):
+    @patch('requests.get')
+    def test_cdn_download(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b'{"prompt": "test", "response": "test"}'
+        mock_get.return_value = mock_response
+        result = main.cdn_download('https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/test.json')
+        self.assertEqual(result, {'prompt': 'test', 'response': 'test'})
 
-# test_manifest.py
-def test_load_manifest_valid_json():
-    from dataset_enrich import load_manifest
-    manifest = load_manifest("file://tests/fixtures/manifest-valid.json")
-    assert isinstance(manifest, list) and len(manifest) > 0
+    @patch('pyarrow.parquet.read_table')
+    def test_parquet_projection(self, mock_read_table):
+        mock_table = MagicMock()
+        mock_table.to_pylist = MagicMock(return_value=[{'prompt': 'test', 'response': 'test'}])
+        mock_read_table.return_value = mock_table
+        result = main.parquet_projection('test.parquet')
+        self.assertEqual(result, [{'prompt': 'test', 'response': 'test'}])
 
-def test_load_manifest_invalid_raises():
-    from dataset_enrich import load_manifest
-    with pytest.raises(ValueError):
-        load_manifest("file://tests/fixtures/manifest-invalid.json")
+    @patch('lib.dedup.dedup')
+    def test_dedup(self, mock_dedup):
+        mock_dedup.return_value = True
+        result = main.dedup({'prompt': 'test', 'response': 'test'})
+        self.assertTrue(result)
 
-# test_download.py
-@responses.activate
-def test_download_cdn_bypass_no_auth():
-    import dataset_enrich
-    responses.add(responses.GET, "https://huggingface.co/datasets/dataset/file.parquet", body=b"data", status=200)
-    resp = dataset_enrich.download_file("dataset/file.parquet")
-    assert resp.content == b"data"
-    req = responses.calls[0].request
-    assert "Authorization" not in req.headers
+if __name__ == '__main__':
+    unittest.main()
+```
 
-@responses.activate
-def test_download_retries_on_429():
-    import dataset_enrich
-    responses.add(responses.GET, "https://huggingface.co/datasets/dataset/file.parquet", status=429)
-    responses.add(responses.GET, "https://huggingface.co/datasets/dataset/file.parquet", body=b"ok", status=200)
-    resp = dataset_enrich.download_file("dataset/file.parquet", retries=3, backoff_factor=0.01)
-    assert resp.status_code == 200
-    assert len(responses.calls) == 2
+## Integration tests
+### Happy path
+1. Test that the worker runs with SHARD_ID=0, SHARD_TOTAL=16 and produces exactly one shard-0 output file under batches/public-merged/{DATE_FOLDER}/shard0-*.jsonl.
+2. Test that each output record is valid JSON with prompt and response fields; no pyarrow CastError during parquet/JSONL projection.
+3. Test that manifest-driven path selection assigns each file to exactly one shard (deterministic hash) and workers skip non-assigned files.
+4. Test that CDN downloads succeed without Authorization header; HF_TOKEN is only used for commit, and 429/5xx retries wait up to RETRY_WAIT with backoff.
+5. Test that dedup integration via lib/dedup.py prevents duplicate records across shards (md5-based) and logs skipped duplicates.
 
-# test_projection.py
-def test_project_to_prompt_response_drops_malformed():
-    from dataset_enrich import project_to_prompt_response
-    table = pa.table({"prompt": ["a", None], "response": ["b", "c"], "extra": [1, 2]})
-    rows = project_to_prompt_response(table)
-    assert len(rows) == 1
-    assert rows[0] == {"prompt": "a", "response": "b"}
+### Edge cases
+1. Test that the worker handles errors and exceptions correctly, including retrying failed downloads and commits.
+2. Test that the worker skips files that are not assigned to its shard.
+3. Test that the worker handles the case where the manifest file is missing or empty.
 
-# test_dedup.py
-def test_md5_dedup_skips_existing(tmp_path):
-    from dataset_enrich import should_process
-    store = tmp_path / "dedup.jsonl"
-    store.write_text('{"md5":"abc123"}\n')
-    assert not should_process("abc123", store)
-
-def test_md5_dedup_allows_new(tmp_path):
-    from dataset_enrich import should_process
-    store = tmp_path / "dedup.jsonl"
-    assert shoul
+## Risk register
+* **Risk**: The worker may fail to download files from the CDN due to network errors or rate limiting.
+	+ **Mitigation**: Implement retry logic with backoff to handle temporary failures.
+* **Risk**: The worker may fail to commit files to the Hugging Face repository due to authentication errors or rate limiting.
+	+ **Mitigation**: Implement retry logic with backoff to handle temporary failures, and ensure that the HF_TOKEN is valid and has the necessary permissions.
+* **Risk**: The worker may produce duplicate records across shards due to errors in the deduplication process.
+	+ **Mitigation**: Implement a robust deduplication process using a centralized md5 store, and log skipped duplicates to detect any issues.
