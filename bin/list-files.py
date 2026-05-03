@@ -1,90 +1,88 @@
 #!/usr/bin/env python3
 """
-Generate deterministic file list for a date folder in axentx/surrogate-1-training-pairs.
-Run from Mac/CI after rate-limit window clears. Produces file-list.json for workers.
-
+Generate deterministic file-list for a date folder in axentx/surrogate-1-training-pairs.
 Usage:
-  HF_TOKEN=hf_xxx python bin/list-files.py --date 2026-05-02 --out file-list.json
+  HF_TOKEN=<token> python bin/list-files.py --repo axentx/surrogate-1-training-pairs \
+    --date 2026-05-02 --out file-list.json
 """
-
 import argparse
 import hashlib
 import json
 import os
 import sys
-from typing import List, Dict
+from datetime import datetime
 
 from huggingface_hub import HfApi
 
-REPO_ID = "axentx/surrogate-1-training-pairs"
-
-def list_date_folder(date: str, api: HfApi) -> List[Dict]:
-    """
-    Use list_repo_tree per folder (non-recursive) to avoid 100x pagination.
-    Returns list of dicts: {"path": "...", "size": int, "sha256": str|None}
-    """
-    prefix = f"batches/public-merged/{date}/"
-    entries = api.list_repo_tree(
-        repo_id=REPO_ID,
-        path=prefix.rstrip("/"),
-        repo_type="dataset",
-        recursive=False,
-    )
-
-    files = []
-    for entry in entries:
-        if entry.type != "file":
-            continue
-        try:
-            meta = api.get_paths_info(
-                repo_id=REPO_ID,
-                paths=[entry.path],
-                repo_type="dataset",
-            )
-            info = meta[0] if meta else None
-            size = getattr(info, "size", None)
-        except Exception:
-            size = None
-
-        files.append({
-            "path": entry.path,
-            "size": size,
-            "sha256": None,
-        })
-
-    files.sort(key=lambda x: x["path"])
-    return files
+def sha256_of_path(path: str, api: HfApi, repo: str) -> str | None:
+    """Best-effort LFS/OID lookup; fallback to path hash if unavailable."""
+    try:
+        meta = api.get_paths_metadata(repo_id=repo, paths=[path], repo_type="dataset")
+        if meta and meta[0] and getattr(meta[0], "lfs", None):
+            return meta[0].lfs.get("oid", "").replace("sha256:", "")
+    except Exception:
+        pass
+    # Deterministic fallback
+    return hashlib.sha256(path.encode()).hexdigest()
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="List files for date folder (CDN ingest).")
-    parser.add_argument("--date", required=True, help="Date folder, e.g. 2026-05-02")
-    parser.add_argument("--out", default="file-list.json", help="Output JSON path")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder under data/ or root")
+    parser.add_argument("--out", default="file-list.json")
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN")
     if not token:
-        print("ERROR: HF_TOKEN env var required", file=sys.stderr)
+        print("HF_TOKEN required", file=sys.stderr)
         sys.exit(1)
 
     api = HfApi(token=token)
 
+    prefix = args.date if args.date.endswith("/") else f"{args.date}/"
     try:
-        files = list_date_folder(args.date, api)
-    except Exception as exc:
-        print(f"ERROR listing folder: {exc}", file=sys.stderr)
-        sys.exit(1)
+        entries = api.list_repo_tree(
+            repo_id=args.repo,
+            path=prefix,
+            repo_type="dataset",
+            recursive=False,
+        )
+    except Exception:
+        # Fallback: try root-level listing if date folder not found
+        entries = api.list_repo_tree(
+            repo_id=args.repo,
+            path="",
+            repo_type="dataset",
+            recursive=False,
+        )
+        entries = [e for e in entries if e.path.startswith(prefix)]
+
+    files = []
+    for e in entries:
+        if e.type != "file":
+            continue
+        sha256 = sha256_of_path(e.path, api, args.repo)
+        cdn_url = f"https://huggingface.co/datasets/{args.repo}/resolve/main/{e.path}"
+        files.append(
+            {
+                "path": e.path,
+                "size": e.size,
+                "sha256": sha256,
+                "cdn_url": cdn_url,
+            }
+        )
 
     payload = {
-        "repo": REPO_ID,
+        "repo": args.repo,
         "date": args.date,
-        "generated_by": "bin/list-files.py",
+        "generated_at": datetime.utcnow().isoformat() + "Z",
         "files": files,
     }
 
-    with open(args.out, "w", encoding="utf-8") as f:
+    with open(args.out, "w") as f:
         json.dump(payload, f, indent=2)
 
-    print(f"Wrote {len(files)} entries to {args.out}")
+    print(f"Wrote {len(files)} files to {args.out}")
 
 if __name__ == "__main__":
     main()
