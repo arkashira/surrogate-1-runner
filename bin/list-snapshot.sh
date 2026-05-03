@@ -1,29 +1,37 @@
 #!/usr/bin/env bash
-# Generate deterministic snapshot for today's folder.
-# Usage: HF_TOKEN=... ./bin/list-snapshot.sh > snapshot.json
+# Usage: list-snapshot.sh <date> [repo]
+# Example: list-snapshot.sh 2026-05-02 axentx/surrogate-1-training-pairs
 set -euo pipefail
 
-REPO="axentx/surrogate-1-training-pairs"
-DATE=$(date -u +%Y-%m-%d)
-FOLDER="public-raw/${DATE}"  # adjust if your layout differs
+DATE="${1:-}"
+REPO="${2:-axentx/surrogate-1-training-pairs}"
+OUTDIR="snapshot/${DATE}"
+OUTFILE="${OUTDIR}/file-list.json"
 
-# list single-level tree for the date folder (non-recursive)
-python3 - "$REPO" "$FOLDER" <<'PY'
-import os, json, sys
+if [[ -z "$DATE" ]]; then
+  echo "Usage: $0 <date> [repo]" >&2
+  exit 1
+fi
+
+mkdir -p "$OUTDIR"
+
+# Single API call: list top-level folder for this date (non-recursive)
+python3 - "$REPO" "$DATE" "$OUTFILE" <<'PY'
+import json, os, sys
 from huggingface_hub import HfApi
 
-repo = sys.argv[1]
-folder = sys.argv[2].rstrip("/")
-api = HfApi(token=os.environ.get("HF_TOKEN"))
-entries = api.list_repo_tree(repo=repo, path=folder, recursive=False)
+repo_id = sys.argv[1]
+date = sys.argv[2]
+outfile = sys.argv[3]
 
-out = []
-for e in entries:
-    if e.type != "file":
-        continue
-    # CDN URL bypasses API auth/rate limits
-    cdn = f"https://huggingface.co/datasets/{repo}/resolve/main/{e.path}"
-    out.append({"path": e.path, "cdn": cdn, "size": e.size})
+api = HfApi()
+tree = api.list_repo_tree(repo_id=repo_id, path=date, recursive=False)
+files = [{"path": t.path, "size": getattr(t, "size", None)} for t in tree if not t.path.endswith("/")]
 
-sys.stdout.write(json.dumps({"date": folder, "entries": out}, indent=2))
+with open(outfile, "w", encoding="utf-8") as f:
+    json.dump({"date": date, "repo": repo_id, "files": files}, f, indent=2)
+
+print(f"Wrote {len(files)} files to {outfile}")
 PY
+
+echo "Snapshot created: $OUTFILE"
