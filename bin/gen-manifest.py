@@ -1,71 +1,56 @@
 #!/usr/bin/env python3
 """
-Generate manifest-{DATE}.json for a given DATE.
-
+Generate a flat manifest for a date folder to avoid recursive HF API calls.
 Usage:
-  HF_TOKEN=hf_xxx \
-  python bin/gen-manifest.py \
+  HF_TOKEN=... python bin/gen-manifest.py \
     --repo axentx/surrogate-1-training-pairs \
     --date 2026-05-03 \
     --out manifest-2026-05-03.json
 """
-
 import argparse
 import json
 import os
 import sys
-from datetime import datetime
-from pathlib import Path
-
-import requests
-
-HF_API = "https://huggingface.co/api/datasets"
-
-def list_repo_tree(repo: str, date: str, token: Optional[str] = None) -> list:
-    """
-    Return list of dicts: {"path": "...", "type": "file", "size": ...}
-    for files under {date}/ in the repo.
-    """
-    headers = {}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    url = f"{HF_API}/{repo}/tree/main"
-    params = {"recursive": "true", "path": date}
-    resp = requests.get(url, headers=headers, params=params, timeout=60)
-    resp.raise_for_status()
-    tree = resp.json()
-    return [item for item in tree if item.get("type") == "file"]
+from huggingface_hub import HfApi, list_repo_tree
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate manifest for a DATE folder.")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--date", required=True, help="DATE folder (YYYY-MM-DD)")
-    parser.add_argument("--out", required=True, help="Output manifest JSON path")
-    parser.add_argument("--hf-token", default=os.getenv("HF_TOKEN"))
+    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder under public-merged/ or raw/")
+    parser.add_argument("--out", required=True, help="Output JSON path")
+    parser.add_argument("--prefix", default="public-raw", help="Top-level folder in repo")
     args = parser.parse_args()
 
-    try:
-        datetime.strptime(args.date, "%Y-%m-%d")
-    except ValueError:
-        sys.exit("Invalid DATE format; expected YYYY-MM-DD")
+    token = os.environ.get("HF_TOKEN")
+    api = HfApi(token=token) if token else HfApi()
 
-    token = args.hf_token
-    items = list_repo_tree(args.repo, args.date, token)
+    # List only one level at a time to avoid huge recursive pagination.
+    # We assume date folder contains only files (or shallow subfolders).
+    base = f"{args.prefix}/{args.date}"
+    entries = list_repo_tree(repo_id=args.repo, path=base, recursive=False)
+
+    files = []
+    for e in entries:
+        if e.type == "file":
+            files.append(e.path)
+        elif e.type == "dir":
+            # shallow list inside subfolder (avoid deep recursion)
+            sub = list_repo_tree(repo_id=args.repo, path=e.path, recursive=False)
+            for se in sub:
+                if se.type == "file":
+                    files.append(se.path)
 
     manifest = {
         "repo": args.repo,
         "date": args.date,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
-        "files": [{"path": item["path"], "size": item.get("size", 0)} for item in items],
+        "prefix": args.prefix,
+        "files": sorted(files),
     }
 
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w") as f:
+    with open(args.out, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    print(f"Manifest written to {out_path} ({len(items)} files)")
+    print(f"Wrote {len(files)} files to {args.out}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
