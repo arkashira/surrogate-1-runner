@@ -1,34 +1,29 @@
 #!/usr/bin/env bash
+# Generate deterministic snapshot for today's folder.
+# Usage: HF_TOKEN=... ./bin/list-snapshot.sh > snapshot.json
 set -euo pipefail
 
-REPO="${HF_REPO:-axentx/surrogate-1-training-pairs}"
-DATE="${1:-$(date +%Y-%m-%d)}"
-OUTDIR="${2:-snapshots}"
-OUT="${OUTDIR}/snapshot-${DATE}.json"
+REPO="axentx/surrogate-1-training-pairs"
+DATE=$(date -u +%Y-%m-%d)
+FOLDER="public-raw/${DATE}"  # adjust if your layout differs
 
-mkdir -p "${OUTDIR}"
-
-python3 - <<PY
-import os, json, datetime, sys
+# list single-level tree for the date folder (non-recursive)
+python3 - "$REPO" "$FOLDER" <<'PY'
+import os, json, sys
 from huggingface_hub import HfApi
 
-repo = os.getenv("HF_REPO", "axentx/surrogate-1-training-pairs")
-date = os.getenv("SNAPSHOT_DATE", datetime.date.today().isoformat())
-out = os.getenv("SNAPSHOT_OUT", "snapshots/snapshot-{}.json".format(date))
+repo = sys.argv[1]
+folder = sys.argv[2].rstrip("/")
+api = HfApi(token=os.environ.get("HF_TOKEN"))
+entries = api.list_repo_tree(repo=repo, path=folder, recursive=False)
 
-api = HfApi(token=os.getenv("HF_TOKEN"))
-try:
-    tree = api.list_repo_tree(repo=repo, path=date, recursive=False)
-except Exception as e:
-    # If folder missing, produce empty snapshot so runners skip cleanly
-    files = []
-else:
-    files = [{"path": f.rfilename, "size": getattr(f, "size", None)} for f in tree]
+out = []
+for e in entries:
+    if e.type != "file":
+        continue
+    # CDN URL bypasses API auth/rate limits
+    cdn = f"https://huggingface.co/datasets/{repo}/resolve/main/{e.path}"
+    out.append({"path": e.path, "cdn": cdn, "size": e.size})
 
-os.makedirs(os.path.dirname(out), exist_ok=True)
-with open(out, "w") as fh:
-    json.dump({"date": date, "ts": datetime.datetime.utcnow().isoformat() + "Z", "files": files}, fh)
-print(f"Wrote {len(files)} entries to {out}")
+sys.stdout.write(json.dumps({"date": folder, "entries": out}, indent=2))
 PY
-
-echo "Snapshot created: ${OUT}"
