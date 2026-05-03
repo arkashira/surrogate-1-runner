@@ -1,50 +1,48 @@
 #!/usr/bin/env python3
 """
-Usage (Mac, after rate-limit window clears):
-  python3 bin/list_files.py \
-    --repo axentx/surrogate-1-training-pairs \
-    --path batches/public-merged/2026-05-02 \
-    --out file-list.json
-
-Output:
-{
-  "repo": "...",
-  "path": "...",
-  "files": [
-    {"path": "batches/public-merged/2026-05-02/shard0-120000.jsonl", "size": 12345},
-    ...
-  ]
-}
+Generate deterministic file list for a date folder in surrogate-1-training-pairs.
+Usage:
+    python bin/list_files.py --date 2026-04-29 --out file-list-2026-04-29.json
 """
 import argparse
 import json
 import os
 import sys
-
 from huggingface_hub import HfApi
+
+REPO_ID = "datasets/axentx/surrogate-1-training-pairs"
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", required=True)
-    parser.add_argument("--path", required=True)
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--date", required=True, help="Date folder, e.g. 2026-04-29")
+    parser.add_argument("--out", required=True, help="Output JSON path")
     args = parser.parse_args()
 
-    api = HfApi()
-    tree = api.list_repo_tree(repo_id=args.repo, path=args.path, recursive=False)
-    files = [{"path": f.path, "size": f.size} for f in tree if f.type == "file"]
+    api = HfApi(token=os.getenv("HF_TOKEN"))
+    try:
+        tree = api.list_repo_tree(
+            repo_id=REPO_ID,
+            path=args.date,
+            repo_type="dataset",
+            recursive=False,
+        )
+    except Exception as e:
+        print(f"Failed to list {args.date}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    files = [entry.path for entry in tree if entry.type == "file"]
+    files.sort()
 
     payload = {
-        "repo": args.repo,
-        "path": args.path,
+        "date": args.date,
+        "repo": REPO_ID,
         "files": files,
+        "count": len(files),
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(payload, f, indent=2)
-
-    print(f"Wrote {len(files)} files to {args.out}", file=sys.stderr)
+    print(f"Wrote {len(files)} files to {args.out}")
 
 if __name__ == "__main__":
     main()
