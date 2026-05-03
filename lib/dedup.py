@@ -1,36 +1,26 @@
+import os
 import sqlite3
 from pathlib import Path
-from contextlib import contextmanager
+from typing import Optional
 
-class DedupStore:
-    def __init__(self, db_path: str = ".dedup.db"):
-        self.db_path = db_path
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        with self._conn() as conn:
-            conn.execute("CREATE TABLE IF NOT EXISTS seen_pair (hash TEXT PRIMARY KEY)")
+def get_db() -> sqlite3.Connection:
+    db_path = os.getenv("DEDUP_DB", str(Path(__file__).parent.parent / "dedup.sqlite"))
+    conn = sqlite3.connect(db_path, timeout=30)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS seen_hashes ("
+        "  md5 TEXT PRIMARY KEY,"
+        "  ts DATETIME DEFAULT CURRENT_TIMESTAMP"
+        ")"
+    )
+    conn.commit()
+    return conn
 
-    @contextmanager
-    def _conn(self):
-        conn = sqlite3.connect(self.db_path, isolation_level=None)
-        try:
-            yield conn
-        finally:
-            conn.close()
+def is_duplicate(conn: sqlite3.Connection, md5_hex: str) -> bool:
+    cur = conn.execute("SELECT 1 FROM seen_hashes WHERE md5=?", (md5_hex,))
+    return cur.fetchone() is not None
 
-    def add(self, pair_hash: str) -> bool:
-        """Return True if newly inserted, False if duplicate."""
-        cur = self._conn().__enter__().cursor()
-        try:
-            cur.execute("INSERT INTO seen_pair (hash) VALUES (?)", (pair_hash,))
-            return True
-        except sqlite3.IntegrityError:
-            return False
-        finally:
-            cur.close()
-
-    def bulk_contains(self, hashes):
-        if not hashes:
-            return set()
-        cur = self._conn().__enter__().cursor()
-        cur.execute(f"SELECT hash FROM seen_pair WHERE hash IN ({','.join('?'*len(hashes))})", hashes)
-        return {row[0] for row in cur.fetchall()}
+def mark_seen(conn: sqlite3.Connection, md5_hex: str) -> None:
+    try:
+        conn.execute("INSERT INTO seen_hashes (md5) VALUES (?)", (md5_hex,))
+    except sqlite3.IntegrityError:
+        pass  # race ok
