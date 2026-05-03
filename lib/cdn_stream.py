@@ -1,71 +1,38 @@
-#!/usr/bin/env python3
-"""
-CDN-only data loader for surrogate-1.
-
-Usage:
-  from lib.cdn_stream import CDNParquetDataset
-  dataset = CDNParquetDataset("file-list.json", shard_id=0, num_shards=16)
-  for row in dataset:
-      print(row)
-"""
-
 import io
 import json
-from pathlib import Path
-from typing import Dict, Iterator, Optional
-
-import pyarrow as pa
+import hashlib
 import pyarrow.parquet as pq
 import requests
 
-HF_REPO = "axentx/surrogate-1-training-pairs"  # override via env if needed
+from lib.dedup import is_duplicate, store_hash  # existing dedup module
 
-def normalize_record(obj: Dict) -> Dict:
-    """Project to {prompt, response} only; keep attribution in filename pattern."""
-    prompt = obj.get("prompt") or obj.get("input") or obj.get("text") or ""
-    response = obj.get("response") or obj.get("output") or obj.get("completion") or ""
-    return {"prompt": str(prompt), "response": str(response)}
+CDN_ROOT = "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main"
 
-class CDNParquetDataset:
-    def __init__(
-        self,
-        file_list_path: str,
-        shard_id: Optional[int] = None,
-        num_shards: Optional[int] = None,
-        repo: Optional[str] = None,
-    ):
-        self.repo = repo or HF_REPO
-        with open(file_list_path) as f:
-            self.files = [json.loads(ln)["path"] for ln in f if ln.strip()]
+def stream_cdn_parquet(cdn_url: str, columns=("prompt", "response")):
+    """
+    Stream a parquet file from CDN and yield rows as dicts.
+    Retries and timeouts handled by caller.
+    """
+    with requests.get(cdn_url, stream=True, timeout=60) as r:
+        r.raise_for_status()
+        buf = io.BytesIO()
+        for chunk in r.iter_content(chunk_size=8192):
+            buf.write(chunk)
+        buf.seek(0)
+        table = pq.read_table(buf, columns=columns)
+        for batch in table.to_batches(max_chunksize=1024):
+            for row in batch.to_pylist():
+                yield row
 
-        if shard_id is not None and num_shards is not None:
-            self.files = [p for i, p in enumerate(self.files) if i % num_shards == shard_id]
-
-    def _stream_file(self, path: str) -> Iterator[Dict]:
-        url = f"https://huggingface.co/datasets/{self.repo}/resolve/main/{path}"
-        resp = requests.get(url, timeout=60)
-        resp.raise_for_status()
-        content = resp.content
-
-        try:
-            table = pq.read_table(io.BytesIO(content))
-            for row in table.to_pylist():
-                nr = normalize_record(row)
-                if nr["prompt"] and nr["response"]:
-                    yield nr
-        except Exception:
-            # Fallback: line-delimited JSON
-            for line in content.decode("utf-8", errors="ignore").strip().splitlines():
-                if not line.strip():
-                    continue
-                try:
-                    row = json.loads(line)
-                    nr = normalize_record(row)
-                    if nr["prompt"] and nr["response"]:
-                        yield nr
-                except Exception:
-                    continue
-
-    def __iter__(self) -> Iterator[Dict]:
-        for path in self.files:
-            yield from self._stream_file(path)
+def process_and_dedup_row(row):
+    """Return JSON-serializable record or None if duplicate/invalid."""
+    prompt = (row.get("prompt") or "").strip()
+    response = (row.get("response") or "").strip()
+    if not prompt or not response:
+        return None
+    blob = f"{prompt}\n{response}".encode()
+    md5 = hashlib.md5(blob).hexdigest()
+    if is_duplicate(md5):
+        return None
+    store_hash(md5)
+    return {"prompt": prompt, "response": response}
