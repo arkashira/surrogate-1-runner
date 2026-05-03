@@ -1,60 +1,59 @@
-"""
-lib/cdn_stream.py
-
-Usage:
-  from lib.cdn_stream import iter_cdn_parquet
-  for item in iter_cdn_parquet(file_list, max_retries=5):
-      ...
-"""
-
+import io
 import json
 import time
-from pathlib import Path
-from typing import Iterable, Dict, Any
+from typing import Dict, Iterator
 
 import pyarrow.parquet as pq
 import requests
 
-CDN_TIMEOUT = 30
+CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
 
-def _download(url: str, out_path: Path, max_retries: int = 5) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    for attempt in range(1, max_retries + 1):
+def cdn_url(repo: str, path: str) -> str:
+    return CDN_TEMPLATE.format(repo=repo, path=path)
+
+def fetch_with_retry(url: str, max_retries: int = 5, backoff: float = 1.0) -> bytes:
+    for attempt in range(max_retries):
         try:
-            with requests.get(url, stream=True, timeout=CDN_TIMEOUT) as r:
-                r.raise_for_status()
-                with open(out_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-            return
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            return resp.content
         except Exception as exc:
-            wait = 2 ** attempt
-            print(f"CDN download attempt {attempt}/{max_retries} failed: {exc}. Retrying in {wait}s...")
-            time.sleep(wait)
-    raise RuntimeError(f"Failed to download {url} after {max_retries} attempts")
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(backoff * (2 ** attempt))
+    raise RuntimeError("unreachable")
 
-def iter_cdn_parquet(
-    file_list_path: str,
-    work_dir: str = ".cdn_cache",
-    max_retries: int = 5,
-    fields=("prompt", "response"),
-) -> Iterable[Dict[str, Any]]:
+def project_row(raw: Dict[str, object]) -> Dict[str, str]:
     """
-    Given file-list.json, download each parquet via CDN and yield projected rows.
+    Best-effort projection to {prompt, response}.
+    Handles common schema variants seen in surrogate-1 mirrors.
     """
-    with open(file_list_path, encoding="utf-8") as f:
-        manifest = json.load(f)
+    prompt = raw.get("prompt") or raw.get("input") or raw.get("question") or ""
+    response = raw.get("response") or raw.get("output") or raw.get("answer") or ""
+    return {"prompt": str(prompt), "response": str(response)}
 
-    work_dir = Path(work_dir)
-    for item in manifest["files"]:
-        if not item["path"].lower().endswith(".parquet"):
+def stream_parquet_from_cdn(repo: str, path: str) -> Iterator[Dict[str, str]]:
+    data = fetch_with_retry(cdn_url(repo, path))
+    table = pq.read_table(io.BytesIO(data))
+    for batch in table.to_batches(max_chunksize=1000):
+        cols = {name: batch.column(name).to_pylist() for name in batch.schema.names}
+        n = len(next(iter(cols.values()))) if cols else 0
+        for i in range(n):
+            raw = {k: v[i] for k, v in cols.items()}
+            yield project_row(raw)
+
+def stream_jsonl_from_cdn(repo: str, path: str) -> Iterator[Dict[str, str]]:
+    data = fetch_with_retry(cdn_url(repo, path))
+    for line in io.BytesIO(data).read().splitlines():
+        if not line.strip():
             continue
-        local_path = work_dir / item["path"]
-        if not local_path.exists():
-            _download(item["cdn_url"], local_path, max_retries=max_retries)
+        raw = json.loads(line)
+        yield project_row(raw)
 
-        table = pq.read_table(local_path, columns=fields)
-        for batch in table.to_batches():
-            cols = {name: batch.column(name).to_pylist() for name in fields}
-            for i in range(batch.num_rows):
-                yield {k: cols[k][i] for k in fields}
+def stream_from_cdn(repo: str, path: str) -> Iterator[Dict[str, str]]:
+    if path.endswith(".parquet"):
+        yield from stream_parquet_from_cdn(repo, path)
+    elif path.endswith(".jsonl"):
+        yield from stream_jsonl_from_cdn(repo, path)
+    else:
+        raise ValueError(f"Unsupported file type: {path}")
