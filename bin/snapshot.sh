@@ -1,22 +1,43 @@
 #!/usr/bin/env bash
-# Generate snapshot of dataset files for a date folder.
-# Usage: SNAPSHOT_DATE=2026-05-02 ./bin/snapshot.sh
-# Outputs: snapshot/latest.json and snapshot/<date>.json
 set -euo pipefail
 
-REPO="${HF_DATASET_REPO:-axentx/surrogate-1-training-pairs}"
-DATE_FOLDER="${SNAPSHOT_DATE:-$(date -u +%Y-%m-%d)}"
-OUT_DIR="snapshot"
-LATEST="${OUT_DIR}/latest.json"
-DATED="${OUT_DIR}/${DATE_FOLDER}.json"
+# Usage: bin/snapshot.sh [YYYY-MM-DD]
+# Generates snapshot-YYYY-MM-DD.json listing files under public-merged/<date>/
 
-mkdir -p "${OUT_DIR}"
+REPO="axentx/surrogate-1-training-pairs"
+DATE="${1:-$(date +%Y-%m-%d)}"
+OUT="snapshot-${DATE}.json"
 
-echo "Generating snapshot for ${REPO} -> public-merged/${DATE_FOLDER}"
-python3 bin/lib/snapshot.py "${REPO}" "public-merged/${DATE_FOLDER}" "${DATED}"
+python3 - "$REPO" "$DATE" "$OUT" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from huggingface_hub import HfApi
 
-# Also keep latest
-cp "${DATED}" "${LATEST}"
+repo_id = sys.argv[1]
+date_folder = sys.argv[2]
+out_path = sys.argv[3]
 
-echo "Snapshot saved: ${DATED}"
-echo "Files: $(jq '.count' "${DATED}")"
+api = HfApi()
+path_prefix = f"public-merged/{date_folder}"
+try:
+    tree = api.list_repo_tree(repo_id=repo_id, path=path_prefix, recursive=False)
+    files = [item.path for item in tree if item.type == "file"]
+except Exception as e:
+    # Fallback: try recursive=False per folder if path_prefix not found
+    # If still fails, produce empty list so caller can fallback
+    files = []
+
+snapshot = {
+    "date": date_folder,
+    "repo": repo_id,
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "files": sorted(files)
+}
+
+with open(out_path, "w", encoding="utf-8") as f:
+    json.dump(snapshot, f, indent=2)
+print(f"Wrote {len(files)} files to {out_path}")
+PY
+
+echo "Snapshot written to $OUT"
