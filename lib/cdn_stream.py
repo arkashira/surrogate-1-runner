@@ -1,59 +1,71 @@
+#!/usr/bin/env python3
+"""
+CDN-only data loader for surrogate-1.
+
+Usage:
+  from lib.cdn_stream import CDNParquetDataset
+  dataset = CDNParquetDataset("file-list.json", shard_id=0, num_shards=16)
+  for row in dataset:
+      print(row)
+"""
+
 import io
 import json
-import time
-from typing import Dict, Iterator
+from pathlib import Path
+from typing import Dict, Iterator, Optional
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
 
-CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+HF_REPO = "axentx/surrogate-1-training-pairs"  # override via env if needed
 
-def cdn_url(repo: str, path: str) -> str:
-    return CDN_TEMPLATE.format(repo=repo, path=path)
-
-def fetch_with_retry(url: str, max_retries: int = 5, backoff: float = 1.0) -> bytes:
-    for attempt in range(max_retries):
-        try:
-            resp = requests.get(url, timeout=30)
-            resp.raise_for_status()
-            return resp.content
-        except Exception as exc:
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(backoff * (2 ** attempt))
-    raise RuntimeError("unreachable")
-
-def project_row(raw: Dict[str, object]) -> Dict[str, str]:
-    """
-    Best-effort projection to {prompt, response}.
-    Handles common schema variants seen in surrogate-1 mirrors.
-    """
-    prompt = raw.get("prompt") or raw.get("input") or raw.get("question") or ""
-    response = raw.get("response") or raw.get("output") or raw.get("answer") or ""
+def normalize_record(obj: Dict) -> Dict:
+    """Project to {prompt, response} only; keep attribution in filename pattern."""
+    prompt = obj.get("prompt") or obj.get("input") or obj.get("text") or ""
+    response = obj.get("response") or obj.get("output") or obj.get("completion") or ""
     return {"prompt": str(prompt), "response": str(response)}
 
-def stream_parquet_from_cdn(repo: str, path: str) -> Iterator[Dict[str, str]]:
-    data = fetch_with_retry(cdn_url(repo, path))
-    table = pq.read_table(io.BytesIO(data))
-    for batch in table.to_batches(max_chunksize=1000):
-        cols = {name: batch.column(name).to_pylist() for name in batch.schema.names}
-        n = len(next(iter(cols.values()))) if cols else 0
-        for i in range(n):
-            raw = {k: v[i] for k, v in cols.items()}
-            yield project_row(raw)
+class CDNParquetDataset:
+    def __init__(
+        self,
+        file_list_path: str,
+        shard_id: Optional[int] = None,
+        num_shards: Optional[int] = None,
+        repo: Optional[str] = None,
+    ):
+        self.repo = repo or HF_REPO
+        with open(file_list_path) as f:
+            self.files = [json.loads(ln)["path"] for ln in f if ln.strip()]
 
-def stream_jsonl_from_cdn(repo: str, path: str) -> Iterator[Dict[str, str]]:
-    data = fetch_with_retry(cdn_url(repo, path))
-    for line in io.BytesIO(data).read().splitlines():
-        if not line.strip():
-            continue
-        raw = json.loads(line)
-        yield project_row(raw)
+        if shard_id is not None and num_shards is not None:
+            self.files = [p for i, p in enumerate(self.files) if i % num_shards == shard_id]
 
-def stream_from_cdn(repo: str, path: str) -> Iterator[Dict[str, str]]:
-    if path.endswith(".parquet"):
-        yield from stream_parquet_from_cdn(repo, path)
-    elif path.endswith(".jsonl"):
-        yield from stream_jsonl_from_cdn(repo, path)
-    else:
-        raise ValueError(f"Unsupported file type: {path}")
+    def _stream_file(self, path: str) -> Iterator[Dict]:
+        url = f"https://huggingface.co/datasets/{self.repo}/resolve/main/{path}"
+        resp = requests.get(url, timeout=60)
+        resp.raise_for_status()
+        content = resp.content
+
+        try:
+            table = pq.read_table(io.BytesIO(content))
+            for row in table.to_pylist():
+                nr = normalize_record(row)
+                if nr["prompt"] and nr["response"]:
+                    yield nr
+        except Exception:
+            # Fallback: line-delimited JSON
+            for line in content.decode("utf-8", errors="ignore").strip().splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                    nr = normalize_record(row)
+                    if nr["prompt"] and nr["response"]:
+                        yield nr
+                except Exception:
+                    continue
+
+    def __iter__(self) -> Iterator[Dict]:
+        for path in self.files:
+            yield from self._stream_file(path)
