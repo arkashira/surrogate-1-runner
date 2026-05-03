@@ -1,24 +1,24 @@
+name: ingest
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+env:
+  DATE: ${{ github.event.inputs.date || (github.event_name == 'schedule' && steps.date.outputs.today) || '' }}
+
 jobs:
   ingest:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch manifest
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          FILE_MANIFEST="data/file_manifest_${DATE}.json"
-          if [ -f "$FILE_MANIFEST" ]; then
-            echo "Using existing $FILE_MANIFEST"
-          else
-            echo "Manifest not found; runners will fallback to streaming"
-          fi
-          echo "FILE_MANIFEST=$FILE_MANIFEST" >> $GITHUB_ENV
-      - name: Run shard
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python bin/dataset-enrich.py --shard ${{ matrix.shard }} --date ${{ env.DATE }}
         env:
-          SHARD_ID: ${{ matrix.shard }}
-          FILE_MANIFEST: ${{ env.FILE_MANIFEST }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          bash bin/dataset-enrich.sh
