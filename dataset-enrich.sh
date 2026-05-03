@@ -1,18 +1,19 @@
-#!/usr/bin/env bash
+from lightning import Lightning, Teamspace, Machine, Studio
 
-# Download file list for current date partition using HF CDN bypass
-DATE_PARTITION=$(date +"%Y/%m/%d")
-FILE_LIST_URL="https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/${DATE_PARTITION}"
-FILE_LIST_JSON="file_list_${DATE_PARTITION}.json"
+team = Teamspace("your-team")
+studio_name = "surrogate-1-train"
 
-curl -s -o ${FILE_LIST_JSON} ${FILE_LIST_URL}
+existing = [s for s in team.studios if s.name == studio_name and s.status == "Running"]
+if existing:
+    studio = existing[0]
+    print(f"Reusing running studio: {studio.id}")
+else:
+    studio = Studio.create(name=studio_name, machine=Machine.L40S, create_ok=True)
 
-# Embed file list in dataset-enrich.sh
-FILE_LIST=$(jq -r '.[] | .filename' ${FILE_LIST_JSON})
+if studio.status != "Running":
+    studio.start(machine=Machine.L40S)
 
-for FILE in ${FILE_LIST}; do
-  # Stream file from HF CDN
-  FILE_URL="https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/${DATE_PARTITION}/${FILE}"
-  curl -s -o ${FILE} ${FILE_URL}
-  # Process file...
-done
+job = studio.run(
+    "python train-cdn.py --file-list snapshot-2026-05-02.json",
+    wait=False,
+)
