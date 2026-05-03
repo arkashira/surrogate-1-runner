@@ -1,54 +1,40 @@
 #!/usr/bin/env bash
-# bin/snapshot.sh
-# Generate CDN snapshot for surrogate-1 dataset ingestion.
-# Usage: HF_TOKEN=... ./bin/snapshot.sh <date> [output.json]
-
 set -euo pipefail
 
-REPO="axentx/surrogate-1-training-pairs"
-DATE="${1:-$(date +%Y-%m-%d)}"
-OUT="${2:-snapshot-${DATE}.json}"
+REPO="datasets/axentx/surrogate-1-training-pairs"
+OUTDIR="${1:-.}"
+DATE="${2:-$(date +%Y-%m-%d)}"
+OUTFILE="${OUTDIR}/snapshot-${DATE}.json"
 
-python3 - "$REPO" "$DATE" "$OUT" <<'PY'
-import json, os, sys
-from datetime import datetime, timezone
+python3 - "$REPO" "$DATE" "$OUTFILE" <<'PY'
+import json, sys
 from huggingface_hub import HfApi
 
-repo, date, out = sys.argv[1], sys.argv[2], sys.argv[3]
-api = HfApi(token=os.getenv("HF_TOKEN"))
+repo_id, date = sys.argv[1], sys.argv[2]
+outfile = sys.argv[3]
+api = HfApi()
 
-# List top-level date folders (non-recursive)
-tree = api.list_repo_tree(repo, path="", recursive=False)
-folders = [t for t in tree if t.type == "directory" and t.path.startswith(date)]
-
-if not folders:
-    print(f"No folders found for date {date}", file=sys.stderr)
-    sys.exit(1)
-
-entries = []
-for f in folders:
-    files = api.list_repo_tree(repo, path=f.path, recursive=False)
-    for file in files:
-        if file.type == "file" and file.path.endswith((".parquet", ".jsonl")):
-            cdn_url = f"https://huggingface.co/datasets/{repo}/resolve/main/{file.path}"
-            entries.append({
-                "path": file.path,
-                "cdn_url": cdn_url,
-                "size": getattr(file, "size", None)
-            })
-
-# Deterministic ordering
-entries.sort(key=lambda x: x["path"])
+# Non-recursive list to avoid pagination explosion
+items = api.list_repo_tree(repo_id, path=f"public-merged/{date}", recursive=False)
+files = []
+for item in items:
+    if item.type == "file":
+        files.append({
+            "path": item.path,
+            "size": item.size,
+            "sha256": getattr(item, "sha256", None)
+        })
 
 snapshot = {
-    "repo": repo,
+    "repo": repo_id,
     "date": date,
-    "ts": datetime.now(timezone.utc).isoformat(),
-    "files": entries
+    "generated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    "files": files
 }
 
-with open(out, "w") as fp:
-    json.dump(snapshot, fp, indent=2)
-
-print(f"Snapshot written to {out} ({len(entries)} files)")
+with open(outfile, "w") as f:
+    json.dump(snapshot, f, indent=2)
+print(f"Wrote {len(files)} files to {outfile}")
 PY
+
+echo "Snapshot saved: $OUTFILE"
