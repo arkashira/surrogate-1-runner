@@ -1,0 +1,1 @@
+     hey -n 50 -c 10 -m POST http://localhost:3000/api/documents/123/open
