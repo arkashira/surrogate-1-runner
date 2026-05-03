@@ -1,91 +1,77 @@
-# Accept MANIFEST_JSON env or arg.
-# Downloads via CDN (no auth/API) and projects to {prompt,response}.
-
+#!/usr/bin/env bash
 set -euo pipefail
 
-MANIFEST="${MANIFEST_JSON:-}"
-SHARD_ID="${SHARD_ID:-0}"
-TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
-OUT_DIR="output"
-mkdir -p "$OUT_DIR"
+HF_TOKEN=${HF_TOKEN:?missing}
+HF_REPO=${HF_REPO:-axentx/surrogate-1-training-pairs}
+DATE=${DATE:?missing}
+SHARD_ID=${SHARD_ID:?missing}
+SHARD_TOTAL=${SHARD_TOTAL:-16}
+RUN_TS=$(date -u +%Y%m%d-%H%M%S)
 
-if [ -z "$MANIFEST" ] || [ ! -f "$MANIFEST" ]; then
-  echo "MANIFEST_JSON must point to a valid manifest file"
-  exit 1
+OUT_DIR="batches/public-merged/${DATE}"
+OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-${RUN_TS}.jsonl"
+TMP_DIR=$(mktemp -d)
+cleanup() { rm -rf "${TMP_DIR}"; }
+trap cleanup EXIT
+
+mkdir -p "$(dirname "${OUT_FILE}")"
+
+# File list: prefer pre-generated artifact; else one API call
+FILE_LIST="${TMP_DIR}/file-list.json"
+if [[ -f "file-list-${DATE}.json" ]]; then
+  cp "file-list-${DATE}.json" "${FILE_LIST}"
+else
+  echo "Fetching file list for ${DATE}..."
+  curl -sSf -H "Authorization: Bearer ${HF_TOKEN}" \
+    "https://huggingface.co/api/datasets/${HF_REPO}/tree/public-raw/${DATE}?recursive=false" \
+    > "${FILE_LIST}"
 fi
 
-# Deterministic shard assignment by file path hash
-python3 - "$MANIFEST" "$SHARD_ID" "$TOTAL_SHARDS" "$OUT_DIR" <<'PY'
-import json, hashlib, os, sys, subprocess, tempfile, itertools, pyarrow.parquet as pq
+mapfile -t FILES < <(jq -r '.[] | select(.type=="file") | .path' < "${FILE_LIST}")
 
-manifest_path, shard_id, total_shards, out_dir = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
-shard_id = int(shard_id)
+# Deterministic shard assignment
+assign_shard() {
+  python3 -c "import hashlib; print(int(hashlib.md5(b'$1').hexdigest(), 16) % ${SHARD_TOTAL})"
+}
 
-with open(manifest_path) as f:
-    manifest = json.load(f)
+# Process file via CDN (fallback to auth)
+process_file() {
+  local rel_path=$1
+  local cdn_url="https://huggingface.co/datasets/${HF_REPO}/resolve/main/${rel_path}"
+  local ext="${rel_path##*.}"
+  python3 parse_and_project.py \
+    --url "${cdn_url}" \
+    --auth-url "https://huggingface.co/datasets/${HF_REPO}/resolve/main/${rel_path}" \
+    --token "${HF_TOKEN}" \
+    --ext "${ext}" \
+    --shard-id "${SHARD_ID}" \
+    --shard-total "${SHARD_TOTAL}" \
+    --out "${TMP_DIR}/rows.jsonl" \
+    --dedup-db "./lib/dedup.db"
+}
 
-files = manifest["files"]
-os.makedirs(out_dir, exist_ok=True)
+> "${TMP_DIR}/rows.jsonl"
+for f in "${FILES[@]}"; do
+  s=$(assign_shard "${f}")
+  if [[ "${s}" == "${SHARD_ID}" ]]; then
+    echo "Processing: ${f}"
+    process_file "${f}" || echo "WARN: failed ${f}"
+  fi
+done
 
-def assign_shard(path: str) -> int:
-    h = int(hashlib.md5(path.encode()).hexdigest(), 16)
-    return h % total_shards
+if [[ -s "${TMP_DIR}/rows.jsonl" ]]; then
+  mkdir -p "$(dirname "${OUT_FILE}")"
+  cp "${TMP_DIR}/rows.jsonl" "${OUT_FILE}"
+  echo "Produced ${OUT_FILE} with $(wc -l < "${OUT_FILE}") rows"
+else
+  echo "No rows for shard ${SHARD_ID}"
+  touch "${OUT_FILE}"
+fi
 
-selected = [f for f in files if assign_shard(f["path"]) == shard_id]
-print(f"Shard {shard_id}/{total_shards}: processing {len(selected)} files")
-
-def normalize_to_pairs(file_info):
-    url = file_info["cdn_url"]
-    path = file_info["path"]
-    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[1], delete=False) as tmp:
-        # CDN download (no auth)
-        subprocess.run(["curl", "-fsSL", "-o", tmp.name, url], check=True)
-        tmp_path = tmp.name
-    try:
-        # Project to prompt/response only; ignore extra columns
-        if path.endswith(".parquet"):
-            table = pq.read_table(tmp_path, columns=["prompt", "response"])
-            df = table.to_pandas()
-        elif path.endswith(".jsonl"):
-            import pandas as pd
-            df = pd.read_json(tmp_path, lines=True)
-            if "prompt" not in df.columns or "response" not in df.columns:
-                # Best-effort column selection
-                df = df.rename(columns={c: c.lower() for c in df.columns})
-                if "prompt" not in df.columns or "response" not in df.columns:
-                    return []
-        else:
-            # CSV fallback
-            import pandas as pd
-            df = pd.read_csv(tmp_path)
-            df.columns = [c.lower() for c in df.columns]
-
-        pairs = []
-        for _, row in df.iterrows():
-            prompt = str(row.get("prompt", ""))
-            response = str(row.get("response", ""))
-            if prompt.strip() and response.strip():
-                pairs.append({"prompt": prompt, "response": response})
-        return pairs
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
-all_pairs = []
-for f in selected:
-    try:
-        pairs = normalize_to_pairs(f)
-        all_pairs.extend(pairs)
-    except Exception as exc:
-        print(f"Failed {f['path']}: {exc}")
-
-ts = manifest["created_at"].replace(":", "").split("T")[0]
-out_file = os.path.join(out_dir, f"shard{shard_id}-{ts}.jsonl")
-with open(out_file, "w", encoding="utf-8") as f:
-    for p in all_pairs:
-        f.write(json.dumps(p, ensure_ascii=False) + "\n")
-
-print(f"Shard {shard_id} wrote {len(all_pairs)} pairs to {out_file}")
-PY
+if [[ -s "${OUT_FILE}" ]]; then
+  git config user.name "github-actions"
+  git config user.email "github-actions@github.com"
+  git add "${OUT_FILE}"
+  git commit -m "shard${SHARD_ID} public-merged ${DATE} ${RUN_TS}" || true
+  git push origin HEAD
+fi
