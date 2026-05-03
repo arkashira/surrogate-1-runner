@@ -3,8 +3,11 @@ name: Ingest
 on:
   workflow_dispatch:
     inputs:
-      DATE:
-        description: 'Date folder to process'
+      SHARD_ID:
+        description: Shard ID
+        required: true
+      ITERATION_TIMESTAMP:
+        description: Iteration timestamp
         required: true
 
 jobs:
@@ -14,19 +17,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
+      - name: Set up Hugging Face token
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          pip install -r requirements.txt
 
-      - name: Generate pre-flight snapshot
-        run: |
-          ./bin/snapshot.sh
+          # Set the snapshot directory
+          SNAPSHOT_DIR="batches/snapshot"
 
-      - name: Process file list from snapshot
-        run: |
-          ./bin/dataset-enrich.sh
+          # Set the shard ID
+          SHARD_ID=${SHARD_ID}
+
+          # Set the iteration timestamp
+          ITERATION_TIMESTAMP=${ITERATION_TIMESTAMP}
+
+          # Set the output file path
+          OUTPUT_FILE="$SNAPSHOT_DIR/public-merged/$ITERATION_TIMESTAMP-$SHARD_ID-$RANDOM.jsonl"
+
+          # Copy the pre-flight snapshot to the output file
+          cp "$SNAPSHOT_DIR/*.parquet" "$OUTPUT_FILE"
+
+          # Dedup the pairs using the central md5 hash store
+          dedup.py "$OUTPUT_FILE"

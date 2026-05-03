@@ -1,34 +1,22 @@
-name: Ingest
+#!/bin/bash
 
-on:
-  workflow_dispatch:
-    inputs:
-      DATE:
-        description: 'Date folder to process'
-        required: true
+# Define dataset repo and path
+REPO="axentx/surrogate-1-training-pairs"
+PATH="public"
 
-jobs:
-  ingest:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+# Define snapshot directory
+SNAPSHOT_DIR="batches/snapshot"
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Generate pre-flight snapshot
-        run: |
-          ./bin/snapshot.sh
-
-      - name: Process file list from snapshot
-        run: |
-          ./bin/dataset-enrich.sh
-        error: on-failure
-        continue-on-error: true
+# Load pre-flight snapshot
+for date in $(find "$SNAPSHOT_DIR" -type d); do
+  echo "$date"
+  slug_hash=$(basename "$date")
+  for file in $(find "$date" -type f); do
+    echo "$file"
+    filename=$(basename "$file")
+    jsonl=$(jq -r '.[] | @base64' <"$file")
+    echo "$jsonl"
+    # Process the JSONL file
+    # ...
+  done
+done
