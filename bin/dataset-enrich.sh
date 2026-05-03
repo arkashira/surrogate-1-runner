@@ -1,22 +1,12 @@
 #!/bin/bash
 
-# Define dataset repo and path
-REPO="axentx/surrogate-1-training-pairs"
-PATH="public"
+# Set cache directory
+CACHE_DIR="/tmp/surrogate-1-snapshot"
 
-# Define snapshot directory
-SNAPSHOT_DIR="batches/snapshot"
+# Load file list from JSON
+file_list=$(cat "${CACHE_DIR}/file_list.json")
 
-# Load pre-flight snapshot
-for date in $(find "$SNAPSHOT_DIR" -type d); do
-  echo "$date"
-  slug_hash=$(basename "$date")
-  for file in $(find "$date" -type f); do
-    echo "$file"
-    filename=$(basename "$file")
-    jsonl=$(jq -r '.[] | @base64' <"$file")
-    echo "$jsonl"
-    # Process the JSONL file
-    # ...
-  done
+# Process file list
+for file in "${file_list[@]}"; do
+    # ... (rest of the script remains the same)
 done
