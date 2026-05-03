@@ -1,60 +1,50 @@
 #!/usr/bin/env bash
+# bin/snapshot.sh
+# Generate a file manifest for a date folder in axentx/surrogate-1-training-pairs
+# Usage: bin/snapshot.sh <date> [output.json]
+# Example: bin/snapshot.sh 2026-05-02
+
 set -euo pipefail
 
-REPO="${1:-axentx/surrogate-1-training-pairs}"
-OUTDIR="${2:-snapshots}"
-DATE_TAG=$(date +%Y%m%d)
-OUTFILE="${OUTDIR}/snapshot-${DATE_TAG}.json"
+REPO="axentx/surrogate-1-training-pairs"
+DATE="${1:-$(date +%Y-%m-%d)}"
+OUT="${2:-snapshot-${DATE}.json}"
 
-mkdir -p "${OUTDIR}"
+echo "Listing dataset tree for ${REPO}/batches/public-merged/${DATE} ..."
 
 python3 - <<PY
-import os, json, sys, datetime
+import json, os, sys
 from huggingface_hub import HfApi
 
 repo = os.environ.get("REPO", "$REPO")
-outfile = os.environ.get("OUTFILE", "$OUTFILE")
-base_path = os.environ.get("BASE_PATH", "public-merged")
+date = os.environ.get("DATE", "$DATE")
+out = os.environ.get("OUT", "$OUT")
 
 api = HfApi()
-entries = []
+# non-recursive listing of the date folder
+tree = api.list_repo_tree(
+    repo=repo,
+    path=f"batches/public-merged/{date}",
+    recursive=False,
+)
 
-try:
-    # List top-level folders (date folders) then files within each
-    tree = api.list_repo_tree(repo=repo, recursive=False, path=base_path)
-    for item in tree:
-        if item.type == "directory":
-            subpath = item.path
-            subfiles = api.list_repo_tree(repo=repo, recursive=False, path=subpath)
-            for f in subfiles:
-                if f.type == "file":
-                    entries.append({
-                        "repo": repo,
-                        "path": f.path,
-                        "size": f.size,
-                        "sha": f.bin_sha if hasattr(f, "bin_sha") else None,
-                        "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{f.path}"
-                    })
-        elif item.type == "file":
-            entries.append({
-                "repo": repo,
-                "path": item.path,
-                "size": item.size,
-                "sha": item.bin_sha if hasattr(item, "bin_sha") else None,
-                "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{item.path}"
-            })
-except Exception as e:
-    print(f"Error listing repo: {e}", file=sys.stderr)
-    sys.exit(1)
+files = []
+for item in tree:
+    if item.type != "file":
+        continue
+    # CDN URL (no auth)
+    cdn = f"https://huggingface.co/datasets/{repo}/resolve/main/{item.path}"
+    files.append({
+        "path": item.path,
+        "cdn_url": cdn,
+        "size": getattr(item, "size", None),
+    })
 
-output = {
-    "repo": repo,
-    "date": datetime.date.today().isoformat(),
-    "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
-    "files": entries
-}
+os.makedirs(os.path.dirname(out) if os.path.dirname(out) else ".", exist_ok=True)
+with open(out, "w") as f:
+    json.dump({"date": date, "files": files}, f, indent=2)
 
-with open(outfile, "w") as f:
-    json.dump(output, f, indent=2)
-print(outfile)
+print(f"Wrote {len(files)} files to {out}")
 PY
+
+echo "Snapshot saved to ${OUT}"

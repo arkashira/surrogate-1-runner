@@ -2,20 +2,20 @@ jobs:
   snapshot:
     runs-on: ubuntu-latest
     outputs:
-      snapshot-path: ${{ steps.set.outputs.path }}
+      manifest: ${{ steps.set.outputs.manifest }}
     steps:
       - uses: actions/checkout@v4
-      - name: Generate snapshot
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          bin/snapshot.sh "$DATE" batches/snapshot-${DATE}.json
-          echo "path=batches/snapshot-${DATE}.json" >> $GITHUB_OUTPUT
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install huggingface_hub
+      - run: bin/snapshot.sh ${{ github.event.inputs.date || format('2026-05-{0}', github.run_number) }} snapshot.json
+      - name: Set output
+        id: set
+        run: echo "manifest=snapshot.json" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v4
         with:
           name: snapshot
-          path: batches/snapshot-*.json
+          path: snapshot.json
 
   ingest:
     needs: snapshot
@@ -27,10 +27,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: snapshot
-      - name: Run shard
+      - run: bin/dataset-enrich.sh ${{ matrix.shard }} 16 MANIFEST=snapshot.json
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          SHARD_ID: ${{ matrix.shard }}
-        run: |
-          SNAPSHOT=$(ls batches/snapshot-*.json | head -1)
-          bin/dataset-enrich.sh --file-list "$SNAPSHOT"
