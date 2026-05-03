@@ -1,0 +1,1 @@
+chmod +x bin/make_cdn_manifest.py
