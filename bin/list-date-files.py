@@ -1,0 +1,1 @@
+chmod +x bin/list-date-files.py
