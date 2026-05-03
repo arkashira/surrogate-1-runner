@@ -1,34 +1,27 @@
 #!/usr/bin/env python3
 """
-Generate train_manifest.json for a date folder.
-Usage: python gen_manifest.py axentx/surrogate-1-training-pairs 2026-05-03
+Generate train_manifest.json for a given date folder.
+Run once per day (or per cron) on a Mac/CI with HF_TOKEN.
 """
-import json, sys, time
-from pathlib import Path
+import os, json, datetime
 from huggingface_hub import HfApi
 
 API = HfApi()
-REPO = sys.argv[1]
-DATE = sys.argv[2]
-FOLDER = f"batches/public-merged/{DATE}"
-OUT = Path("manifests") / f"{DATE}.json"
-OUT.parent.mkdir(parents=True, exist_ok=True)
+REPO = "axentx/surrogate-1-training-pairs"
+DATE = datetime.date.today().isoformat()  # e.g. 2026-05-03
+MANIFEST = "train_manifest.json"
 
-def backoff(attempt):
-    t = 360 if attempt == 1 else 60 * attempt
-    print(f"Rate limited — sleeping {t}s", file=sys.stderr)
-    time.sleep(t)
+def main() -> None:
+    entries = API.list_repo_tree(
+        repo_id=REPO,
+        path=f"batches/public-merged/{DATE}",
+        recursive=False,
+    )
+    files = [e.path for e in entries if e.path.endswith(".parquet")]
+    manifest = {"date": DATE, "files": sorted(files)}
+    with open(MANIFEST, "w") as f:
+        json.dump(manifest, f, indent=2)
+    print(f"Wrote {MANIFEST} with {len(files)} files for {DATE}")
 
-for attempt in range(1, 4):
-    try:
-        tree = API.list_repo_tree(REPO, path=FOLDER, recursive=False)
-        files = [item.path for item in tree if item.type == "file"]
-        manifest = {"date": DATE, "folder": FOLDER, "files": sorted(files)}
-        OUT.write_text(json.dumps(manifest, indent=2))
-        print(f"Wrote {len(files)} files to {OUT}")
-        break
-    except Exception as e:
-        if "429" in str(e):
-            backoff(attempt)
-        else:
-            raise
+if __name__ == "__main__":
+    main()
