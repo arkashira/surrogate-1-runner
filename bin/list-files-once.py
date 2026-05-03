@@ -1,0 +1,1 @@
+chmod +x bin/list-files-once.py
