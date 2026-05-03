@@ -1,19 +1,26 @@
-from lightning import Lightning, Teamspace, Machine, Studio
+name: Ingest
 
-team = Teamspace("your-team")
-studio_name = "surrogate-1-train"
+on:
+  workflow_dispatch:
+    inputs:
+      REPO:
+        description: Dataset repository
+        required: true
+      PATH:
+        description: Dataset path
+        required: true
 
-existing = [s for s in team.studios if s.name == studio_name and s.status == "Running"]
-if existing:
-    studio = existing[0]
-    print(f"Reusing running studio: {studio.id}")
-else:
-    studio = Studio.create(name=studio_name, machine=Machine.L40S, create_ok=True)
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-if studio.status != "Running":
-    studio.start(machine=Machine.L40S)
+      - name: Download snapshot
+        run: |
+          curl -o snapshot.txt https://raw.githubusercontent.com/axentx/surrogate-1-runner/main/bin/snapshot.txt
 
-job = studio.run(
-    "python train-cdn.py --file-list snapshot-2026-05-02.json",
-    wait=False,
-)
+      - name: Enrich dataset
+        run: |
+          ./bin/dataset-enrich.sh
