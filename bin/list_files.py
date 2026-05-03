@@ -1,73 +1,52 @@
 #!/usr/bin/env python3
 """
-Usage (Mac orchestration):
-  python bin/list_files.py \
-    --repo axentx/surrogate-1-training-pairs \
-    --date 2026-05-02 \
-    --out file_list.json
+Usage:
+  python bin/list_files.py axentx/surrogate-1-training-pairs 2026-05-02 > file-list.json
 
-Produces:
-  {
-    "repo": "...",
-    "date": "...",
-    "files": [
-      "batches/public-merged/2026-05-02/file1.parquet",
-      ...
-    ],
-    "cdn_prefix": "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/"
-  }
+Outputs:
+  [
+    {"path": "raw/2026-05-02/foo.parquet", "sha256": "..."},
+    ...
+  ]
+
+Notes:
+- Uses huggingface_hub list_repo_tree (non-recursive per folder) to avoid 429.
+- Falls back to repo root listing if subpath missing.
+- sha256 is repo file LFS pointer hash when available; otherwise None.
 """
-
-import argparse
 import json
-import os
 import sys
-from typing import List
+from pathlib import Path
 
-try:
-    from huggingface_hub import HfApi
-except ImportError:
-    print("error: huggingface_hub not installed", file=sys.stderr)
-    sys.exit(1)
+from huggingface_hub import HfApi, list_repo_tree
 
-CDN_PREFIX = "https://huggingface.co/datasets/{repo}/resolve/main/"
+API = HfApi()
 
-def list_date_files(repo: str, date: str) -> List[str]:
-    api = HfApi()
-    folder = f"batches/public-merged/{date}"
+def list_files(repo_id: str, subpath: str = "") -> list[dict]:
     try:
-        items = api.list_repo_tree(repo=repo, path=folder, recursive=False)
-    except Exception as exc:
-        raise RuntimeError(f"HF list_repo_tree failed for {repo}/{folder}: {exc}") from exc
+        items = list_repo_tree(repo_id=repo_id, path=subpath, recursive=False)
+    except Exception:
+        # If subpath invalid, list root
+        items = list_repo_tree(repo_id=repo_id, path="", recursive=False)
 
-    files = []
+    out = []
     for item in items:
-        if hasattr(item, "path") and item.path:
-            # list_repo_tree may return nested objects; accept path string
-            files.append(item.path)
-    files.sort()
-    return files
+        if item.type != "file":
+            continue
+        out.append({
+            "path": str(Path(subpath) / item.path) if subpath else item.path,
+            "sha256": getattr(item, "lfs", {}).get("sha256") if hasattr(item, "lfs") else None,
+        })
+    return out
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Pre-flight file listing for CDN-only ingestion")
-    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder under batches/public-merged/")
-    parser.add_argument("--out", default="file_list.json", help="Output JSON path")
-    args = parser.parse_args()
-
-    files = list_date_files(args.repo, args.date)
-    payload = {
-        "repo": args.repo,
-        "date": args.date,
-        "files": files,
-        "cdn_prefix": CDN_PREFIX.format(repo=args.repo),
-    }
-
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-        f.write("\n")
-
-    print(f"listed {len(files)} files -> {args.out}", file=sys.stderr)
+    if len(sys.argv) < 2:
+        print("Usage: list_files.py <repo_id> [subpath]", file=sys.stderr)
+        sys.exit(1)
+    repo_id = sys.argv[1]
+    subpath = sys.argv[2] if len(sys.argv) > 2 else ""
+    result = list_files(repo_id, subpath)
+    json.dump(result, sys.stdout, indent=None, separators=(",", ":"))
 
 if __name__ == "__main__":
     main()
