@@ -1,0 +1,1 @@
+chmod +x bin/snapshot-verify.sh
