@@ -1,36 +1,53 @@
 name: ingest
-
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
-  ingest:
+  file-list:
+    runs-on: ubuntu-latest
+    outputs:
+      date: ${{ steps.vars.outputs.date }}
+      file_list: ${{ steps.list.outputs.files }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: pip install huggingface_hub
+      - name: Generate file list (single API call)
+        id: list
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RUN_DATE: ""  # let script default to UTC today
+        run: |
+          bash bin/build-file-list.sh
+          echo "files=$(jq -c .files file-list.json)" >> $GITHUB_OUTPUT
+          echo "date=$(jq -r .date file-list.json)" >> $GITHUB_OUTPUT
+      - name: Upload file-list artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-list
+          path: file-list.json
+
+  ingest-shard:
+    needs: file-list
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+        shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Download file-list
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.11'
-
+          name: file-list
       - name: Install deps
         run: pip install -r requirements.txt
-
-      - name: Run shard
+      - name: Run shard worker
         env:
-          SHARD_ID: ${{ matrix.shard }}
+          SHARD_ID: ${{ matrix.shard_id }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          DEDUP_DB: ""   # optional: point to shared SQLite if cross-run dedup desired
-        run: bash bin/dataset-enrich.sh
-
-      - name: Upload shard output
-        uses: actions/upload-artifact@v4
-        with:
-          name: shard-${{ matrix.shard }}-${{ github.run_id }}
-          path: batches/public-merged/
+          FILE_LIST: file-list.json
+          RUN_DATE: ${{ needs.file-list.outputs.date }}
+        run: |
+          bash bin/dataset-enrich.sh
