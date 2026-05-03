@@ -1,48 +1,43 @@
-import argparse
-import random
+import json
+import os
 from pathlib import Path
+from typing import Dict, Iterator
 
-from bin.lib.cdn_loader import load_manifest, stream_jsonl_cdn
+import pyarrow.parquet as pq
+import requests
+from torch.utils.data import IterableDataset
 
-def build_dataloader_from_snapshot(manifest_path: str, repo: str, seed: int = 42):
-    manifest = load_manifest(manifest_path)
-    files = sorted(manifest["files"], key=lambda x: x["path"])
-    random.Random(seed).shuffle(files)
+MANIFEST_PATH = os.getenv("FILE_MANIFEST", "file_manifest.json")
 
-    def generator():
-        for item in files:
+class CDNParquetIterable(IterableDataset):
+    """Stream parquet files from CDN using manifest (zero HF API calls)."""
+
+    def __init__(self, manifest_path: str = MANIFEST_PATH, columns=None):
+        super().__init__()
+        self.manifest_path = manifest_path
+        self.columns = columns
+
+    def _iter_files(self) -> Iterator[Dict]:
+        with open(self.manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for meta in data["files"]:
+            yield meta
+
+    def _stream_parquet(self, cdn_url: str):
+        resp = requests.get(cdn_url, stream=True, timeout=60)
+        resp.raise_for_status()
+        import io
+        buf = io.BytesIO()
+        for chunk in resp.iter_content(chunk_size=8192):
+            buf.write(chunk)
+        buf.seek(0)
+        table = pq.read_table(buf, columns=self.columns)
+        yield from table.to_pylist()
+
+    def __iter__(self):
+        for meta in self._iter_files():
             try:
-                for record in stream_jsonl_cdn(
-                    repo=repo,
-                    filepath=item["path"],
-                    expected_size=item.get("size"),
-                ):
-                    yield {
-                        "prompt": record.get("prompt") or record.get("input") or "",
-                        "response": record.get("response") or record.get("output") or "",
-                    }
+                yield from self._stream_parquet(meta["cdn_url"])
             except Exception as exc:
-                # Log and skip bad shards instead of crashing training
-                print(f"Skipping {item['path']}: {exc}")
+                print(f"Skipping {meta['path']}: {exc}")
                 continue
-
-    return generator
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--snapshot", type=str, default=None, help="Path to manifest.json")
-    parser.add_argument("--repo", type=str, default="axentx/surrogate-1-training-pairs")
-    args = parser.parse_args()
-
-    if args.snapshot:
-        gen = build_dataloader_from_snapshot(args.snapshot, args.repo)
-        # Example: consume first batch
-        for i, item in enumerate(gen):
-            if i >= 10:
-                break
-            print(item)
-    else:
-        # Legacy path (unchanged)
-        from datasets import load_dataset
-        ds = load_dataset(args.repo, split="train")
-        print("Legacy dataset loaded (no snapshot).")
