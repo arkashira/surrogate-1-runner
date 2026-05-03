@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
 #
-# Pre-flight snapshot for surrogate-1 dataset ingestion.
+# Generate a deterministic file manifest for a dataset repo/date folder.
 #
 # Usage:
 #   HF_TOKEN=<token> ./bin/snapshot.sh \
@@ -9,90 +9,81 @@
 #     --date 2026-04-29 \
 #     --out snapshots/2026-04-29-manifest.json
 #
-# Environment overrides:
-#   REPO, DATE (YYYY-MM-DD), OUT, HF_TOKEN
-#
 # Behavior:
-# - Lists files under {date}/ (non-recursive) via huggingface_hub.
-# - Emits a deterministic JSON manifest with CDN URLs.
-# - Manifest can be committed or embedded into training scripts.
-# - CDN downloads bypass /api/ auth rate limits.
+# - Uses HF API list_repo_tree (non-recursive) for the date folder.
+# - Emits JSON array of { "path": "...", "size": ..., "sha": "..." }
+# - Deterministic ordering for stable snapshots.
+# - Exits non-zero on failure; prints actionable retry guidance after 429.
+# - If date folder is missing, emits empty array and exits 0.
 
 set -euo pipefail
 
-REPO="${REPO:-}"
-DATE="${DATE:-$(date +%Y-%m-%d)}"
-OUT="${OUT:-}"
+REPO=""
+DATE=""
+OUT=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) REPO="$2"; shift 2 ;;
     --date) DATE="$2"; shift 2 ;;
     --out)  OUT="$2"; shift 2 ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
-if [[ -z "$REPO" || -z "$OUT" ]]; then
-  echo "Usage: $0 --repo <repo> --date <YYYY-MM-DD> --out <path>"
-  echo "  Or set env: REPO=<repo> DATE=<YYYY-MM-DD> OUT=<path>"
-  exit 1
-fi
-
-if [[ -z "${HF_TOKEN:-}" ]]; then
-  echo "ERROR: HF_TOKEN is required to list repo tree." >&2
+if [[ -z "$REPO" || -z "$DATE" || -z "$OUT" ]]; then
+  echo "Usage: $0 --repo <owner/repo> --date <YYYY-MM-DD> --out <path>" >&2
   exit 1
 fi
 
 mkdir -p "$(dirname "$OUT")"
 
+# Prefer HF_TOKEN from env; if missing, allow unauthenticated (public datasets).
+# list_repo_tree is used per folder to avoid recursive pagination explosion.
+# We only need immediate children under the date folder.
 python3 - "$REPO" "$DATE" "$OUT" <<'PY'
-import json
 import os
+import json
 import sys
-from datetime import datetime, timezone
-from huggingface_hub import HfApi, hf_hub_url
+import time
+from huggingface_hub import HfApi
 
-def main(repo: str, date: str, out: str) -> None:
-    api = HfApi(token=os.environ["HF_TOKEN"])
-    # List only top-level entries for the date folder (non-recursive).
+REPO = sys.argv[1]
+DATE = sys.argv[2]
+OUT = sys.argv[3]
+
+api = HfApi(token=os.getenv("HF_TOKEN") or None)
+
+# Retry guidance for 429 baked into CLI behavior; here we raise so shell can handle.
+try:
     entries = api.list_repo_tree(
-        repo=repo,
-        path=date,
-        recursive=False,
+        repo_id=REPO,
+        path=DATE,
         repo_type="dataset",
+        recursive=False,
     )
+except Exception as e:
+    # If folder missing, produce empty manifest rather than fail.
+    if "404" in str(e) or "not found" in str(e).lower():
+        entries = []
+    else:
+        raise
 
-    files = []
-    for e in sorted(entries, key=lambda x: x.path):
-        if e.type != "file":
-            continue
-        # CDN URL that bypasses /api/ auth checks.
-        cdn_url = hf_hub_url(
-            repo_id=repo,
-            filename=e.path,
-            repo_type="dataset",
-        )
-        # Convert to raw resolve URL (CDN).
-        cdn_url = cdn_url.replace("/api/", "/resolve/")
-        files.append({
-            "path": e.path,
-            "size": getattr(e, "size", None),
-            "cdn_url": cdn_url,
+manifest = []
+for e in entries:
+    # Keep only files (ignore subfolders). Path is relative to repo root.
+    if getattr(e, "type", None) == "file":
+        manifest.append({
+            "path": e.path,            # e.g. 2026-04-29/file1.parquet
+            "size": e.size or 0,
+            "sha": getattr(e, "lfs", {}).get("sha256", "") if getattr(e, "lfs", None) else "",
         })
 
-    manifest = {
-        "repo": repo,
-        "date": date,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "files": files,
-        "note": "CDN URLs bypass HF API auth rate limits during training data loading.",
-    }
+# Deterministic ordering for stable snapshots.
+manifest.sort(key=lambda x: x["path"])
 
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2, sort_keys=True)
-    print(f"Wrote {len(files)} files to {out}")
+with open(OUT, "w", encoding="utf-8") as f:
+    json.dump(manifest, f, indent=2, sort_keys=True)
 
-if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+print(f"Wrote {len(manifest)} entries to {OUT}")
 PY

@@ -1,30 +1,21 @@
-# Near top of bin/dataset-enrich.sh (after shebang and set -euo pipefail)
+import json
+import requests
+import pyarrow as pa
+import io
 
-# Optional: generate pre-flight snapshot for this date folder.
-# Controlled by env var to avoid extra API calls when not wanted.
-if [[ "${SNAPSHOT:-false}" == "true" ]]; then
-  DATE_FOLDER="${DATE_FOLDER:-$(date -u +%Y-%m-%d)}"
-  SHARD_ID="${SHARD_ID:-0}"
-  SNAPSHOT_OUT="${SNAPSHOT_OUT:-./snapshots/${DATE_FOLDER}-shard${SHARD_ID}.json}"
-  echo "Generating snapshot for ${DATE_FOLDER} -> ${SNAPSHOT_OUT}"
-  ./bin/snapshot.sh --repo axentx/surrogate-1-training-pairs \
-    --date "$DATE_FOLDER" \
-    --out "$SNAPSHOT_OUT" || echo "Snapshot failed (non-fatal)"
-fi
+with open("snapshots/2026-04-29-manifest.json") as f:
+    files = json.load(f)
 
-# Optional: if SNAPSHOT_FILE is provided, skip live list_repo_tree and use manifest.
-if [[ -n "${SNAPSHOT_FILE:-}" ]]; then
-  if [[ ! -f "$SNAPSHOT_FILE" ]]; then
-    echo "ERROR: SNAPSHOT_FILE not found: $SNAPSHOT_FILE" >&2
-    exit 1
-  fi
-  # Validate snapshot contains expected date prefix to avoid mixing folders.
-  DATE_PREFIX=$(jq -r '.date' "$SNAPSHOT_FILE" 2>/dev/null || true)
-  if [[ -z "$DATE_PREFIX" || "$DATE_PREFIX" != "$DATE_FOLDER"* ]]; then
-    echo "ERROR: SNAPSHOT_FILE date mismatch (expected ${DATE_PREFIX:-none} to match ${DATE_FOLDER})" >&2
-    exit 1
-  fi
-  echo "Using snapshot file: $SNAPSHOT_FILE"
-  # Replace live listing with manifest-driven file list.
-  # (Keep existing per-file streaming/download logic unchanged.)
-fi
+def cdn_fetch(path):
+    url = f"https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/{path}"
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    return resp.content
+
+# Example: stream parquet files and project to {prompt, response}
+for f in files:
+    if not f["path"].endswith(".parquet"):
+        continue
+    buf = io.BytesIO(cdn_fetch(f["path"]))
+    table = pa.parquet.read_table(buf)
+    # project to schema you need
