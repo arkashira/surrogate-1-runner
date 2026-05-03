@@ -1,44 +1,56 @@
 #!/usr/bin/env bash
+# bin/snapshot.sh
+# Usage: HF_TOKEN=... ./bin/snapshot.sh <date> [out.json]
+# Example: ./bin/snapshot.sh 2026-05-03 snapshots/public-merged/2026-05-03/manifest.json
+
 set -euo pipefail
 
-REPO="${1:-axentx/surrogate-1-training-pairs}"
-DATE="${2:-$(date +%Y-%m-%d)}"
-OUT="${3:-snapshot-${REPO//\//-}-${DATE}.json}"
+REPO="axentx/surrogate-1-training-pairs"
+DATE="${1:-$(date +%Y-%m-%d)}"
+OUT="${2:-snapshots/public-merged/${DATE}/manifest.json}"
+HF_TOKEN="${HF_TOKEN:-}"
+
+if [ -z "$HF_TOKEN" ]; then
+  echo "ERROR: HF_TOKEN is required" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$OUT")"
 
 python3 - "$REPO" "$DATE" "$OUT" <<'PY'
-import json, sys, datetime
+import os, json, sys
 from huggingface_hub import HfApi
 
-repo, date, out = sys.argv[1], sys.argv[2], sys.argv[3]
-api = HfApi()
+repo = sys.argv[1]
+date = sys.argv[2]
+out_path = sys.argv[3]
+token = os.environ["HF_TOKEN"]
 
-try:
-    files = api.list_repo_tree(repo=repo, path=date, recursive=False)
-except Exception as e:
-    print(f"ERROR: failed to list repo tree: {e}", file=sys.stderr)
-    sys.exit(1)
+api = HfApi(token=token)
 
-manifest = {
-    "repo": repo,
-    "date": date,
-    "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
-    "files": []
-}
+# Single non-recursive call
+tree = api.list_repo_tree(
+    repo_id=repo,
+    path=f"batches/public-merged/{date}",
+    repo_type="dataset",
+    recursive=False
+)
 
-for f in files:
-    if f.type != "file":
-        continue
-    path = f.rfilename
-    manifest["files"].append({
-        "path": path,
-        "cdn_url": f"https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+manifest = []
+for item in tree:
+    if item.path.rstrip("/").endswith("/"):
+        continue  # skip directory entries
+    manifest.append({
+        "path": item.path,
+        "size": getattr(item, "size", None),
+        "lfs": getattr(item, "lfs", None),
     })
 
-if not manifest["files"]:
-    print(f"ERROR: no files found in {repo} at {date}", file=sys.stderr)
-    sys.exit(1)
+# Deterministic ordering
+manifest.sort(key=lambda x: x["path"])
 
-with open(out, "w") as fh:
-    json.dump(manifest, fh, indent=2)
-print(out)
+with open(out_path, "w", encoding="utf-8") as f:
+    json.dump({"repo": repo, "date": date, "files": manifest}, f, indent=2, sort_keys=True)
+
+print(f"Wrote {len(manifest)} entries to {out_path}")
 PY
