@@ -1,38 +1,47 @@
-import io
 import json
-import hashlib
-import pyarrow.parquet as pq
+import time
 import requests
+from typing import Iterator, Dict, Any
 
-from lib.dedup import is_duplicate, store_hash  # existing dedup module
+HEADERS = {"User-Agent": "axentx-surrogate-1/1.0"}
 
-CDN_ROOT = "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main"
-
-def stream_cdn_parquet(cdn_url: str, columns=("prompt", "response")):
+def cdn_stream(entries: list[Dict[str, str]]) -> Iterator[Dict[str, Any]]:
     """
-    Stream a parquet file from CDN and yield rows as dicts.
-    Retries and timeouts handled by caller.
+    Stream JSONL lines from CDN URLs.
+    Each entry: {"path": "...", "cdn_url": "..."}
+    Yields {"prompt": ..., "response": ..., "_source": path}
     """
-    with requests.get(cdn_url, stream=True, timeout=60) as r:
-        r.raise_for_status()
-        buf = io.BytesIO()
-        for chunk in r.iter_content(chunk_size=8192):
-            buf.write(chunk)
-        buf.seek(0)
-        table = pq.read_table(buf, columns=columns)
-        for batch in table.to_batches(max_chunksize=1024):
-            for row in batch.to_pylist():
-                yield row
-
-def process_and_dedup_row(row):
-    """Return JSON-serializable record or None if duplicate/invalid."""
-    prompt = (row.get("prompt") or "").strip()
-    response = (row.get("response") or "").strip()
-    if not prompt or not response:
-        return None
-    blob = f"{prompt}\n{response}".encode()
-    md5 = hashlib.md5(blob).hexdigest()
-    if is_duplicate(md5):
-        return None
-    store_hash(md5)
-    return {"prompt": prompt, "response": response}
+    for entry in entries:
+        url = entry["cdn_url"]
+        path = entry["path"]
+        retries = 3
+        for attempt in range(1, retries + 1):
+            try:
+                with requests.get(url, headers=HEADERS, stream=True, timeout=30) as r:
+                    r.raise_for_status()
+                    for line in r.iter_lines(decode_unicode=True):
+                        if not line or line.isspace():
+                            continue
+                        try:
+                            obj = json.loads(line)
+                            # Normalize to {prompt, response}
+                            prompt = obj.get("prompt") or obj.get("input") or obj.get("question")
+                            response = obj.get("response") or obj.get("output") or obj.get("answer")
+                            if prompt is None or response is None:
+                                continue
+                            yield {"prompt": prompt, "response": response, "_source": path}
+                        except json.JSONDecodeError:
+                            continue
+                break
+            except requests.HTTPError as e:
+                if e.response.status_code == 429:
+                    wait = 2 ** attempt * 5
+                    print(f"CDN 429 on {url}, sleeping {wait}s")
+                    time.sleep(wait)
+                    continue
+                raise
+            except requests.RequestException as e:
+                if attempt == retries:
+                    print(f"Failed to stream {url}: {e}")
+                    raise
+                time.sleep(2 ** attempt)
