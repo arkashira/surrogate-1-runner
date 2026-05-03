@@ -88,4 +88,53 @@ jobs:
           path: batches/public-merged/train-cdn-config.json
 
   shard:
-    needs: pr
+    needs: prelist
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    env:
+      SHARD_ID: ${{ matrix.shard_id }}
+      RUN_DATE: ${{ needs.prelist.outputs.run_date }}
+      FOLDER: ${{ needs.prelist.outputs.folder }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download file-list
+        uses: actions/download-artifact@v4
+        with:
+          name: file-list
+
+      - name: Download training config
+        uses: actions/download-artifact@v4
+        with:
+          name: train-cdn-config
+          path: batches/public-merged/
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run shard worker (with retries)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          max_retries=3
+          for i in $(seq 1 $max_retries); do
+            if bash bin/dataset-enrich.sh "$SHARD_ID" "$N_SHARDS" "$RUN_DATE" "$FOLDER"; then
+              echo "Shard $SHARD_ID succeeded"
+              exit 0
+            else
+              echo "Attempt $i failed for shard $SHARD_ID"
+              if [ $i -lt $max_retries ]; then sleep $(( 10 * i )); fi
+            fi
+          done
+          echo "Shard $SHARD_ID failed after $max_retries attempts"
+          exit 1
+
+      - name: Upload shard output as artifact (for inspection)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard_id }}-output
+          path: batches/public-merged/${{ env.FOLDER }}/
