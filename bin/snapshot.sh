@@ -1,20 +1,19 @@
 #!/bin/bash
 
-# Set date folder
-DATE_FOLDER=$(date -d "yesterday" +%Y-%m-%d)
+# Set the dataset repository and snapshot directory
+REPO="axentx/surrogate-1-training-pairs"
+SNAPSHOT_DIR="batches/snapshot"
 
-# Set dataset repo
-DATASET_REPO="axentx/surrogate-1-training-pairs"
+# Use `list_repo_tree` to get the list of files in the repository
+files=$(huggingface_hub.api.env.hf_api_env "list_repo_tree($REPO, recursive=False)")
 
-# Set cache directory
-CACHE_DIR="/tmp/surrogate-1-snapshot"
+# Save the list of files to a JSON file
+echo "$files" > "$SNAPSHOT_DIR/files.json"
 
-# Download list of files for the date folder
-LIST_REPO_TREE=$(curl -s -X GET \
-  https://huggingface.co/datasets/${DATASET_REPO}/resolve/main/${DATE_FOLDER}/ \
-  -H 'Authorization: Bearer $HF_TOKEN' \
-  -H 'Content-Type: application/json' \
-  | jq -r '.[] | .path')
-
-# Save list to JSON
-echo "${LIST_REPO_TREE}" > "${CACHE_DIR}/file_list.json"
+# Use `hf_hub_download` to download each file individually
+for file in $(jq -r '.[] | .path' "$SNAPSHOT_DIR/files.json"); do
+  if ! hf_hub_download "$REPO" "$file" --path "$SNAPSHOT_DIR/$file"; then
+    echo "Error downloading file $file"
+    exit 1
+  fi
+done

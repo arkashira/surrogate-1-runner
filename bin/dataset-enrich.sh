@@ -1,13 +1,10 @@
-name: Ingest Public Dataset
+name: Ingest
 
 on:
   workflow_dispatch:
     inputs:
-      DATE:
-        description: 'Date to ingest (YYYY-MM-DD)'
-        required: true
-      REPO:
-        description: 'Repository to ingest'
+      shard_id:
+        description: Shard ID
         required: true
 
 jobs:
@@ -17,10 +14,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Run pre-flight snapshot generation
+      - name: Run dataset-enrich.sh
         run: |
-          bin/snapshot.sh ${{ inputs.DATE }} ${{ inputs.REPO }}
-
-      - name: Run dataset enrichment
-        run: |
-          bin/dataset-enrich.sh ${{ inputs.DATE }} ${{ inputs.REPO }}
+          bin/dataset-enrich.sh ${{ inputs.shard_id }}
+        retry: 3
+        retry-on: failure
