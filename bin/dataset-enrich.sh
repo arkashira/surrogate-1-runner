@@ -1,10 +1,13 @@
-name: Ingest Surrogate-1 Training Pairs
+name: Ingest Public Dataset
 
 on:
   workflow_dispatch:
     inputs:
-      shard-id:
-        description: 'Shard ID'
+      DATE:
+        description: 'Date to ingest (YYYY-MM-DD)'
+        required: true
+      REPO:
+        description: 'Repository to ingest'
         required: true
 
 jobs:
@@ -14,10 +17,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Download pre-flight snapshot
+      - name: Run pre-flight snapshot generation
         run: |
-          ./bin/snapshot.sh ${{ inputs.shard-id }}
+          bin/snapshot.sh ${{ inputs.DATE }} ${{ inputs.REPO }}
 
-      - name: Ingest data
+      - name: Run dataset enrichment
         run: |
-          ./bin/dataset-enrich.sh ${{ inputs.shard-id }}
+          bin/dataset-enrich.sh ${{ inputs.DATE }} ${{ inputs.REPO }}
