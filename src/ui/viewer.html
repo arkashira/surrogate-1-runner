@@ -1,0 +1,62 @@
+--- /opt/axentx/surrogate-1/src/ui/viewer.html
++++ /opt/axentx/surrogate-1/src/ui/viewer.html
+@@ -0,0 +1,40 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>Document Viewer</title>
++    <style>
++        body { font-family: Arial, sans-serif; }
++        #viewer { margin: 20px; }
++        #page { font-size: 24px; }
++        button { margin: 5px; }
++    </style>
++</head>
++<body>
++    <div id="viewer">
++        <div id="page">Page: <span id="current-page">1</span></div>
++        <button id="prev-page">Previous</button>
++        <button id="next-page">Next</button>
++        <div id="content">Loading...</div>
++    </div>
++
++    <script>
++        let currentPage = 1;
++        const totalPages = 100; // Assume total pages are known
++
++        function loadPage(page) {
++            document.getElementById('current-page').innerText = page;
++            // Simulate loading content
++            document.getElementById('content').innerText = 'Content of page ' + page;
++            // Here you would load the actual PDF and text content
++        }
++
++        document.getElementById('prev-page').addEventListener('click', () => {
++            if (currentPage > 1) {
++                currentPage--;
++                loadPage(currentPage);
++            }
++        });
++
++        document.getElementById('next-page').addEventListener('click', () => {
++            if (currentPage < totalPages) {
++                currentPage++;
++                loadPage(currentPage);
++            }
++        });
++
++        document.addEventListener('keydown', (event) => {
++            if (event.key === 'ArrowLeft') {
++                document.getElementById('prev-page').click();
++            } else if (event.key === 'ArrowRight') {
++                document.getElementById('next-page').click();
++            }
++        });
++
++        // Initial load
++        loadPage(currentPage);
++    </script>
++</body>
++</html>
