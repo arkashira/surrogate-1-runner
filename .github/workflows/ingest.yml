@@ -1,4 +1,36 @@
-## Snapshot-driven ingestion (recommended)
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    outputs:
+      snapshot-path: ${{ steps.set.outputs.path }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate snapshot
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          bin/snapshot.sh "$DATE" batches/snapshot-${DATE}.json
+          echo "path=batches/snapshot-${DATE}.json" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snapshot
+          path: batches/snapshot-*.json
 
-To avoid HuggingFace API rate limits during parallel ingestion, generate a
-deterministic file-list snapshot once and use CDN-only downloads:
+  ingest:
+    needs: snapshot
+    strategy:
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: snapshot
+      - name: Run shard
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SHARD_ID: ${{ matrix.shard }}
+        run: |
+          SNAPSHOT=$(ls batches/snapshot-*.json | head -1)
+          bin/dataset-enrich.sh --file-list "$SNAPSHOT"

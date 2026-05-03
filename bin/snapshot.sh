@@ -1,42 +1,37 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Generate a file manifest for axentx/surrogate-1-training-pairs
-# Usage: bin/snapshot.sh [--output snapshot.json]
+# Usage: HF_TOKEN=... bin/snapshot.sh <date> [output.json]
+# Example: bin/snapshot.sh 2026-05-02 batches/snapshot-2026-05-02.json
 
 set -euo pipefail
 
 REPO="axentx/surrogate-1-training-pairs"
-OUTFILE="${2:-snapshot.json}"
-HF_TOKEN="${HF_TOKEN:-}"
+DATE="${1:-$(date +%Y-%m-%d)}"
+OUT="${2:-batches/snapshot-${DATE}.json}"
 
-if [[ -n "$HF_TOKEN" ]]; then
-  AUTH_HEADER="Authorization: Bearer $HF_TOKEN"
-else
-  AUTH_HEADER=""
-fi
+mkdir -p "$(dirname "$OUT")"
 
-# List top-level date folders (non-recursive) to avoid pagination/rate-limit
-# We only need the folder names; CDN downloads don't require auth.
-echo "Listing top-level folders in $REPO ..."
-folders=$(curl -sS -H "$AUTH_HEADER" \
-  "https://huggingface.co/api/datasets/$REPO/tree?recursive=false" | \
-  jq -r '.[] | select(.type=="directory") | .path')
+echo "[$(date -u)] Listing ${REPO}/batches/public-merged/${DATE} ..."
 
-# Build manifest: for each date folder, list files via CDN tree (no auth required)
-# We use the public tree endpoint per folder (still no auth for public repos).
-manifest="[]"
-for d in $folders; do
-  echo "Scanning $d ..."
-  files=$(curl -sS \
-    "https://huggingface.co/api/datasets/$REPO/tree?path=$d&recursive=true" | \
-    jq -c '.[] | select(.type=="file") | {path: .path, sha: .sha, size: .size}')
-  while IFS= read -r f; do
-    path=$(echo "$f" | jq -r '.path')
-    slug=$(basename "$path" .parquet | sed 's/\.[^.]*$//')
-    manifest=$(echo "$manifest" | jq --arg p "$path" --argjson s "$f" --arg slug "$slug" \
-      '. + [{"path": $p, "sha": $s.sha, "size": $s.size, "slug": $slug}]')
-  done <<< "$files"
-done
+curl -sSf -H "Authorization: Bearer ${HF_TOKEN}" \
+  "https://huggingface.co/api/datasets/${REPO}/tree?path=batches/public-merged/${DATE}&recursive=false" \
+  > "$OUT.tmp"
 
-echo "$manifest" | jq '{generated_at: now|todate, repo: env.REPO, files: .}' > "$OUTFILE"
-echo "Snapshot written to $OUTFILE ($(jq '.files | length' "$OUTFILE") files)"
+# Transform to minimal CDN entries: {path, cdn_url}
+python3 -c "
+import json, sys
+with open('$OUT.tmp') as f:
+    tree = json.load(f)
+out = []
+for node in tree:
+    if node.get('type') == 'file':
+        out.append({
+            'path': node['path'],
+            'cdn_url': f'https://huggingface.co/datasets/${REPO}/resolve/main/{node[\"path\"]}'
+        })
+with open('$OUT', 'w') as f:
+    json.dump(out, f, indent=2)
+"
+rm -f "$OUT.tmp"
+
+echo "[$(date -u)] Snapshot written: $OUT ($(jq length < "$OUT") files)"
