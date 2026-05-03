@@ -1,56 +1,42 @@
 #!/usr/bin/env python3
 """
-Generate a flat manifest for a date folder to avoid recursive HF API calls.
-Usage:
-  HF_TOKEN=... python bin/gen-manifest.py \
-    --repo axentx/surrogate-1-training-pairs \
-    --date 2026-05-03 \
-    --out manifest-2026-05-03.json
+Generate manifest.json for surrogate-1 public dataset ingestion.
+Run from Mac (or any dev machine) after HF API rate-limit window clears.
 """
-import argparse
-import json
-import os
-import sys
-from huggingface_hub import HfApi, list_repo_tree
+import json, os, hashlib
+from huggingface_hub import list_repo_tree
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder under public-merged/ or raw/")
-    parser.add_argument("--out", required=True, help="Output JSON path")
-    parser.add_argument("--prefix", default="public-raw", help="Top-level folder in repo")
-    args = parser.parse_args()
+REPO = "axentx/surrogate-1-training-pairs"
+OUT = "manifest.json"
+N_SHARDS = 16
 
-    token = os.environ.get("HF_TOKEN")
-    api = HfApi(token=token) if token else HfApi()
+def shard_id(slug: str) -> int:
+    return int(hashlib.md5(slug.encode()).hexdigest(), 16) % N_SHARDS
 
-    # List only one level at a time to avoid huge recursive pagination.
-    # We assume date folder contains only files (or shallow subfolders).
-    base = f"{args.prefix}/{args.date}"
-    entries = list_repo_tree(repo_id=args.repo, path=base, recursive=False)
+def main():
+    manifest = {"shards": {str(i): [] for i in range(N_SHARDS)}, "files": {}}
+    # One folder per date: iterate top-level non-recursive
+    for item in list_repo_tree(REPO, path="", recursive=False):
+        if item.type != "directory":
+            continue
+        date = item.path
+        for f in list_repo_tree(REPO, path=date, recursive=False):
+            if f.type != "file":
+                continue
+            slug = f"{date}/{f.path}"
+            sid = shard_id(slug)
+            entry = {
+                "slug": slug,
+                "cdn_url": f"https://huggingface.co/datasets/{REPO}/resolve/main/{slug}",
+                "shard": sid,
+            }
+            manifest["shards"][str(sid)].append(entry)
+            manifest["files"][slug] = entry
 
-    files = []
-    for e in entries:
-        if e.type == "file":
-            files.append(e.path)
-        elif e.type == "dir":
-            # shallow list inside subfolder (avoid deep recursion)
-            sub = list_repo_tree(repo_id=args.repo, path=e.path, recursive=False)
-            for se in sub:
-                if se.type == "file":
-                    files.append(se.path)
-
-    manifest = {
-        "repo": args.repo,
-        "date": args.date,
-        "prefix": args.prefix,
-        "files": sorted(files),
-    }
-
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2)
-
-    print(f"Wrote {len(files)} files to {args.out}", file=sys.stderr)
+    os.makedirs(os.path.dirname(OUT) if os.path.dirname(OUT) else ".", exist_ok=True)
+    with open(OUT, "w") as fp:
+        json.dump(manifest, fp, indent=2)
+    print(f"Wrote {OUT} with {len(manifest['files'])} files across {N_SHARDS} shards.")
 
 if __name__ == "__main__":
     main()
