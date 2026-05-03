@@ -1,0 +1,1 @@
+chmod +x bin/build-file-manifest.py
