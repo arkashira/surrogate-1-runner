@@ -1,125 +1,68 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Config
-REPO="${HF_DATASET_REPO:-axentx/surrogate-1-training-pairs}"
-TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
-SHARD_ID="${SHARD_ID:-0}"
-MANIFEST="${MANIFEST_JSON:-manifest.json}"
-DATEFOLDER="${DATEFOLDER:-$(date +%Y-%m-%d)}"
-OUTDIR="batches/public-merged/${DATEFOLDER}"
-TIMESTAMP=$(date +%H%M%S)
-OUTFILE="${OUTDIR}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
+export HF_TOKEN="${HF_TOKEN:-}"
+export SHARD_ID="${SHARD_ID:-0}"
+MANIFEST="${1:-manifest-2026-05-03.json}"
+OUT_DIR="batches/public-merged/$(date +%F)"
+mkdir -p "$OUT_DIR"
+OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-$(date +%H%M%S).jsonl"
 
-mkdir -p "$(dirname "$OUTFILE")"
+python3 -c "
+import json, hashlib, os, sys, time, requests
+from lib.dedup import DedupStore
 
-# Compute shard assignment from path
-should_process() {
-  local path="$1"
-  local hash
-  hash=$(echo -n "$path" | md5sum | cut -c1-8)
-  local shard=$(( 0x$hash % TOTAL_SHARDS ))
-  [[ $shard -eq $SHARD_ID ]]
-}
+with open('$MANIFEST') as f:
+    data = json.load(f)
+files = data.get('files', [])
 
-# Project record to {prompt, response} (best-effort)
-project_record() {
-  local line="$1"
-  local prompt response slug
-  # Try common keys; fallback to raw fields
-  prompt=$(echo "$line" | python3 -c "
-import sys, json
-r=json.loads(sys.stdin.read())
-print(json.dumps(r.get('prompt') or r.get('input') or r.get('text') or ''))
-" 2>/dev/null || echo '""')
-  response=$(echo "$line" | python3 -c "
-import sys, json
-r=json.loads(sys.stdin.read())
-print(json.dumps(r.get('response') or r.get('output') or r.get('completion') or ''))
-" 2>/dev/null || echo '""')
-  slug=$(echo "$line" | python3 -c "
-import sys, json, hashlib
-r=json.loads(sys.stdin.read())
-print(hashlib.md5((r.get('prompt','')+r.get('response','')).encode()).hexdigest()[:12])
-" 2>/dev/null || echo 'unknown')
-  echo "{\"prompt\":${prompt},\"response\":${response},\"slug\":\"${slug}\",\"shard\":${SHARD_ID}}"
-}
+dedup = DedupStore()
+shard_id = int('$SHARD_ID')
+out_path = '$OUT_FILE'
 
-# Process manifest entries
-if [[ ! -f "$MANIFEST" ]]; then
-  echo "MANIFEST not found: $MANIFEST" >&2
-  exit 1
-fi
+def assign_shard(slug: str) -> int:
+    return int(hashlib.sha256(slug.encode()).hexdigest(), 16) % 16
 
-# Read paths from manifest (supports both list and object with 'paths')
-paths=$(python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    data=json.load(f)
-if isinstance(data, list):
-    for p in data: print(p)
-elif isinstance(data, dict) and 'paths' in data:
-    for p in data['paths']: print(p)
-else:
-    # fallback: try to iterate keys
-    for p in data: print(p)
-" "$MANIFEST")
+def project_to_pair(content: bytes, path: str):
+    # Replace with actual schema projection for your files.
+    # Must return dict with at least {'prompt':..., 'response':...}
+    # and optional 'md5' or 'hash' for dedup.
+    raise NotImplementedError('Implement projection per schema')
 
-processed=0
-while IFS= read -r relpath; do
-  [[ -z "$relpath" ]] && continue
-  if ! should_process "$relpath"; then
-    continue
-  fi
+def robust_get(url, max_retries=3, backoff=360):
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, timeout=60)
+            if resp.status_code == 429:
+                if attempt < max_retries - 1:
+                    print(f'429 on {url}, sleeping {backoff}s', file=sys.stderr)
+                    time.sleep(backoff)
+                    continue
+                else:
+                    resp.raise_for_status()
+            resp.raise_for_status()
+            return resp.content
+        except requests.RequestException:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(backoff)
 
-  url="https://huggingface.co/datasets/${REPO}/resolve/main/${relpath}"
-  echo "Processing shard ${SHARD_ID}: ${relpath}" >&2
+with open(out_path, 'w') as out_f:
+    for entry in files:
+        slug = os.path.splitext(os.path.basename(entry['path']))[0]
+        if assign_shard(slug) != shard_id:
+            continue
 
-  # Stream download and parse line-by-line (assumes jsonl/parquet handled via python)
-  # For parquet files we use python to convert to jsonl projection.
-  case "$relpath" in
-    *.parquet)
-      python3 -c "
-import pyarrow.parquet as pq
-import sys, json, io, urllib.request
-url = sys.argv[1]
-import tempfile, os
-with tempfile.NamedTemporaryFile(delete=False, suffix='.parquet') as tmp:
-    tmp_path = tmp.name
-try:
-    import urllib.request
-    urllib.request.urlretrieve(url, tmp_path)
-    table = pq.read_table(tmp_path, columns=['prompt','response'] if set(['prompt','response']).issubset(pq.read_schema(tmp_path).names) else None)
-    for batch in table.to_batches(max_chunksize=8192):
-        df = batch.to_pandas()
-        for _, row in df.iterrows():
-            rec = row.to_dict()
-            prompt = rec.get('prompt') or rec.get('input') or ''
-            response = rec.get('response') or rec.get('output') or ''
-            print(json.dumps({'prompt': prompt, 'response': response}))
-finally:
-    try: os.unlink(tmp_path)
-    except: pass
-" "$url" 2>/dev/null | while IFS= read -r line; do
-        [[ -n "$line" ]] && echo "$line"
-      done
-      ;;
-    *.jsonl|*.json)
-      curl -fsSL "$url" | while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        project_record "$line"
-      done
-      ;;
-    *)
-      # Generic fallback: try to parse as jsonl
-      curl -fsSL "$url" | while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        project_record "$line"
-      done
-      ;;
-  esac
+        content = robust_get(entry['cdn_url'])
+        try:
+            pair = project_to_pair(content, entry['path'])
+        except Exception as e:
+            print(f'Skip {entry[\"path\"]}: {e}', file=sys.stderr)
+            continue
 
-  processed=$((processed + 1))
-done <<< "$paths"
-
-echo "Shard ${SHARD_ID} processed ${processed} files" >&2
+        key = pair.get('md5') or pair.get('hash')
+        if not dedup.seen(key):
+            out_f.write(json.dumps(pair) + '\n')
+            out_f.flush()
+print('Shard', shard_id, 'done ->', out_path)
+"
