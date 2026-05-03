@@ -106,101 +106,21 @@ def fetch_file_list() -> List[str]:
             wait = backoff(attempt)
             p
 
-## review — reviewer @ 2026-05-03T04:00:26.501701Z
+## review — reviewer @ 2026-05-03T04:00:13.106692Z
 
-APPROVE: 
-* The proposed change replaces the existing shell script with a Python script, which is a good step towards improving maintainability and scalability.
-* The new script uses a manifest-driven approach, which allows for more flexibility and easier management of the dataset ingestion process.
-* The script implements a CDN-bypass ingestion worker, which should help reduce the load on the API and improve performance.
-* The code includes retry and backoff mechanisms for handling rate limits and other errors, which is a good practice for building robust and reliable systems.
-* The script uses a deterministic shard assignment approach, which ensures that files are consistently assigned to the same shard, making it easier to manage and process the data.
+APPROVE: The worker script is a workable, incremental improvement that replaces the shell-based approach with a manifest-driven, CDN-bypass ingestion flow; it provides deterministic sharding, retry/backoff, and a clear output contract that downstream testers can validate.
 
-## qa — qa @ 2026-05-03T04:01:22.798981Z
+Acceptance criteria:
+- Worker accepts `SHARD_ID`, `SHARD_TOTAL`, optional `DATE_FOLDER` and `MANIFEST_PATH` env vars and exits non-zero if `HF_TOKEN` is missing.
+- Single `list_repo_tree` call (or local manifest fallback) produces `file-list.json` in the output directory and contains only file paths for the given `DATE_FOLDER`.
+- Each file is assigned to a shard deterministically via `assign_shard(path)`; worker processes only paths where `assign_shard(path) == SHARD_ID`.
+- CDN fetches use `https://huggingface.co/datasets/.../resolve/main/...` with no Authorization header; 429 triggers ~360s wait and 5xx uses exponential backoff with cap.
+- Output is written to `batches/public-merged/{DATE_FOLDER}/shard{N}-{HHMMSS}.jsonl` with one `{prompt, response}` object per line; malformed/missing prompt/response rows are skipped.
 
-PASS:
+## perf — axentx-perf @ 2026-05-03T04:00:19.116421Z
 
-## 1. Acceptance criteria
-- Worker exits 0 and produces exactly `shard{SHARD_ID}-{HHMMSS}.jsonl` containing only records assigned to `SHARD_ID % SHARD_TOTAL` across all files in `DATE_FOLDER`.
-- Each output record contains exactly `prompt` and `response` string fields (no pyarrow CastError) and an additional `_source_file` field with the original CDN filename.
-- CDN-only fetches use `https://huggingface.co/datasets/.../resolve/main/...` with no Authorization header; total API calls to `/api/` ≤ 1 (for tree listing) regardless of file count.
-- Deduplication via `lib/dedup.py` drops rows with duplicate content md5; dedup store write occurs once per run and is idempotent for identical content.
-- Retry/backoff: on HTTP 429 waits ≥360s before retry; on 5xx uses exponential backoff capped at 360s; after 3 consecutive failures worker exits non-zero and logs error.
-- Manifest fallback: if `MANIFEST_PATH` is provided and valid, worker skips API tree call and uses embedded file list; if invalid, worker exits non-zero with clear error.
-- Output directory structure: `batches/public-merged/{DATE_FOLDER}/` is created if missing; file naming includes UTC timestamp `HHMMSS` and shard index.
+{"verdict": "OK", "findings": [{"severity": "med", "class": "unbounded-query", "detail": "Single list_repo_tree call may return full repo tree unbounded; filtering by DATE_FOLDER happens post-fetch, which can increase memory and latency for large repos.", "mitigation": "Prefer server-side tree filtering (path prefix) or paginated traversal to bound payload size and memory."}, {"severity": "low", "class": "other", "detail": "Deterministic sharding is fine, but shard skew can occur if path distribution is uneven; no sampling or rebalancing mentioned.", "mitigation": "Monitor shard sizes and add dynamic shard count or re-sharding capability if skew becomes problematic."}, {"severity": "low", "class": "other", "detail": "360s fixed wait on 429 is long and can stall ingestion; may reduce throughput under contention.", "mitigation": "Use Retry-After header when present and consider jitter/backoff to reduce tail latency."}], "summary": "Overall performance-safe: bounded CDN fetch strategy, deterministic sharding, and retry/backoff present. Main risk is unbounded list_repo_tree payload; mitigate with server-side filtering or pagination. No blocking issues."}
 
-## 2. Unit tests
-```python
-# tests/unit/test_dataset_enrich.py
-import os
-import json
-import pytest
-from unittest.mock import MagicMock, patch, mock_open
-from pathlib import Path
+## qa — perf @ 2026-05-03T04:00:19.116453Z
 
-# Import minimal helpers (or patch at import time)
-import bin.dataset_enrich as worker
-
-def test_shard_assignment_deterministic():
-    files = [f"file-{i}.parquet" for i in range(100)]
-    assigned = [f for f in files if worker._shard_of(f, shard_total=16) == 3]
-    assert len(assigned) == 7  # 100/16 -> 6 or 7 depending on hash
-    # deterministic across runs
-    assert [f for f in files if worker._shard_of(f, 16) == 3] == assigned
-
-def test_cdn_url_build():
-    assert worker._cdn_url("2026-05-03/file.parquet") == \
-        "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/2026-05-03/file.parquet"
-
-def test_backoff_cap():
-    assert worker.backoff(0, base=1.0, cap=360.0) == 1.0
-    assert worker.backoff(10, base=1.0, cap=360.0) == 360.0
-
-def test_parse_parquet_projection():
-    mock_table = MagicMock()
-    mock_table.to_pydict.return_value = {
-        "prompt": ["hello"],
-        "response": ["world"],
-        "extra": [123]
-    }
-    rows = worker._project_to_prompt_response(mock_table, source_file="f.parquet")
-    assert len(rows) == 1
-    assert set(rows[0].keys()) == {"prompt", "response", "_source_file"}
-    assert rows[0]["prompt"] == "hello"
-    assert rows[0]["response"] == "world"
-
-def test_dedup_idempotent():
-    with patch("bin.dataset_enrich._dedup_store_push") as push:
-        push.return_value = True
-        assert worker._register_content_md5("abc123") is True
-        assert worker._register_content_md5("abc123") is False  # duplicate
-```
-
-## 3. Integration tests
-```python
-# tests/integration/test_dataset_enrich_integration.py
-import os
-import json
-import tempfile
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
-
-def test_happy_path_single_shard():
-    """Single shard, one file, CDN fetch succeeds, dedup works, output written."""
-    with tempfile.TemporaryDirectory() as td:
-        os.environ.update({
-            "SHARD_ID": "0", "SHARD_TOTAL": "16",
-            "DATE_FOLDER": "2026-05-03",
-            "HF_TOKEN": "fake",
-            "MANIFEST_PATH": ""
-        })
-        with patch("bin.dataset_enrich.HfApi") as MockApi, \
-             patch("bin.dataset_enrich.requests.get") as mock_get, \
-             patch("bin.dataset_enrich._dedup_store_push") as mock_dedup:
-            mock_api = MagicMock()
-            mock_api.list_repo_tree.return_value = [MagicMock(path="2026-05-03/file1.parquet", type="file")]
-            MockApi.return_value = mock_api
-
-            mock_parquet = MagicMock()
-            mock_parquet.to_pydict.return_value = {"prompt": ["p1"], "response": ["r1"]}
-            with pa
+{"verdict": "OK", "findings": [{"severity": "med", "class": "unbounded-query", "detail": "Single list_repo_tree call may return full repo tree unbounded; filtering by DATE_FOLDER happens post-fetch, which can increase memory and latency for large repos.", "mitigation": "Prefer server-side tree filtering (path prefix) or paginated traversal to bound payload size and memory."}, {"severity": "low", "class": "other", "detail": "Deterministic sharding is fine, but shard skew can occur if path distribution is uneven; no sampling or rebalancing mentioned.", "mitigation": "Monitor shard sizes and add dynamic shard count or re-sharding capability if skew becomes problematic."}, {"severity": "low", "class": "other", "detail": "360s fixed wait on 429 is long and can stall ingestion; may reduce throughput under contention.", "mitigation": "Use Retry-After header when present and consider jitter/backoff to reduce tail latency."}], "summary": "Overall performance-safe: bounded CDN fetch strategy, deterministic sharding, and retry/backoff present. Main risk is unbounded list_repo_tree payload; mitigate with server-side filtering or pagination. No blocking issues."}
