@@ -1,72 +1,73 @@
 #!/usr/bin/env python3
 """
-Generate a deterministic snapshot for a date folder in
-axentx/surrogate-1-training-pairs.
-
+Generate deterministic file-list snapshot for surrogate-1 dataset.
 Usage:
   HF_TOKEN=<token> python bin/make-snapshot.py \
     --repo axentx/surrogate-1-training-pairs \
-    --date 2026-05-02 \
-    --out snapshot-2026-05-02.json
+    --date 2026-05-03 \
+    --out snapshot/2026-05-03/file-list.json
 """
-
 import argparse
+import hashlib
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, list_repo_tree
 
-HF_API = HfApi(token=os.getenv("HF_TOKEN"))
+def stable_slug(filename: str) -> str:
+    return os.path.splitext(os.path.basename(filename))[0]
 
-def list_date_folder(repo: str, date: str):
-    """
-    Single API call: list top-level folder contents non-recursively.
-    Assumes layout: <date>/<slug>.parquet  (or other extensions).
-    """
-    prefix = f"{date}/"
-    entries = HF_API.list_repo_tree(
-        repo=repo,
-        path=prefix,
-        recursive=False,
-    )
-    # entries may include nested folders if any; filter to files only
-    files = [e for e in entries if e.type == "file"]
-    return files
-
-def build_snapshot(repo: str, date: str):
-    files = list_date_folder(repo, date)
-    snapshot = {
-        "repo": repo,
-        "date": date,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
-        "files": [
-            {
-                "path": f.rfilename,  # relative path from repo root
-                "size": f.size,
-                "sha": getattr(f, "sha", None),
-            }
-            for f in files
-        ],
-    }
-    return snapshot
-
-def main():
-    parser = argparse.ArgumentParser(description="Create CDN snapshot for date folder")
+def main() -> None:
+    parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder")
+    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder in dataset")
     parser.add_argument("--out", required=True, help="Output JSON path")
     args = parser.parse_args()
 
-    if not os.getenv("HF_TOKEN"):
-        print("error: HF_TOKEN required", file=sys.stderr)
+    token = os.getenv("HF_TOKEN")
+    if not token:
+        print("HF_TOKEN required", file=sys.stderr)
         sys.exit(1)
 
-    snapshot = build_snapshot(args.repo, args.date)
-    with open(args.out, "w", encoding="utf-8") as fh:
-        json.dump(snapshot, fh, indent=2)
-    print(f"wrote {len(snapshot['files'])} files -> {args.out}")
+    api = HfApi(token=token)
+    root = args.date  # e.g. "2026-05-03"
+    entries = list_repo_tree(
+        repo_id=args.repo,
+        path=root,
+        recursive=False,
+        repo_type="dataset",
+    )
+
+    files = []
+    for e in entries:
+        if e.type != "file":
+            continue
+        slug = stable_slug(e.path)
+        files.append(
+            {
+                "repo": args.repo,
+                "path": e.path,
+                "sha": e.lfs.get("oid", None) if getattr(e, "lfs", None) else None,
+                "size": e.size,
+                "slug": slug,
+            }
+        )
+
+    snapshot = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "repo": args.repo,
+        "date": args.date,
+        "root": root,
+        "count": len(files),
+        "files": sorted(files, key=lambda x: x["path"]),
+    }
+
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    with open(args.out, "w") as f:
+        json.dump(snapshot, f, indent=2)
+    print(f"Wrote {len(files)} files to {args.out}")
 
 if __name__ == "__main__":
     main()
