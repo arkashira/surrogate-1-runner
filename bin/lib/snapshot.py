@@ -1,61 +1,42 @@
 #!/usr/bin/env python3
 """
-Snapshot utilities for surrogate-1 dataset folders.
+Generate snapshot of dataset files for a date folder.
+Usage: python bin/lib/snapshot.py <repo> <date_folder> [output.json]
 """
 import json
-import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-from huggingface_hub import HfApi, list_repo_tree
+from huggingface_hub import HfApi
 
-REPO = "axentx/surrogate-1-training-pairs"
-SNAPSHOT_DIR = Path(__file__).parents[2] / "snapshots"
-SNAPSHOT_DIR.mkdir(exist_ok=True, parents=True)
-
-api = HfApi()
-
-def list_date_folder(date: str):
-    """
-    List files in public-merged/{date}/ (non-recursive).
-    Returns list of filenames (relative to repo root).
-    """
-    prefix = f"public-merged/{date}/"
-    try:
-        files = list_repo_tree(repo_id=REPO, path=prefix, repo_type="dataset", recursive=False)
-    except Exception as e:
-        raise RuntimeError(f"Failed to list repo tree for {prefix}: {e}") from e
-    # items are dicts with 'path'
-    paths = [item["path"] for item in files if item.get("type") == "file"]
-    return sorted(paths)
-
-def save_snapshot(date: str, files):
+def generate_snapshot(repo: str, date_folder: str):
+    api = HfApi()
+    # list_repo_tree handles folder path; recursive=False lists immediate children
+    tree = api.list_repo_tree(repo=repo, path=date_folder.rstrip("/"), recursive=False)
+    files = [
+        item.path
+        for item in tree
+        if item.type == "file" and item.path.lower().endswith((".parquet", ".jsonl"))
+    ]
     snapshot = {
-        "repo": REPO,
-        "date": date,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "files": files,
+        "repo": repo,
+        "date_folder": date_folder.rstrip("/"),
+        "snapshot_ts": datetime.now(timezone.utc).isoformat(),
+        "files": sorted(files),
+        "count": len(files),
     }
-    out = SNAPSHOT_DIR / f"public-merged-{date}.json"
-    out.write_text(json.dumps(snapshot, indent=2))
-    return out
-
-def load_snapshot(date: str):
-    p = SNAPSHOT_DIR / f"public-merged-{date}.json"
-    if not p.exists():
-        return None
-    return json.loads(p.read_text())
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: snapshot.py <YYYY-MM-DD>")
-        sys.exit(1)
-    date = sys.argv[1]
-    print(f"Listing public-merged/{date}/ ...")
-    files = list_date_folder(date)
-    out = save_snapshot(date, files)
-    print(f"Saved {len(files)} files to {out}")
+    return snapshot
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 3:
+        print("Usage: snapshot.py <repo> <date_folder> [output.json]")
+        sys.exit(1)
+    repo = sys.argv[1]
+    date_folder = sys.argv[2]
+    out_path = sys.argv[3] if len(sys.argv) > 3 else "-"
+    snapshot = generate_snapshot(repo, date_folder)
+    if out_path == "-":
+        json.dump(snapshot, sys.stdout, indent=2)
+    else:
+        with open(out_path, "w") as f:
+            json.dump(snapshot, f, indent=2)

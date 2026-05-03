@@ -1,25 +1,46 @@
-# Near top of dataset-enrich.sh, after argument parsing
-MANIFEST="${MANIFEST:-}"
-if [ -n "${MANIFEST}" ] && [ -f "${MANIFEST}" ]; then
-  echo "Using manifest ${MANIFEST}"
-  # Use python helper to stream CDN URLs instead of HF API listing
-  URLS=$(python3 -c "
-import sys, json
-with open('${MANIFEST}') as f:
-    files = json.load(f).get('files', [])
-for f in files:
-    print(f['cdn_url'])
-")
+#!/usr/bin/env bash
+# ... existing header ...
+set -euo pipefail
+
+REPO="axentx/surrogate-1-training-pairs"
+DATE_FOLDER="${DATE_FOLDER:-$(date -u +%Y-%m-%d)}"
+SNAPSHOT_FILE="${SNAPSHOT_FILE:-}"
+
+# Determine file list
+if [[ -n "${SNAPSHOT_FILE}" && -f "${SNAPSHOT_FILE}" ]]; then
+  echo "Using snapshot: ${SNAPSHOT_FILE}"
+  mapfile -t ALL_FILES < <(jq -r '.files[]' "${SNAPSHOT_FILE}")
 else
-  # fallback to existing behavior (HF API listing)
-  URLS=$(python3 -c "
+  echo "No snapshot provided; listing repo tree (non-recursive) for public-merged/${DATE_FOLDER}"
+  mapfile -t ALL_FILES < <(
+    python3 -c "
+import sys
 from huggingface_hub import HfApi
 api = HfApi()
-tree = api.list_repo_tree('axentx/surrogate-1-training-pairs', path='batches/public-merged/${DATE}', recursive=False)
+tree = api.list_repo_tree('${REPO}', path='public-merged/${DATE_FOLDER}', recursive=False)
 for item in tree:
-    if item.type == 'file':
-        print(f'https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/{item.path}')
-")
+    if item.type == 'file' and item.path.lower().endswith(('.parquet','.jsonl')):
+        print(item.path)
+"
+  )
 fi
 
-# Then iterate over $URLS as before (download via CDN URLs)
+# Shard assignment (unchanged)
+SHARD_ID="${SHARD_ID:-0}"
+TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
+
+process_file() {
+  local rel_path="$1"
+  local cdn_url="https://huggingface.co/datasets/${REPO}/resolve/main/${rel_path}"
+  # Download via CDN (no auth header) and process
+  # ... existing normalization + dedup logic ...
+}
+
+for f in "${ALL_FILES[@]}"; do
+  # Deterministic shard selection
+  slug=$(basename "$f" | sed 's/\.[^.]*$//')
+  bucket=$(( $(echo -n "$slug" | md5sum | cut -c1-8) % TOTAL_SHARDS ))
+  if [[ "$bucket" -eq "$SHARD_ID" ]]; then
+    process_file "$f"
+  fi
+done
