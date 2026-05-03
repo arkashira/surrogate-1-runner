@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-Create a deterministic snapshot for a date folder in surrogate-1-training-pairs.
+Generate a deterministic snapshot for a date folder in
+axentx/surrogate-1-training-pairs.
+
 Usage:
-  HF_TOKEN=<token> python bin/make-snapshot.py --date 2026-05-02 --out snapshot-2026-05-02.json
+  HF_TOKEN=<token> python bin/make-snapshot.py \
+    --repo axentx/surrogate-1-training-pairs \
+    --date 2026-05-02 \
+    --out snapshot-2026-05-02.json
 """
+
 import argparse
 import json
 import os
@@ -12,52 +18,55 @@ from datetime import datetime
 
 from huggingface_hub import HfApi
 
-API = HfApi()
-REPO = "axentx/surrogate-1-training-pairs"
+HF_API = HfApi(token=os.getenv("HF_TOKEN"))
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Create snapshot for a date folder.")
-    parser.add_argument("--date", required=True, help="Date folder, e.g. 2026-05-02")
-    parser.add_argument("--out", required=True, help="Output JSON path")
-    parser.add_argument("--repo", default=REPO, help="HF dataset repo")
-    args = parser.parse_args()
+def list_date_folder(repo: str, date: str):
+    """
+    Single API call: list top-level folder contents non-recursively.
+    Assumes layout: <date>/<slug>.parquet  (or other extensions).
+    """
+    prefix = f"{date}/"
+    entries = HF_API.list_repo_tree(
+        repo=repo,
+        path=prefix,
+        recursive=False,
+    )
+    # entries may include nested folders if any; filter to files only
+    files = [e for e in entries if e.type == "file"]
+    return files
 
-    token = os.getenv("HF_TOKEN")
-    if not token:
-        print("ERROR: HF_TOKEN required", file=sys.stderr)
-        sys.exit(1)
-
-    # Non-recursive list per folder to avoid 100× pagination
-    try:
-        files = API.list_repo_tree(
-            repo_id=args.repo,
-            path=args.date,
-            repo_type="dataset",
-            token=token,
-            recursive=False,
-        )
-    except Exception as e:
-        print(f"ERROR listing repo tree: {e}", file=sys.stderr)
-        sys.exit(1)
-
+def build_snapshot(repo: str, date: str):
+    files = list_date_folder(repo, date)
     snapshot = {
-        "date": args.date,
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "repo": repo,
+        "date": date,
+        "generated_at": datetime.utcnow().isoformat() + "Z",
         "files": [
             {
-                "file_path": f.rfilename if hasattr(f, "rfilename") else f["path"],
-                "size": f.size if hasattr(f, "size") else f.get("size"),
-                "sha": f.lfs.get("sha256") if hasattr(f, "lfs") else None,
+                "path": f.rfilename,  # relative path from repo root
+                "size": f.size,
+                "sha": getattr(f, "sha", None),
             }
             for f in files
-            if (hasattr(f, "type") and f.type == "file") or (isinstance(f, dict) and f.get("type") == "file")
         ],
     }
+    return snapshot
 
-    with open(args.out, "w") as fp:
-        json.dump(snapshot, fp, indent=2)
+def main():
+    parser = argparse.ArgumentParser(description="Create CDN snapshot for date folder")
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    parser.add_argument("--date", required=True, help="YYYY-MM-DD folder")
+    parser.add_argument("--out", required=True, help="Output JSON path")
+    args = parser.parse_args()
 
-    print(f"Snapshot written to {args.out} ({len(snapshot['files'])} files)")
+    if not os.getenv("HF_TOKEN"):
+        print("error: HF_TOKEN required", file=sys.stderr)
+        sys.exit(1)
+
+    snapshot = build_snapshot(args.repo, args.date)
+    with open(args.out, "w", encoding="utf-8") as fh:
+        json.dump(snapshot, fh, indent=2)
+    print(f"wrote {len(snapshot['files'])} files -> {args.out}")
 
 if __name__ == "__main__":
     main()
