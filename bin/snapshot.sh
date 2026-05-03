@@ -1,60 +1,53 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# snapshot.sh — list dataset files once for CDN-only training
-# Usage: ./bin/snapshot.sh --repo <owner>/<dataset> --date YYYY-MM-DD [--out <path>] [--dry-run]
 
-REPO=""
-DATE=""
-OUT=""
-DRY_RUN=0
+# Usage: bin/snapshot.sh [YYYY-MM-DD]
+# Requires: huggingface_hub (pip), HF_TOKEN (read-only is fine for public repos)
+# Emits: snapshots/<DATE>.json
 
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --repo)  REPO="$2"; shift 2 ;;
-    --date)  DATE="$2"; shift 2 ;;
-    --out)   OUT="$2"; shift 2 ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    *) echo "Unknown option $1"; exit 1 ;;
-  esac
-done
+REPO="axentx/surrogate-1-training-pairs"
+DATE="${1:-$(date +%Y-%m-%d)}"
+OUTDIR="snapshots"
+OUTFILE="${OUTDIR}/${DATE}.json"
 
-: "${REPO:?required}"
-: "${DATE:?required}"
-OUT="${OUT:-snapshot-${DATE}.json}"
+mkdir -p "${OUTDIR}"
 
 python3 - <<PY
-import os, json, sys, time
+import os, json, sys
 from huggingface_hub import HfApi
-from datetime import datetime
 
-repo = "${REPO}"
+repo = os.environ.get("REPO", "${REPO}")
 date = "${DATE}"
-out = "${OUT}"
-dry_run = ${DRY_RUN}
+path = f"public-merged/{date}"
 api = HfApi()
 
 try:
-    tree = api.list_repo_tree(repo=repo, path=date, repo_type="dataset", recursive=False)
+    # Single API call: recursive tree listing for the date folder
+    tree = api.list_repo_tree(repo=repo, path=path, recursive=True)
 except Exception as e:
-    if "429" in str(e):
-        print("Rate limited (429). Wait 360s before retry.", file=sys.stderr)
+    print(f"ERROR listing repo tree: {e}", file=sys.stderr)
     sys.exit(1)
 
-files = [{"path": f.rfilename, "size": getattr(f, "size", None)} for f in tree if f.rfilename]
-snapshot = {
-    "repo": repo,
-    "date": date,
-    "generated_at": datetime.utcnow().isoformat() + "Z",
-    "files": files
-}
+files = []
+for item in tree:
+    if item.type != "file":
+        continue
+    # Only include .jsonl and .parquet files
+    if not (item.path.endswith(".jsonl") or item.path.endswith(".parquet")):
+        continue
+    # CDN URL (no Authorization header required)
+    cdn = f"https://huggingface.co/datasets/{repo}/resolve/main/{item.path}"
+    files.append({
+        "path": item.path,
+        "cdn": cdn,
+        "size": getattr(item, "size", None)
+    })
 
-if dry_run:
-    print(f"[dry-run] Would write {len(files)} files to {out}")
-    sys.exit(0)
+out = os.path.join(os.environ.get("OUTDIR", "${OUTDIR}"), "${DATE}.json")
+with open(out, "w") as f:
+    json.dump({"date": date, "root": path, "files": files}, f, indent=2)
 
-os.makedirs(os.path.dirname(out) if os.path.dirname(out) else ".", exist_ok=True)
-with open(out, "w") as fp:
-    json.dump(snapshot, fp, indent=2)
-
-print(f"Snapshot written to {out} ({len(files)} files)")
+print(f"Wrote {len(files)} files to {out}")
 PY
+
+echo "Snapshot created: ${OUTFILE}"
