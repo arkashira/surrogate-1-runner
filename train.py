@@ -1,43 +1,45 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, Iterator
+from typing import List, Dict
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
 from torch.utils.data import IterableDataset
 
-MANIFEST_PATH = os.getenv("FILE_MANIFEST", "file_manifest.json")
+class CDNParquetDataset(IterableDataset):
+    """
+    Zero-HF-API dataset loader.
+    Reads file_manifest.json and streams parquet files via CDN URLs.
+    """
 
-class CDNParquetIterable(IterableDataset):
-    """Stream parquet files from CDN using manifest (zero HF API calls)."""
-
-    def __init__(self, manifest_path: str = MANIFEST_PATH, columns=None):
+    def __init__(self, manifest_path: str, columns=("prompt", "response")):
         super().__init__()
-        self.manifest_path = manifest_path
+        with open(manifest_path) as f:
+            self.manifest = json.load(f)
+        self.files: List[Dict] = self.manifest["files"]
         self.columns = columns
 
-    def _iter_files(self) -> Iterator[Dict]:
-        with open(self.manifest_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        for meta in data["files"]:
-            yield meta
-
     def _stream_parquet(self, cdn_url: str):
-        resp = requests.get(cdn_url, stream=True, timeout=60)
-        resp.raise_for_status()
-        import io
-        buf = io.BytesIO()
-        for chunk in resp.iter_content(chunk_size=8192):
-            buf.write(chunk)
-        buf.seek(0)
-        table = pq.read_table(buf, columns=self.columns)
-        yield from table.to_pylist()
+        # Stream parquet from CDN without auth/API
+        with requests.get(cdn_url, stream=True, timeout=60) as r:
+            r.raise_for_status()
+            # Write to temp buffer (or memory-map if small)
+            data = r.content
+            table = pq.read_table(pa.BufferReader(data), columns=self.columns)
+            yield from table.to_pylist()
 
     def __iter__(self):
-        for meta in self._iter_files():
-            try:
-                yield from self._stream_parquet(meta["cdn_url"])
-            except Exception as exc:
-                print(f"Skipping {meta['path']}: {exc}")
-                continue
+        for entry in self.files:
+            yield from self._stream_parquet(entry["cdn_url"])
+
+# Lightning DataModule usage
+# class SurrogateDataModule(L.LightningDataModule):
+#     def __init__(self, manifest_path="file_manifest.json"):
+#         super().__init__()
+#         self.manifest_path = manifest_path
+#
+#     def train_dataloader(self):
+#         dataset = CDNParquetDataset(self.manifest_path)
+#         return DataLoader(dataset, batch_size=...)
