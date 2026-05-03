@@ -1,37 +1,54 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Usage: HF_TOKEN=... bin/snapshot.sh <date> [output.json]
-# Example: bin/snapshot.sh 2026-05-02 batches/snapshot-2026-05-02.json
+# Generate CDN snapshot for surrogate-1 dataset ingestion.
+# Usage: HF_TOKEN=... ./bin/snapshot.sh <date> [output.json]
 
 set -euo pipefail
 
 REPO="axentx/surrogate-1-training-pairs"
 DATE="${1:-$(date +%Y-%m-%d)}"
-OUT="${2:-batches/snapshot-${DATE}.json}"
+OUT="${2:-snapshot-${DATE}.json}"
 
-mkdir -p "$(dirname "$OUT")"
+python3 - "$REPO" "$DATE" "$OUT" <<'PY'
+import json, os, sys
+from datetime import datetime, timezone
+from huggingface_hub import HfApi
 
-echo "[$(date -u)] Listing ${REPO}/batches/public-merged/${DATE} ..."
+repo, date, out = sys.argv[1], sys.argv[2], sys.argv[3]
+api = HfApi(token=os.getenv("HF_TOKEN"))
 
-curl -sSf -H "Authorization: Bearer ${HF_TOKEN}" \
-  "https://huggingface.co/api/datasets/${REPO}/tree?path=batches/public-merged/${DATE}&recursive=false" \
-  > "$OUT.tmp"
+# List top-level date folders (non-recursive)
+tree = api.list_repo_tree(repo, path="", recursive=False)
+folders = [t for t in tree if t.type == "directory" and t.path.startswith(date)]
 
-# Transform to minimal CDN entries: {path, cdn_url}
-python3 -c "
-import json, sys
-with open('$OUT.tmp') as f:
-    tree = json.load(f)
-out = []
-for node in tree:
-    if node.get('type') == 'file':
-        out.append({
-            'path': node['path'],
-            'cdn_url': f'https://huggingface.co/datasets/${REPO}/resolve/main/{node[\"path\"]}'
-        })
-with open('$OUT', 'w') as f:
-    json.dump(out, f, indent=2)
-"
-rm -f "$OUT.tmp"
+if not folders:
+    print(f"No folders found for date {date}", file=sys.stderr)
+    sys.exit(1)
 
-echo "[$(date -u)] Snapshot written: $OUT ($(jq length < "$OUT") files)"
+entries = []
+for f in folders:
+    files = api.list_repo_tree(repo, path=f.path, recursive=False)
+    for file in files:
+        if file.type == "file" and file.path.endswith((".parquet", ".jsonl")):
+            cdn_url = f"https://huggingface.co/datasets/{repo}/resolve/main/{file.path}"
+            entries.append({
+                "path": file.path,
+                "cdn_url": cdn_url,
+                "size": getattr(file, "size", None)
+            })
+
+# Deterministic ordering
+entries.sort(key=lambda x: x["path"])
+
+snapshot = {
+    "repo": repo,
+    "date": date,
+    "ts": datetime.now(timezone.utc).isoformat(),
+    "files": entries
+}
+
+with open(out, "w") as fp:
+    json.dump(snapshot, fp, indent=2)
+
+print(f"Snapshot written to {out} ({len(entries)} files)")
+PY
