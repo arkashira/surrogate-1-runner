@@ -1,26 +1,21 @@
-import os
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
-def get_db() -> sqlite3.Connection:
-    db_path = os.getenv("DEDUP_DB", str(Path(__file__).parent.parent / "dedup.sqlite"))
-    conn = sqlite3.connect(db_path, timeout=30)
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS seen_hashes ("
-        "  md5 TEXT PRIMARY KEY,"
-        "  ts DATETIME DEFAULT CURRENT_TIMESTAMP"
-        ")"
-    )
+_DB_PATH = Path(__file__).parent.parent / "dedup.db"
+
+def _ensure_db() -> sqlite3.Connection:
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(_DB_PATH))
+    conn.execute("CREATE TABLE IF NOT EXISTS seen (md5 TEXT PRIMARY KEY)")
     conn.commit()
     return conn
 
-def is_duplicate(conn: sqlite3.Connection, md5_hex: str) -> bool:
-    cur = conn.execute("SELECT 1 FROM seen_hashes WHERE md5=?", (md5_hex,))
-    return cur.fetchone() is not None
-
-def mark_seen(conn: sqlite3.Connection, md5_hex: str) -> None:
-    try:
-        conn.execute("INSERT INTO seen_hashes (md5) VALUES (?)", (md5_hex,))
-    except sqlite3.IntegrityError:
-        pass  # race ok
+def is_duplicate(md5: str) -> bool:
+    conn = _ensure_db()
+    cur = conn.execute("SELECT 1 FROM seen WHERE md5 = ?", (md5,))
+    exists = cur.fetchone() is not None
+    if not exists:
+        conn.execute("INSERT INTO seen (md5) VALUES (?)", (md5,))
+        conn.commit()
+    conn.close()
+    return exists
