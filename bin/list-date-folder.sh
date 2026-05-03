@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 # bin/list-date-folder.sh
-# Usage: ./list-date-folder.sh 2026-05-03 > file-list-2026-05-03.json
+# Usage: HF_TOKEN=... ./bin/list-date-folder.sh <date-folder> > file-list-<date>.json
 set -euo pipefail
 
-REPO="${1:-axentx/surrogate-1-training-pairs}"
-DATE_FOLDER="${2:-$(date +%Y-%m-%d)}"
-HF_TOKEN="${HF_TOKEN:-}"
-
-URL="https://huggingface.co/api/datasets/${REPO}/tree?path=${DATE_FOLDER}&recursive=false"
-
-if [[ -n "$HF_TOKEN" ]]; then
-  curl -sL -H "Authorization: Bearer ${HF_TOKEN}" "$URL"
-else
-  curl -sL "$URL"
+REPO="datasets/axentx/surrogate-1-training-pairs"
+FOLDER="${1:-}"
+if [[ -z "$FOLDER" ]]; then
+  echo "Usage: $0 <date-folder>" >&2
+  exit 1
 fi
+
+python3 - <<PY
+import os, json, sys
+from huggingface_hub import HfApi
+
+api = HfApi(token=os.environ.get("HF_TOKEN"))
+repo = os.environ.get("REPO", "$REPO")
+folder = os.environ.get("FOLDER", "$FOLDER")
+
+tree = api.list_repo_tree(repo=repo, path=folder, recursive=False)
+files = [item.rfilename for item in tree if item.type == "file"]
+sys.stdout.write(json.dumps(files))
+PY
