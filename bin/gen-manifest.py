@@ -1,62 +1,71 @@
 #!/usr/bin/env python3
 """
-Generate a date-scoped manifest for surrogate-1 ingestion.
-Usage (Mac orchestrator):
-  HF_TOKEN=... python bin/gen-manifest.py \
-    --repo axentx/some-public-raw \
+Generate manifest-{DATE}.json for a given DATE.
+
+Usage:
+  HF_TOKEN=hf_xxx \
+  python bin/gen-manifest.py \
+    --repo axentx/surrogate-1-training-pairs \
     --date 2026-05-03 \
-    --out manifests/2026-05-03.json
+    --out manifest-2026-05-03.json
 """
+
 import argparse
 import json
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
-from huggingface_hub import HfApi, login
+import requests
 
-def build_parser():
-    p = argparse.ArgumentParser()
-    p.add_argument("--repo", required=True)
-    p.add_argument("--date", required=True, help="YYYY-MM-DD")
-    p.add_argument("--out", required=True)
-    p.add_argument("--token", default=os.getenv("HF_TOKEN"))
-    return p
+HF_API = "https://huggingface.co/api/datasets"
 
-def main():
-    args = build_parser().parse_args()
-    if not args.token:
-        print("HF_TOKEN required", file=sys.stderr)
-        sys.exit(1)
+def list_repo_tree(repo: str, date: str, token: Optional[str] = None) -> list:
+    """
+    Return list of dicts: {"path": "...", "type": "file", "size": ...}
+    for files under {date}/ in the repo.
+    """
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
-    login(token=args.token)
-    api = HfApi()
+    url = f"{HF_API}/{repo}/tree/main"
+    params = {"recursive": "true", "path": date}
+    resp = requests.get(url, headers=headers, params=params, timeout=60)
+    resp.raise_for_status()
+    tree = resp.json()
+    return [item for item in tree if item.get("type") == "file"]
 
-    # List top-level date folder only (avoid recursive on big repos)
-    prefix = f"raw/{args.date}/"
-    entries = api.list_repo_tree(repo_id=args.repo, path=prefix, recursive=False)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate manifest for a DATE folder.")
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    parser.add_argument("--date", required=True, help="DATE folder (YYYY-MM-DD)")
+    parser.add_argument("--out", required=True, help="Output manifest JSON path")
+    parser.add_argument("--hf-token", default=os.getenv("HF_TOKEN"))
+    args = parser.parse_args()
 
-    files = []
-    for e in entries:
-        if not e.path.endswith((".json", ".jsonl", ".parquet", ".csv")):
-            continue
-        files.append({
-            "path": e.path,
-            "cdn_url": f"https://huggingface.co/datasets/{args.repo}/resolve/main/{e.path}"
-        })
+    try:
+        datetime.strptime(args.date, "%Y-%m-%d")
+    except ValueError:
+        sys.exit("Invalid DATE format; expected YYYY-MM-DD")
+
+    token = args.hf_token
+    items = list_repo_tree(args.repo, args.date, token)
 
     manifest = {
         "repo": args.repo,
         "date": args.date,
         "generated_at": datetime.utcnow().isoformat() + "Z",
-        "files": sorted(files, key=lambda x: x["path"])
+        "files": [{"path": item["path"], "size": item.get("size", 0)} for item in items],
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w") as f:
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w") as f:
         json.dump(manifest, f, indent=2)
 
-    print(f"Wrote {len(files)} files to {args.out}")
+    print(f"Manifest written to {out_path} ({len(items)} files)")
 
 if __name__ == "__main__":
     main()
