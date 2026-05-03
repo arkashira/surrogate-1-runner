@@ -1,102 +1,69 @@
 name: surrogate-1-ingest
-
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: '*/30 * * * *'
   workflow_dispatch:
-    inputs:
-      date:
-        description: "Date partition (YYYY-MM-DD). If omitted, uses UTC today."
-        required: false
-
-env:
-  DATASET_REPO: axentx/surrogate-1-training-pairs
 
 jobs:
   preflight:
     runs-on: ubuntu-latest
     outputs:
-      date_part: ${{ steps.date.outputs.date_part }}
-      file_count: ${{ steps.list.outputs.file_count }}
+      date: ${{ steps.date.outputs.DATE }}
+      time: ${{ steps.time.outputs.TIME }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set date partition
+      - name: Set date/time
         id: date
-        run: |
-          if [ -n "${{ github.event.inputs.date }}" ]; then
-            echo "date_part=${{ github.event.inputs.date }}" >> $GITHUB_OUTPUT
-          else
-            echo "date_part=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
-          fi
+        run: echo "DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
-      - name: Install huggingface_hub
-        run: pip install huggingface_hub
+      - name: Set time
+        id: time
+        run: echo "TIME=$(date -u +%H%M%S)" >> $GITHUB_OUTPUT
 
-      - name: List date folder (non-recursive)
-        id: list
+      - name: List today folder (single API call)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          DATE_PART: ${{ steps.date.outputs.date_part }}
         run: |
           python - <<'PY'
-          import os, json, sys
+          import os, json, datetime
           from huggingface_hub import HfApi
-          api = HfApi()
-          repo = os.environ["DATASET_REPO"]
-          date_part = os.environ["DATE_PART"]
-          try:
-              tree = api.list_repo_tree(repo=repo, path=date_part, recursive=False)
-              files = sorted([t.path for t in tree if t.type == "file"])
-          except Exception:
-              files = []
-          out = {"date": date_part, "files": files}
-          out_path = "file-list.json"
-          with open(out_path, "w") as f:
-              json.dump(out, f)
-          print(f"::set-output name=file_count::{len(files)}")
+          api = HfApi(token=os.getenv("HF_TOKEN"))
+          today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+          repo = "datasets/axentx/surrogate-1-training-pairs"
+          items = api.list_repo_tree(repo=repo, path=today, recursive=False)
+          files = sorted(it.rfilename for it in items if hasattr(it, "rfilename"))
+          with open("file-list.json", "w") as f:
+              json.dump({"date": today, "files": files}, f)
           PY
 
-      - name: Fail fast if no files
-        if: steps.list.outputs.file_count == '0'
-        run: |
-          echo "No files found for date ${{ steps.date.outputs.date_part }} — nothing to ingest."
-          exit 1
-
-      - name: Upload file-list artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: file-list
           path: file-list.json
 
   ingest:
     needs: preflight
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
-    runs-on: ubuntu-latest
-    env:
-      SHARD_ID: ${{ matrix.shard_id }}
-      DATE_PART: ${{ needs.preflight.outputs.date_part }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download file-list
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: file-list
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
 
       - name: Install deps
         run: pip install -r requirements.txt
 
       - name: Run shard worker
         env:
+          SHARD_ID: ${{ matrix.shard_id }}
+          DATE_PART: ${{ needs.preflight.outputs.date }}
+          TIME_PART: ${{ needs.preflight.outputs.time }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          REPO: "datasets/axentx/surrogate-1-training-pairs"
         run: |
-          bash bin/dataset-enrich.sh "$SHARD_ID" "$DATE_PART"
+          bash bin/dataset-enrich.sh

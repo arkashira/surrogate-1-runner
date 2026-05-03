@@ -1,113 +1,84 @@
 #!/usr/bin/env bash
-# bin/dataset-enrich.sh
-# Deterministic shard worker with CDN-bypass ingestion.
 set -euo pipefail
 
-# -- config --
-REPO="axentx/surrogate-1-training-pairs"
-BASE_URL="https://huggingface.co/datasets/${REPO}/resolve/main"
-WORKDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEDUP_PY="${WORKDIR}/lib/dedup.py"
+: "${SHARD_ID:?}"
+: "${DATE_PART:?}"
+: "${TIME_PART:?}"
+: "${REPO:?}"
+: "${HF_TOKEN:?}"
 
-HF_TOKEN="${HF_TOKEN:-}"
-SHARD_ID="${SHARD_ID:?required}"
-TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
-DATE="${INGEST_DATE:-$(date -u +%Y-%m-%d)}"
-TIMESTAMP="$(date -u +%H%M%S)"
-OUT_DIR="${WORKDIR}/out/batches/public-merged/${DATE}"
-OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
-SUMMARY_FILE="${OUT_DIR}/shard${SHARD_ID}-${TIMESTAMP}-summary.json"
+BASE_OUT="batches/public-merged/${DATE_PART}"
+OUT_FILE="${BASE_OUT}/shard${SHARD_ID}-${TIME_PART}.jsonl"
+SUCCESS_MARKER="${BASE_OUT}/shard${SHARD_ID}-${TIME_PART}.success"
 
-FILE_LIST="${WORKDIR}/file-list-${DATE}.json"
+mkdir -p "$(dirname "$OUT_FILE")"
 
-mkdir -p "${OUT_DIR}"
-
-log() { echo "[$(date -u +%H:%M:%S)] $*"; }
-
-# -- helpers --
-should_process() {
-  local slug="$1"
-  local hash
-  hash=$(echo -n "$slug" | md5sum | cut -c1-8)
-  hash=$((0x${hash} % TOTAL_SHARDS))
-  [[ $hash -eq $SHARD_ID ]]
-}
-
-download_cdn() {
-  local path="$1"
-  local out="$2"
-  curl -fL --retry 3 --retry-delay 5 \
-    "${BASE_URL}/${path}" -o "${out}"
-}
-
-process_file() {
-  local relpath="$1"
-  local tmp
-  tmp="$(mktemp)"
-  if download_cdn "${relpath}" "${tmp}"; then
-    python3 "${DEDUP_PY}" --input "${tmp}" --shard-id "${SHARD_ID}" --out "${OUT_FILE}" || true
-  else
-    log "WARN: failed to download ${relpath}"
-    return 1
-  fi
-  rm -f "${tmp}"
-}
-
-# -- main --
-log "Starting shard ${SHARD_ID}/${TOTAL_SHARDS} for ${DATE}"
-
-# Idempotency: if any existing shard output exists for this run pattern, skip processing.
-# (We still produce a fresh timestamped file each run, but avoid re-processing same list.)
-if compgen -G "${OUT_DIR}/shard${SHARD_ID}-*.jsonl" > /dev/null 2>&1; then
-  log "Found existing shard outputs in ${OUT_DIR}; skipping processing (idempotency)."
+# Skip if this exact shard/time already completed (avoid races/repeats)
+if [[ -f "$SUCCESS_MARKER" ]]; then
+  echo "Shard ${SHARD_ID} for ${DATE_PART} ${TIME_PART} already done (success marker present). Skipping."
   exit 0
 fi
 
-if [[ -f "${FILE_LIST}" ]]; then
-  log "Using pre-flight file list ${FILE_LIST}"
-  mapfile -t FILES < <(python3 -c "
-import json, sys
-with open('${FILE_LIST}') as f:
-    data=json.load(f)
-for fn in data.get('files', []):
-    print(fn)
-")
-  if [[ ${#FILES[@]} -eq 0 ]]; then
-    log "WARN: file list empty; nothing to process."
-    echo '{"shard_id":'${SHARD_ID}',"date":"'${DATE}'","status":"no_files","processed":0,"skipped":0,"errors":0}' > "${SUMMARY_FILE}"
-    exit 0
-  fi
-else
-  log "WARN: no file list ${FILE_LIST}; skipping (prefer pre-flight list)."
-  echo '{"shard_id":'${SHARD_ID}',"date":"'${DATE}'","status":"no_file_list","processed":0,"skipped":0,"errors":0}' > "${SUMMARY_FILE}"
-  exit 0
-fi
+# Deterministic shard assignment by slug
+shard_for() {
+  local slug=$1
+  python -c "import hashlib; print(abs(int(hashlib.sha256('$slug'.encode()).hexdigest(), 16)) % 16)"
+}
 
-TOTAL=${#FILES[@]}
-PROCESSED=0
-ERRORS=0
+python - <<PY
+import json, os, hashlib, sys, requests, tqdm
 
-for f in "${FILES[@]}"; do
-  slug="${f##*/}"
-  slug="${slug%.*}"
-  if should_process "${slug}"; then
-    log "Processing ${f}"
-    if process_file "${f}"; then
-      PROCESSED=$((PROCESSED+1))
-    else
-      ERRORS=$((ERRORS+1))
-    fi
-  fi
-done
+SHARD_ID = int(os.getenv("SHARD_ID"))
+REPO = os.getenv("REPO")
+OUT_FILE = os.getenv("OUT_FILE")
+FILE_LIST = "file-list.json"
 
-log "Shard ${SHARD_ID} finished. Output: ${OUT_FILE}"
-echo '{
-  "shard_id": '${SHARD_ID}',
-  "date": "'${DATE}'",
-  "status": "done",
-  "processed": '${PROCESSED}',
-  "total_candidates": '${TOTAL}',
-  "errors": '${ERRORS}',
-  "output_file": "'${OUT_FILE}'",
-  "generated_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-}' > "${SUMMARY_FILE}"
+with open(FILE_LIST) as f:
+    manifest = json.load(f)
+
+files = manifest["files"]
+
+def shard_for(slug: str) -> int:
+    return abs(int(hashlib.sha256(slug.encode()).hexdigest(), 16)) % 16
+
+def download_cdn(path: str) -> bytes:
+    url = f"https://huggingface.co/datasets/{REPO}/resolve/main/{path}"
+    r = requests.get(url, timeout=30)
+    r.raise_for_status()
+    return r.content
+
+def parse_to_pair(raw: bytes, filename: str):
+    # Adapt to your schema. Must return dict with at least {prompt,response}.
+    text = raw.decode("utf-8", errors="replace")
+    return {"prompt": f"from {filename}", "response": text[:2000]}
+
+written = 0
+with open(OUT_FILE, "w", encoding="utf-8") as out:
+    for fpath in tqdm.tqdm(files, desc="Processing"):
+        slug = os.path.splitext(os.path.basename(fpath))[0]
+        if shard_for(slug) != SHARD_ID:
+            continue
+        try:
+            raw = download_cdn(fpath)
+            pair = parse_to_pair(raw, fpath)
+            if pair is None:
+                continue
+            pair["_md5"] = hashlib.md5(raw).hexdigest()
+            pair["_source_file"] = fpath
+            out.write(json.dumps(pair, ensure_ascii=False) + "\n")
+            written += 1
+        except Exception as e:
+            print(f"WARN: failed {fpath}: {e}", file=sys.stderr)
+
+print(f"Wrote {written} pairs to {OUT_FILE}")
+PY
+
+# Create success marker to prevent re-runs/races for this exact shard/time
+touch "$SUCCESS_MARKER"
+
+# Push only this shard's file + marker
+git config user.name "github-actions"
+git config user.email "github-actions@github.com"
+git add "$OUT_FILE" "$SUCCESS_MARKER"
+git commit -m "shard${SHARD_ID} ${DATE_PART} ${TIME_PART}" || true
+git push "https://${HF_TOKEN}@huggingface.co/datasets/${REPO}.git" HEAD:main
