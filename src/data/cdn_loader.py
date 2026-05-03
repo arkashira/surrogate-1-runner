@@ -1,38 +1,42 @@
-import requests, pyarrow.parquet as pq, io, json
-from typing import Iterator, Dict
+from pathlib import Path
+import json, hashlib, requests, pyarrow.csv as pc, pyarrow.parquet as pq
+from torch.utils.data import IterableDataset
 
-CDN_ROOT = "https://huggingface.co/datasets"
+CDN = "https://huggingface.co/datasets"
 
-def cdn_url(repo: str, path: str) -> str:
-    return f"{CDN_ROOT}/{repo}/resolve/main/{path}"
+class CdnDataset(IterableDataset):
+    def __init__(self, manifest_path, shard_id=0, num_shards=1):
+        manifest = json.loads(Path(manifest_path).read_text())
+        self.folder = manifest["folder"]
+        # deterministic sharding by filename
+        files = sorted(manifest["files"])
+        self.files = [
+            f for f in files
+            if hashlib.md5(f.encode()).digest()[0] % num_shards == shard_id
+        ]
+        self.shard_id = shard_id
+        self.num_shards = num_shards
 
-def project_record(raw: Dict) -> Dict:
-    # Strict projection to avoid mixed schemas / CastError
-    return {
-        "prompt": str(raw.get("prompt") or raw.get("input") or ""),
-        "response": str(raw.get("response") or raw.get("output") or "")
-    }
-
-def stream_cdn_files(manifest_path: str) -> Iterator[Dict]:
-    with open(manifest_path) as f:
-        manifest = json.load(f)
-
-    repo = manifest["repo"]
-    for rel_path in manifest["files"]:
-        url = cdn_url(repo, rel_path)
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-
-        if rel_path.endswith(".parquet"):
-            table = pq.read_table(io.BytesIO(resp.content))
-            for batch in table.to_batches(max_chunksize=1000):
-                for row in batch.to_pylist():
-                    yield project_record(row)
-        elif rel_path.endswith(".jsonl"):
-            for line in resp.iter_lines(decode_unicode=True):
-                if not line:
-                    continue
-                row = json.loads(line)
-                yield project_record(row)
-        else:
-            continue
+    def __iter__(self):
+        for fname in self.files:
+            url = f"{CDN}/{self.folder}/{fname}"
+            try:
+                with requests.get(url, stream=True) as r:
+                    r.raise_for_status()
+                    if fname.endswith(".parquet"):
+                        table = pq.read_table(pq.ParquetFile(r.raw))
+                    else:
+                        # project only prompt/response to avoid CastError
+                        table = pc.read_csv(
+                            r.raw,
+                            read_options=pc.ReadOptions(column_names=["prompt", "response"]),
+                            parse_options=pc.ParseOptions(delimiter="\t"),
+                        )
+                    for batch in table.to_batches(max_chunksize=1024):
+                        cols = batch.to_pydict()
+                        for p, r_ in zip(cols.get("prompt", []), cols.get("response", [])):
+                            if p and r_:
+                                yield {"prompt": p, "response": r_}
+            except Exception as exc:
+                print(f"Skipping {url}: {exc}")
+                continue
