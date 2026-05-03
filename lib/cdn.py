@@ -1,28 +1,37 @@
+import json
+import time
 import requests
 from pathlib import Path
-from huggingface_hub import hf_hub_download
-import time
+from typing import List, Dict
+from huggingface_hub import list_repo_tree
 
-def cdn_fetch(path: str, repo: str, out_path: Path, max_retries: int = 3):
-    url = f"https://huggingface.co/datasets/{repo}/resolve/main/{path}"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+HF_DATASETS_BASE = "https://huggingface.co/datasets"
 
-    for attempt in range(max_retries):
+def build_cdn_url(repo: str, filepath: str) -> str:
+    return f"{HF_DATASETS_BASE}/{repo}/resolve/main/{filepath}"
+
+def robust_list_repo_tree(repo: str, folder: str = "", recursive: bool = True, max_retries: int = 3) -> List[Dict]:
+    """One-time listing with 429 retry (Candidate 1 robustness)."""
+    for attempt in range(1, max_retries + 1):
         try:
-            resp = requests.get(url, timeout=60)
-            resp.raise_for_status()
-            out_path.write_bytes(resp.content)
-            return out_path
+            return list(list_repo_tree(repo, folder=folder, recursive=recursive))
         except Exception as e:
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(2 ** attempt)
-    return out_path
+            if hasattr(e, "response") and getattr(e.response, "status_code", None) == 429 and attempt < max_retries:
+                wait = 60 * attempt
+                time.sleep(wait)
+                continue
+            raise
 
-def fetch_file(path: str, repo: str, out_path: Path, use_cdn: bool = True):
-    if use_cdn:
-        try:
-            return cdn_fetch(path, repo, out_path)
-        except Exception:
-            pass
-    return Path(hf_hub_download(repo_id=repo, filename=path, cache_dir=out_path.parent))
+def generate_file_list(repo: str, output_path: str, folder: str = "", recursive: bool = True) -> List[Dict]:
+    items = robust_list_repo_tree(repo, folder=folder, recursive=recursive)
+    files = [
+        {"path": item.path, "cdn_url": build_cdn_url(repo, item.path), "size": getattr(item, "size", None)}
+        for item in items
+        if item.type == "file" and item.path.endswith((".jsonl", ".parquet", ".json"))
+    ]
+    Path(output_path).write_text(json.dumps(files, indent=2))
+    print(f"Saved {len(files)} files to {output_path}")
+    return files
+
+def load_file_list(path: str) -> List[Dict]:
+    return json.loads(Path(path).read_text())
