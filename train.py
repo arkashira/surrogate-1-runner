@@ -1,23 +1,15 @@
-name: Ingest Public Dataset
+import json
+import requests
+from pathlib import Path
 
-on:
-  workflow_dispatch:
-    inputs:
-      date_folder:
-        description: 'Date folder to ingest'
-        required: true
+def load_via_cdn(manifest_path: str):
+    with open(manifest_path) as f:
+        m = json.load(f)
 
-jobs:
-  ingest:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Run pre-flight snapshot generation
-        run: |
-          ./bin/snapshot.sh
-
-      - name: Run training script
-        run: |
-          ./train.py
+    for fmeta in m["files"]:
+        url = fmeta["cdn_url"]
+        # Stream download with no Authorization header (public CDN).
+        resp = requests.get(url, stream=True, timeout=60)
+        resp.raise_for_status()
+        # Process bytes (e.g., parse parquet/jsonl) and project to {prompt,response}.
+        yield process(resp.raw)
