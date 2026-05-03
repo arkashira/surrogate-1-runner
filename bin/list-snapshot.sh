@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
+# bin/list-snapshot.sh
+# Usage: HF_TOKEN=... ./bin/list-snapshot.sh axentx/surrogate-1-training-pairs 2026-05-02 > snapshot-2026-05-02.json
 set -euo pipefail
 
-REPO="${HF_DATASET_REPO:-axentx/surrogate-1-training-pairs}"
-DATE="${1:-$(date +%Y-%m-%d)}"
-OUTFILE="${2:-file-list.json}"
+REPO="${1:-axentx/surrogate-1-training-pairs}"
+DATE="${2:-$(date +%F)}"
+FOLDER="public-raw/${DATE}"
 
-# Requires huggingface_hub; install via pip if missing
-python3 - "$REPO" "$DATE" "$OUTFILE" <<'PY'
-import json, os, sys
+python3 - "$REPO" "$FOLDER" <<'PY'
+import os, json, sys
 from huggingface_hub import HfApi
 
-repo, date, outfile = sys.argv[1], sys.argv[2], sys.argv[3]
-api = HfApi()
-# Single non-recursive call per date folder
-tree = api.list_repo_tree(repo=repo, path=date, recursive=False)
-files = [f.rfilename for f in tree if f.rfilename.endswith(('.jsonl', '.parquet', '.csv'))]
-with open(outfile, "w") as f:
-    json.dump({"date": date, "files": files, "snapshot_ts": time.time()}, f, indent=2)
-print(f"Snapshot written: {len(files)} files -> {outfile}")
+repo_id = sys.argv[1]
+folder = sys.argv[2].rstrip("/")
+api = HfApi(token=os.environ.get("HF_TOKEN"))
+
+# Single API call: non-recursive per folder to avoid pagination explosion.
+entries = api.list_repo_tree(repo_id, path=folder, recursive=False)
+
+files = []
+for e in entries:
+    if not e.path.endswith((".jsonl", ".parquet", ".json")):
+        continue
+    files.append({
+        "path": e.path,
+        "cdn_url": f"https://huggingface.co/datasets/{repo_id}/resolve/main/{e.path}"
+    })
+
+sys.stdout.write(json.dumps({"repo": repo_id, "folder": folder, "files": files}, indent=2))
 PY
