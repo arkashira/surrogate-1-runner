@@ -1,65 +1,74 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HF_TOKEN="${HF_TOKEN:-}"
+# Surrogate-1 CDN-bypass ingestion worker
+# Usage: ./dataset-enrich.sh <date> <shard_id> <total_shards>
+# Example: ./dataset-enrich.sh 2026-05-03 0 16
+
+DATE="${1:-$(date +%Y-%m-%d)}"
+SHARD_ID="${2:-0}"
+TOTAL_SHARDS="${3:-16}"
 REPO="axentx/surrogate-1-training-pairs"
-DATE="${DATE:-$(date +%Y-%m-%d)}"
-SHARD_ID="${SHARD_ID:-0}"
-FILE_MANIFEST="${FILE_MANIFEST:-}"
-OUT_DIR="batches/public-merged/${DATE}"
-TS=$(date +%H%M%S)
-OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-${TS}.jsonl"
+FOLDER="public-raw/${DATE}"
+OUT_DIR="output/${DATE}"
+TIMESTAMP=$(date +%H%M%S)
+OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-${TIMESTAMP}.jsonl"
 
-mkdir -p "$OUT_DIR"
+mkdir -p "${OUT_DIR}"
 
-shard_for() {
-  local slug="$1"
-  local hash
-  hash=$(echo -n "$slug" | sha256sum | tr -d ' -')
-  echo $(( 0x${hash:0:8} % 16 ))
-}
+echo "[$(date)] Worker shard=${SHARD_ID}/${TOTAL_SHARDS} date=${DATE}"
+echo "[$(date)] Listing folder (non-recursive): ${FOLDER}"
 
-if [[ -n "$FILE_MANIFEST" && -f "$FILE_MANIFEST" ]]; then
-  echo "Using CDN-bypass manifest: $FILE_MANIFEST"
-  jq -r '.[] | .path' "$FILE_MANIFEST" | while read -r relpath; do
-    slug=$(basename "$relpath" .parquet)
-    [[ $(shard_for "$slug") -eq "$SHARD_ID" ]] || continue
+# Use huggingface_hub to list only immediate files in folder (no recursion)
+# This avoids paginated list_repo_files and stays under API limits.
+python3 - <<PY > /tmp/filelist.json
+import os, json
+from huggingface_hub import list_repo_tree
 
-    url="https://huggingface.co/datasets/${REPO}/resolve/main/${relpath}"
-    tmp=$(mktemp)
-    if curl -fsSL "$url" -o "$tmp"; then
-      python3 -c "
-import json, pyarrow.parquet as pq, sys
-try:
-  tbl = pq.read_table('$tmp')
-  df = tbl.to_pandas()
-  prompt_col = next((c for c in df.columns if 'prompt' in c.lower()), df.columns[0])
-  response_col = next((c for c in df.columns if 'response' in c.lower() or 'completion' in c.lower()), df.columns[-1])
-  for _, row in df.iterrows():
-    out = {'prompt': str(row[prompt_col]), 'response': str(row[response_col])}
-    print(json.dumps(out, ensure_ascii=False))
-except Exception as e:
-  sys.stderr.write(f'Parse error {e} for $relpath\\n')
-" >> "$OUT_FILE"
-    else
-      echo "Download failed: $url"
-    fi
-    rm -f "$tmp"
-  done
-else
-  echo "WARNING: FILE_MANIFEST not provided; falling back to streaming (may hit rate limits)"
-  python3 -c "
-from datasets import load_dataset
-import json
-ds = load_dataset('$REPO', split='train', streaming=True)
-for ex in ds:
-  if hash(ex.get('slug', '')) % 16 == $SHARD_ID:
-    print(json.dumps({'prompt': ex.get('prompt', ''), 'response': ex.get('response', '')}, ensure_ascii=False))
-" >> "$OUT_FILE"
-fi
+repo = os.environ.get("REPO", "${REPO}")
+folder = os.environ.get("FOLDER", "${FOLDER}")
 
-if [[ -n "$HF_TOKEN" ]]; then
-  huggingface-cli upload --repo-type dataset "$REPO" "$OUT_FILE" "$OUT_FILE" --token "$HF_TOKEN"
-else
-  echo "HF_TOKEN not set; skipping upload"
-fi
+# Non-recursive tree listing for one folder
+tree = list_repo_tree(repo=repo, path=folder, recursive=False)
+files = [f.rfilename for f in tree if f.type == "file"]
+json.dump(files, open("/tmp/filelist.json", "w"))
+print(json.dumps(files))
+PY
+
+FILELIST=$(cat /tmp/filelist.json)
+FILE_COUNT=$(echo "${FILELIST}" | jq length)
+echo "[$(date)] Found ${FILE_COUNT} files in ${FOLDER}"
+
+# Determine shard slice by deterministic hash of filename
+python3 - <<PY
+import json, hashlib, os, sys
+
+files = json.loads(os.environ["FILELIST"])
+shard_id = int(os.environ["SHARD_ID"])
+total_shards = int(os.environ["TOTAL_SHARDS"])
+out_file = os.environ["OUT_FILE"]
+
+def shard_for(fname, total):
+    # Deterministic, stable across runs
+    h = int(hashlib.sha256(fname.encode()).hexdigest(), 16)
+    return h % total
+
+selected = [f for f in files if shard_for(f, total_shards) == shard_id]
+print(f"Shard {shard_id}/{total_shards} processing {len(selected)} files")
+
+# Pass selected files to the enrichment script via env
+os.environ["SELECTED_FILES"] = json.dumps(selected)
+PY
+
+SELECTED_FILES=$(python3 -c "import os,json; print(os.environ.get('SELECTED_FILES','[]'))")
+
+# Run enrichment using CDN-only fetches
+python3 bin/enrich_worker.py \
+  --repo "${REPO}" \
+  --date "${DATE}" \
+  --shard-id "${SHARD_ID}" \
+  --total-shards "${TOTAL_SHARDS}" \
+  --out "${OUT_FILE}" \
+  --filelist "${SELECTED_FILES}"
+
+echo "[$(date)] Wrote ${OUT_FILE}"
