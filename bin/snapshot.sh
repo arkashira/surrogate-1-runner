@@ -1,73 +1,56 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Generate a deterministic file manifest for a dataset repo + date folder.
-#
-# Usage:
-#   REPO=axentx/surrogate-1-training-pairs DATE=2026-04-29 ./bin/snapshot.sh
-#
-# Outputs: snapshots/snapshot-<repo_slug>-<DATE>.json
-# Requires: python3, huggingface_hub
-
+# Usage: HF_TOKEN=... bin/snapshot.sh <repo> <date> [out_dir]
+# Example: HF_TOKEN=... bin/snapshot.sh axentx/surrogate-1-training-pairs 2026-04-29 snapshots
 set -euo pipefail
 
-REPO="${REPO:-}"
-DATE="${DATE:-}"
-OUTDIR="${OUTDIR:-./snapshots}"
+REPO="${1:-axentx/surrogate-1-training-pairs}"
+DATE="${2:-$(date +%Y-%m-%d)}"
+OUT_DIR="${3:-snapshots}"
+HF_TOKEN="${HF_TOKEN:-}"
+API_ROOT="https://huggingface.co/api"
 
-if [[ -z "$REPO" ]]; then
-  echo "ERROR: REPO is required (e.g. axentx/surrogate-1-training-pairs)" >&2
+mkdir -p "${OUT_DIR}/${REPO}/${DATE}"
+
+# Single non-recursive tree call to avoid pagination/429
+echo "Listing ${REPO} tree for ${DATE} (non-recursive)..."
+TREE_JSON=$(curl -sSf \
+  -H "Authorization: Bearer ${HF_TOKEN}" \
+  "${API_ROOT}/datasets/${REPO}/tree?path=${DATE}&recursive=false")
+
+# Extract file paths (type "file") and sort deterministically
+FILES=$(echo "$TREE_JSON" | python3 -c "
+import sys, json
+tree = json.load(sys.stdin)
+paths = [item['path'] for item in tree if item.get('type') == 'file']
+for p in sorted(paths):
+    print(p)
+")
+
+if [ -z "$FILES" ]; then
+  echo "No files found for ${DATE} in ${REPO}"
   exit 1
 fi
 
-if [[ -z "$DATE" ]]; then
-  DATE=$(date -u -d 'yesterday' '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
-  echo "INFO: DATE not provided, defaulting to $DATE" >&2
-fi
+SNAP_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+MANIFEST="${OUT_DIR}/${REPO}/${DATE}/manifest.json"
 
-REPO_SLUG=$(echo "$REPO" | tr '/-' '__')
-mkdir -p "$OUTDIR"
-OUTPUT="${OUTDIR}/snapshot-${REPO_SLUG}-${DATE}.json"
-
-python3 - "$REPO" "$DATE" "$OUTPUT" <<'PY'
-import json
-import os
-import sys
-from datetime import datetime, timezone
-
-try:
-    from huggingface_hub import HfApi
-except ImportError:
-    print("ERROR: huggingface_hub not installed. pip install huggingface_hub", file=sys.stderr)
-    sys.exit(1)
-
-repo = sys.argv[1]
-date_folder = sys.argv[2].rstrip('/')
-output_path = sys.argv[3]
-
-api = HfApi()
-path = date_folder  # top-level date folder inside dataset repo
-
-try:
-    entries = api.list_repo_tree(repo=repo, path=path, recursive=False)
-except Exception as e:
-    print(f"ERROR: failed to list repo tree for {repo}/{path}: {e}", file=sys.stderr)
-    sys.exit(1)
-
-files = sorted([e.path for e in entries if not e.path.endswith('/')])
-
+python3 -c "
+import json, os
+repo = os.environ['REPO']
+date = os.environ['DATE']
+files = os.environ['FILES'].splitlines()
 manifest = {
-    "repo": repo,
-    "date": date_folder,
-    "path_prefix": path,
-    "files": files,
-    "generated_at": datetime.now(timezone.utc).isoformat(),
-    "note": "Use CDN URLs for training: https://huggingface.co/datasets/{repo}/resolve/main/{file}"
+    'repo': repo,
+    'date': date,
+    'snapshot_ts': os.environ['SNAP_TS'],
+    'files': files,
+    'count': len(files)
 }
-
-os.makedirs(os.path.dirname(output_path), exist_ok=True)
-with open(output_path, "w", encoding="utf-8") as f:
+with open(os.environ['MANIFEST'], 'w') as f:
     json.dump(manifest, f, indent=2)
-print(f"INFO: snapshot written to {output_path} ({len(files)} files)")
-PY
+print(f'Wrote {len(files)} entries to {os.environ[\"MANIFEST\"]}')
+" -- \
+  REPO="$REPO" DATE="$DATE" FILES="$FILES" SNAP_TS="$SNAP_TS" MANIFEST="$MANIFEST"
 
-echo "INFO: snapshot created at $OUTPUT"
+echo "Snapshot created: ${MANIFEST}"
