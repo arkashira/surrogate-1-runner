@@ -1,32 +1,32 @@
-// Example: src/routes/requestRoutes.ts
-import express from 'express';
-import { RequestService } from '../services/requestService';
++ import { notifyStatusChangeQueue } from '../jobs/notifyStatusChange';
 
-const router = express.Router();
-const requestService = new RequestService();
+  export class RequestService {
+    // ... existing code
 
-router.patch('/requests/:id/status', async (req, res) => {
-  try {
-    const { status } = req.body;
-    const actorId = req.user?.id; // or from auth middleware
-    const actorType = 'platform_engineer';
+-   // old status change logic (example)
+-   async updateStatus(requestId: string, newStatus: string) {
+-     const request = await this.requestRepo.findById(requestId);
+-     request.status = newStatus;
+-     await this.requestRepo.save(request);
+-   }
 
-    if (!status) {
-      return res.status(400).json({ error: 'status is required' });
-    }
-
-    const updated = await requestService.updateRequestStatus(
-      req.params.id,
-      status,
-      actorId,
-      actorType
-    );
-
-    return res.json(updated);
-  } catch (err: any) {
-    const status = err.status || 500;
-    return res.status(status).json({ error: err.message });
++   async updateStatus(requestId: string, newStatus: string, channel?: string) {
++     const request = await this.requestRepo.findById(requestId);
++     const previousStatus = request.status;
++     request.status = newStatus;
++     await this.requestRepo.save(request);
++
++     // Enqueue notification job
++     await notifyStatusChangeQueue.add('notify-status-change', {
++       requestId,
++       channel: channel || process.env.SLACK_DEFAULT_CHANNEL || 'status-updates',
++       previousStatus,
++       newStatus,
++     }, {
++       attempts: 3,
++       backoff: { type: 'exponential', delay: 2000 },
++       removeOnComplete: 100,
++       removeOnFail: 50,
++     });
++   }
   }
-});
-
-export default router;
