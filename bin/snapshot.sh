@@ -1,56 +1,29 @@
 #!/usr/bin/env bash
 # bin/snapshot.sh
-# Usage: HF_TOKEN=... ./bin/snapshot.sh <date> [out.json]
-# Example: ./bin/snapshot.sh 2026-05-03 snapshots/public-merged/2026-05-03/manifest.json
-
+# Usage: HF_TOKEN=... ./bin/snapshot.sh axentx/surrogate-1-training-pairs 2026-05-03
 set -euo pipefail
 
-REPO="axentx/surrogate-1-training-pairs"
-DATE="${1:-$(date +%Y-%m-%d)}"
-OUT="${2:-snapshots/public-merged/${DATE}/manifest.json}"
-HF_TOKEN="${HF_TOKEN:-}"
+REPO="${1:-axentx/surrogate-1-training-pairs}"
+DATE="${2:-$(date +%Y-%m-%d)}"
+OUTDIR="snapshots/${DATE}"
+MANIFEST="${OUTDIR}/snapshot.json"
 
-if [ -z "$HF_TOKEN" ]; then
-  echo "ERROR: HF_TOKEN is required" >&2
-  exit 1
-fi
+mkdir -p "${OUTDIR}"
 
-mkdir -p "$(dirname "$OUT")"
-
-python3 - "$REPO" "$DATE" "$OUT" <<'PY'
+echo "Listing ${REPO} tree for date=${DATE} ..."
+# Single API call; recursive=False to avoid pagination explosion
+python3 - <<PY > "${OUTDIR}/tree.json"
 import os, json, sys
 from huggingface_hub import HfApi
-
+api = HfApi(token=os.environ.get("HF_TOKEN"))
 repo = sys.argv[1]
 date = sys.argv[2]
-out_path = sys.argv[3]
-token = os.environ["HF_TOKEN"]
+items = api.list_repo_tree(repo, path=date, recursive=False)
+# Keep only files (exclude subfolders)
+files = [it for it in items if it.type == "file"]
+print(json.dumps([{"path": f.path, "size": getattr(f, "size", None)} for f in files], indent=2))
+PY "$REPO" "$DATE"
 
-api = HfApi(token=token)
-
-# Single non-recursive call
-tree = api.list_repo_tree(
-    repo_id=repo,
-    path=f"batches/public-merged/{date}",
-    repo_type="dataset",
-    recursive=False
-)
-
-manifest = []
-for item in tree:
-    if item.path.rstrip("/").endswith("/"):
-        continue  # skip directory entries
-    manifest.append({
-        "path": item.path,
-        "size": getattr(item, "size", None),
-        "lfs": getattr(item, "lfs", None),
-    })
-
-# Deterministic ordering
-manifest.sort(key=lambda x: x["path"])
-
-with open(out_path, "w", encoding="utf-8") as f:
-    json.dump({"repo": repo, "date": date, "files": manifest}, f, indent=2, sort_keys=True)
-
-print(f"Wrote {len(manifest)} entries to {out_path}")
-PY
+echo "Building manifest with CDN URLs ..."
+python3 bin/build_manifest.py "${OUTDIR}/tree.json" "$REPO" "$DATE" > "$MANIFEST"
+echo "Snapshot written to $MANIFEST"
