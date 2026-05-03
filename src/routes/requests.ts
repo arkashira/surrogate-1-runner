@@ -1,5 +1,10 @@
+import { Router } from 'express';
+import { db } from '../db';
+import { computeSlaStatus, VALID_TRANSITIONS } from '../lib/sla';
 
----
+const router = Router();
 
-### 2) Queue + worker implementation  
-File: `/opt/axentx/surrogate-1/src/queue/notificationQueue.ts`
+// PATCH /requests/:id/state
+router.patch('/:id/state', (req, res) => {
+  const { id } = req.params;
+  const { state, changed_by, reas
