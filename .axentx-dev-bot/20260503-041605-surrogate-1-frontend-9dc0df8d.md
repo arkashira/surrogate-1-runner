@@ -110,99 +110,91 @@ if __name__ == "__main__":
 #!/usr/bin/env python3
 """
 
-## review — reviewer @ 2026-05-03T04:16:15.798807Z
+## review — reviewer @ 2026-05-03T04:16:25.435362Z
 
-APPROVE: Manifest-driven CDN-bypass worker is a clear, workable improvement that directly addresses HF API rate limits and schema fragility; deterministic sharding and NDJSON streaming are sensible for large-scale ingestion, and the thin wrapper keeps CI compatibility.
+APPROVE: Manifest-driven worker replaces fragile shell ingestion with deterministic sharding and CDN-bypass ingestion; schema projection and NDJSON streaming are concrete, testable improvements that unblock training data loads without HF API rate limits.
 
 Acceptance criteria:
-- Worker accepts `SHARD_ID`/`N_SHARDS` env vars and deterministically assigns date folders via `hash(date_folder) % N_SHARDS`.
-- Worker lists top-level date folders with one `list_repo_tree` call, then downloads parquet via CDN URLs (no per-file HF API calls) and projects rows to `{prompt, response}` with schema fallback.
-- Worker streams NDJSON output and handles errors per-file (skip + log) without aborting the entire shard.
-- `bin/build_manifest.py` produces a valid `manifest.json` for a given date folder and repo, including CDN URLs for parquet files.
-- CI workflow (or local run) can execute the worker matrix (e.g., 16 shards) using `HF_TOKEN` and emit per-shard NDJSON artifacts or push to a dataset branch.
+- `bin/worker.py` accepts `SHARD_ID`/`N_SHARDS` env vars, lists date folders via `list_repo_tree`, assigns shards by `hash(date_folder) % N_SHARDS`, downloads parquet via CDN URLs, projects rows to `{prompt, response}` with fallback keys, and streams NDJSON output.
+- `bin/build_manifest.py` produces `manifest.json` for a given repo/date folder containing repo, date, and list of `{path, cdn_url}` entries; exits non-zero on HF API failure.
+- `bin/dataset-enrich.sh` invokes `worker.py` so existing GitHub Actions matrix jobs continue to work (thin wrapper).
+- `requirements.txt` includes `requests`, `pyarrow`, `tqdm` (and `huggingface_hub` if not present).
+- `.github/workflows/ingest.yml` (or equivalent) defines a 16-shard matrix passing `SHARD_ID`/`N_SHARDS`, uses `HF_TOKEN`, and uploads per-shard NDJSON artifacts or pushes to a dataset branch.
 
-## qa — qa @ 2026-05-03T04:17:30.507527Z
+## qa — qa @ 2026-05-03T04:16:39.159360Z
 
-PASS: surrogate-1 manifest-driven CDN-bypass worker
+PASS: surrogate-1
 
 1. **Acceptance criteria**
-- Worker accepts SHARD_ID and N_SHARDS (default 16) from environment and deterministically assigns date folders via hash(date_folder) % N_SHARDS; shard assignment is stable across runs.
-- Worker performs exactly one list_repo_tree call to list top-level date folders under batches/public-merged/ and zero per-file HF API calls during parquet downloads (CDN-only).
-- Worker projects each parquet row to {prompt, response} using schema fallback (prompt/input/question × response/output/answer) and emits one valid NDJSON object per row.
-- Worker streams NDJSON to stdout (or file) with bounded memory (no full-dataset materialization) and handles per-file errors by skipping and logging without aborting the shard.
-- bin/build_manifest.py produces manifest.json for a given repo and date folder containing repo, date, and an array of parquet entries with CDN URLs and optional metadata; output is valid JSON and reproducible for same inputs.
-- CI/local execution supports a 16-shard matrix using HF_TOKEN and emits per-shard NDJSON artifacts or pushes to a dataset branch; total rows across all shards equal total rows in assigned date folders (no loss or duplication).
-- Default N_SHARDS=16 when N_SHARDS is unset; SHARD_ID must be an integer in [0, N_SHARDS-1] and validation fails fast with a clear error otherwise.
+- Worker accepts SHARD_ID and N_SHARDS (default 16) via environment and emits only NDJSON lines where each line is valid JSON containing string keys `prompt` and `response`.
+- Worker lists top-level date folders under `batches/public-merged/` via one `list_repo_tree` call and assigns folders to shards by `hash(date_folder) % N_SHARDS`; shard assignment is deterministic across runs.
+- Worker downloads parquet files via CDN URLs (`resolve/main/...`) and projects rows to `{prompt, response}` using fallback key paths (`prompt/input/question` × `response/output/answer`); malformed rows are skipped and counted.
+- `bin/build_manifest.py` produces `manifest.json` with `repo`, `date`, and `files: [{path, cdn_url}]`; exits non-zero and prints error on HF API failure or missing token.
+- `bin/dataset-enrich.sh` is a thin wrapper that invokes `python bin/worker.py` and preserves existing GitHub Actions matrix behavior (pass-through env and exit code).
+- `requirements.txt` contains `requests`, `pyarrow`, `tqdm`, and `huggingface_hub` (pinned or minimum version).
+- `.github/workflows/ingest.yml` defines a 16-shard matrix with `SHARD_ID: [0..15]`, passes `N_SHARDS=16`, uses `HF_TOKEN`, and uploads per-shard NDJSON artifacts (or pushes to dataset branch).
 
-2. **Unit tests** (pytest style)
+2. **Unit tests**
 ```python
-# test_worker_sharding.py
-import os
-from unittest.mock import patch
-from bin.worker import shard_for_date, list_and_assign_shards
+# tests/unit/test_worker_sharding.py
+def test_shard_assignment_deterministic():
+    from bin.worker import assign_shard
+    folders = ["2026-04-30", "2026-05-01", "2026-05-02"]
+    assignments = [assign_shard(f, n=16) for f in folders]
+    assert len(set(assignments)) <= 16
+    assert assignments == [assign_shard(f, n=16) for f in folders]  # deterministic
 
-def test_shard_for_date_deterministic():
-    assert shard_for_date("2026-04-30", n=16) == shard_for_date("2026-04-30", n=16)
-    assert 0 <= shard_for_date("2026-04-30", n=16) < 16
+def test_shard_default_n():
+    import os
+    from unittest.mock import patch
+    from bin.worker import main
+    with patch.dict(os.environ, {"SHARD_ID": "3"}, clear=True):
+        with patch("bin.worker.run_worker") as m:
+            main()
+            m.assert_called_once()
+            call_kwargs = m.call_args.kwargs
+            assert call_kwargs.get("n_shards") == 16
 
-def test_shard_for_date_uniform():
-    # sanity: different dates map to different shards often (not required always)
-    s1 = shard_for_date("2026-04-30", n=16)
-    s2 = shard_for_date("2026-05-01", n=16)
-    assert isinstance(s1, int) and isinstance(s2, int)
+# tests/unit/test_projection.py
+def test_project_row_fallback_keys():
+    from bin.worker import project_row
+    row = {"prompt": {"input": {"question": "q1"}}, "response": {"output": {"answer": "a1"}}}
+    out = project_row(row)
+    assert out == {"prompt": "q1", "response": "a1"}
 
-def test_env_parsing_defaults():
-    with patch.dict(os.environ, {}, clear=True):
-        from bin.worker import get_shard_config
-        cfg = get_shard_config()
-        assert cfg.n_shards == 16
-        assert cfg.shard_id is None  # or raises; depends on chosen behavior
+def test_project_row_flat_keys():
+    from bin.worker import project_row
+    row = {"prompt": "q2", "response": "a2"}
+    out = project_row(row)
+    assert out == {"prompt": "q2", "response": "a2"}
 
-def test_env_parsing_explicit():
-    with patch.dict(os.environ, {"SHARD_ID": "3", "N_SHARDS": "8"}):
-        from bin.worker import get_shard_config
-        cfg = get_shard_config()
-        assert cfg.shard_id == 3 and cfg.n_shards == 8
+def test_project_row_missing_returns_none():
+    from bin.worker import project_row
+    row = {"x": 1}
+    out = project_row(row)
+    assert out is None
 
-def test_invalid_shard_id_raises():
-    with patch.dict(os.environ, {"SHARD_ID": "20", "N_SHARDS": "16"}):
-        from bin.worker import get_shard_config
-        try:
-            get_shard_config()
-            assert False, "expected ValueError"
-        except ValueError:
-            pass
+# tests/unit/test_manifest.py
+def test_build_manifest_output(tmp_path):
+    from bin.build_manifest import build_manifest
+    import json
+    manifest_path = tmp_path / "manifest.json"
+    # mock HF API to return sample tree
+    with patch("bin.build_manifest.HfApi") as MockApi:
+        mock_api = MockApi.return_value
+        mock_api.list_repo_tree.return_value = [
+            {"path": "batches/public-merged/2026-04-30/file1.parquet", "type": "file"},
+            {"path": "batches/public-merged/2026-04-30/file2.parquet", "type": "file"},
+        ]
+        build_manifest(repo="test/repo", date="2026-04-30", out=str(manifest_path), token="tok")
+        data = json.loads(manifest_path.read_text())
+        assert data["repo"] == "test/repo"
+        assert data["date"] == "2026-04-30"
+        assert len(data["files"]) == 2
+        assert all("cdn_url" in f and f["cdn_url"].startswith("https://") for f in data["files"])
+```
 
-# test_worker_projection.py
-import pyarrow as pa
-from bin.worker import project_row_to_prompt_response
-
-def test_project_prompt_response_happy():
-    row = {"prompt": "hello", "response": "world"}
-    out = project_row_to_prompt_response(row)
-    assert out == {"prompt": "hello", "response": "world"}
-
-def test_project_fallback_prompt_input():
-    row = {"prompt": {"input": {"question": "q"}, "response": {"output": {"answer": "a"}}}}
-    out = project_row_to_prompt_response(row)
-    assert out == {"prompt": "q", "response": "a"}
-
-def test_project_fallback_response_output():
-    row = {"input": "q", "output": "a"}
-    out = project_row_to_prompt_response(row)
-    # choose expected policy: map input->prompt, output->response
-    assert out == {"prompt": "q", "response": "a"}
-
-def test_project_missing_fields_returns_none():
-    row = {"other": "x"}
-    out = project_row_to_prompt_response(row)
-    assert out is None  # or empty; policy: skip row
-
-# test_build_manifest.py
-import json
-from unittest.mock import MagicMock
-from bin.build_manifest import build_manifest
-
-def test_build_manifest_valid_json(tmp_path):
-    mock_api = MagicMock()
-    mock_api.list_repo_tree.r
+3. **Integration tests**
+- Happy: Worker with mocked `list_repo_tree` and local parquet fixture processes assigned shard and emits valid NDJSON lines equal to total rows across assigned files; exit code 0.
+- Happy: `build_manifest.py` against real repo (smoke) produces manifest with non-empty files and valid CDN URLs; exit code 0.
+- Happy: GitHub Actions m
