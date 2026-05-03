@@ -1,0 +1,7 @@
+{
+  "date": "2026-05-03",
+  "files": [
+    {"path": "batches/public-merged/2026-05-03/shard0-090000.jsonl", "rows": 12400},
+    {"path": "batches/public-merged/2026-05-03/shard1-090000.jsonl", "rows": 12380}
+  ]
+}
