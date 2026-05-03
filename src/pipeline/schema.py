@@ -89,3 +89,48 @@ class PipelineDefinition(BaseModel):
             return v
 
         stage_values = [node.stage for node in v]
+        if len(set(stage_values)) != len(stage_values):
+            raise ValueError("Stages must be unique within a pipeline definition")
+
+        canonical_order = list(PipelineStage)
+        indices = [canonical_order.index(s) for s in stage_values]
+
+        # Must be strictly increasing to enforce canonical order without skips
+        if indices != sorted(indices):
+            raise ValueError(
+                "Stages must follow canonical order: research -> signal -> risk -> execution"
+            )
+
+        # Disallow skips (e.g., research->risk) in definition
+        for i in range(len(indices) - 1):
+            if (canonical_order[indices[i]], canonical_order[indices[i + 1]]) not in _ALLOWED_TRANSITIONS:
+                raise ValueError(
+                    f"Invalid stage sequence in definition: "
+                    f"{canonical_order[indices[i]].value} -> {canonical_order[indices[i + 1]].value}"
+                )
+        return v
+
+    def validate_transition(self, from_stage: PipelineStage, to_stage: PipelineStage) -> bool:
+        return is_valid_transition(from_stage, to_stage)
+
+    def emit_initial_event(self) -> PipelineTransitionEvent:
+        if not self.stages:
+            raise ValueError("Pipeline has no stages")
+        first_stage = self.stages[0].stage
+        return PipelineTransitionEvent(
+            from_stage=None,
+            to_stage=first_stage,
+            state=PipelineState.RUNNING,
+        )
+
+
+def is_valid_transition(
+    from_stage: PipelineStage, to_stage: PipelineStage
+) -> bool:
+    """O(1) transition validation."""
+    return (from_stage, to_stage) in _ALLOWED_TRANSITIONS
+
+
+def validate_pipeline_definition(data: dict) -> PipelineDefinition:
+    """Convenience validator for raw dict input."""
+    return PipelineDefinition(**data)
