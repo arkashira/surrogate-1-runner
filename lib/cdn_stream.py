@@ -1,80 +1,60 @@
+"""
+lib/cdn_stream.py
+
+Usage:
+  from lib.cdn_stream import iter_cdn_parquet
+  for item in iter_cdn_parquet(file_list, max_retries=5):
+      ...
+"""
+
 import json
-import pyarrow.parquet as pq
-import pyarrow as pa
-import requests
 import time
-import tempfile
-import os
-from typing import Iterator, Dict, Any, Optional
+from pathlib import Path
+from typing import Iterable, Dict, Any
 
+import pyarrow.parquet as pq
+import requests
 
-def cdn_download(repo: str, path: str, out_path: str, max_retries: int = 3) -> None:
-    url = f"https://huggingface.co/datasets/{repo}/resolve/main/{path}"
+CDN_TIMEOUT = 30
+
+def _download(url: str, out_path: Path, max_retries: int = 5) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(1, max_retries + 1):
         try:
-            with requests.get(url, stream=True, timeout=30) as r:
+            with requests.get(url, stream=True, timeout=CDN_TIMEOUT) as r:
                 r.raise_for_status()
                 with open(out_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
             return
         except Exception as exc:
-            if attempt == max_retries:
-                raise
-            sleep = 2 ** attempt
-            time.sleep(sleep)
+            wait = 2 ** attempt
+            print(f"CDN download attempt {attempt}/{max_retries} failed: {exc}. Retrying in {wait}s...")
+            time.sleep(wait)
+    raise RuntimeError(f"Failed to download {url} after {max_retries} attempts")
 
-
-def project_to_prompt_response(path: str, tmp_path: str) -> Iterator[Dict[str, Any]]:
-    """Yield {prompt, response} records from JSONL or Parquet."""
-    try:
-        if path.endswith(".parquet"):
-            tbl = pq.read_table(tmp_path, columns=["prompt", "response"])
-            for i in range(tbl.num_rows):
-                rec = {k: tbl[k][i].as_py() for k in ["prompt", "response"]}
-                yield rec
-        else:
-            with open(tmp_path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    rec = json.loads(line)
-                    yield {k: rec.get(k) for k in ["prompt", "response"]}
-    except Exception as exc:
-        # skip malformed; log and continue
-        import sys
-        sys.stderr.write(f"parse error {path}: {exc}\n")
-
-
-def stream_shard(
-    repo: str,
-    file_list: list,
-    shard_id: int,
-    total_shards: int,
-) -> Iterator[Dict[str, Any]]:
+def iter_cdn_parquet(
+    file_list_path: str,
+    work_dir: str = ".cdn_cache",
+    max_retries: int = 5,
+    fields=("prompt", "response"),
+) -> Iterable[Dict[str, Any]]:
     """
-    Deterministic shard assignment by slug (filename without extension).
-    Downloads via CDN and projects to {prompt, response}.
+    Given file-list.json, download each parquet via CDN and yield projected rows.
     """
-    def shard_for(slug: str) -> int:
-        import hashlib
-        h = int(hashlib.sha256(slug.encode()).hexdigest(), 16)
-        return h % total_shards
+    with open(file_list_path, encoding="utf-8") as f:
+        manifest = json.load(f)
 
-    for item in file_list:
-        relpath = item["path"]
-        slug = os.path.splitext(os.path.basename(relpath))[0]
-        if shard_for(slug) != shard_id:
+    work_dir = Path(work_dir)
+    for item in manifest["files"]:
+        if not item["path"].lower().endswith(".parquet"):
             continue
+        local_path = work_dir / item["path"]
+        if not local_path.exists():
+            _download(item["cdn_url"], local_path, max_retries=max_retries)
 
-        with tempfile.NamedTemporaryFile(delete=False) as tf:
-            tmp_path = tf.name
-        try:
-            cdn_download(repo, relpath, tmp_path)
-            yield from project_to_prompt_response(relpath, tmp_path)
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+        table = pq.read_table(local_path, columns=fields)
+        for batch in table.to_batches():
+            cols = {name: batch.column(name).to_pylist() for name in fields}
+            for i in range(batch.num_rows):
+                yield {k: cols[k][i] for k in fields}

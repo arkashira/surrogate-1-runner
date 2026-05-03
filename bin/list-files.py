@@ -1,58 +1,82 @@
 #!/usr/bin/env python3
 """
-Single HF API call to list files for a date folder.
-
 Usage:
-  HF_TOKEN=<token> python bin/list-files.py \
+  HF_TOKEN=... python bin/list-files.py \
     --repo axentx/surrogate-1-training-pairs \
-    --date 2026-05-02 \
-    --out file-list.json
+    --out file-list.json \
+    [--folder batches/public-merged/2026-05-02]
 
-Produces:
-[
-  {"path": "batches/public-merged/2026-05-02/shard0-120000.jsonl", "size": 12345, "sha256": "..."},
-  ...
-]
+Writes:
+{
+  "repo": "...",
+  "folder": "...",
+  "generated_at_utc": "...",
+  "files": [
+    {"path": "...", "size": 123, "sha256": "...", "cdn_url": "..."},
+    ...
+  ],
+  "count": N
+}
 """
+
 import argparse
 import json
 import os
 import sys
-from huggingface_hub import HfApi
+from datetime import datetime
 
+from huggingface_hub import HfApi, RepositoryTreeEntry
+
+CDN_BASE = "https://huggingface.co/datasets"
+
+def list_folder(api: HfApi, repo: str, folder: str) -> list[dict]:
+    entries = api.list_repo_tree(repo=repo, path=folder.rstrip("/"), recursive=False)
+    out = []
+    for e in entries:
+        if isinstance(e, RepositoryTreeEntry) and e.type == "file":
+            out.append({
+                "path": e.path,
+                "size": e.size or 0,
+                "lfs": getattr(e, "lfs", None) is not None,
+                "sha256": getattr(e, "sha256", None),
+                "cdn_url": f"{CDN_BASE}/{repo}/resolve/main/{e.path}"
+            })
+    out.sort(key=lambda x: x["path"])
+    return out
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", required=True)
-    parser.add_argument("--date", required=True, help="Date folder, e.g. 2026-05-02")
-    parser.add_argument("--out", required=True)
+    parser = argparse.ArgumentParser(description="List dataset files for CDN ingestion")
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    parser.add_argument("--out", default="file-list.json")
+    parser.add_argument("--folder", default="batches/public-merged")
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN")
+    if not token:
+        print("ERROR: HF_TOKEN env var required", file=sys.stderr)
+        sys.exit(1)
+
     api = HfApi(token=token)
+    folder = args.folder.rstrip("/")
 
-    folder = f"batches/public-merged/{args.date}"
-    entries = api.list_repo_tree(repo_id=args.repo, path=folder, recursive=True)
+    try:
+        files = list_folder(api, args.repo, folder)
+    except Exception as exc:
+        print(f"ERROR listing repo tree: {exc}", file=sys.stderr)
+        sys.exit(1)
 
-    files = []
-    for e in entries:
-        if getattr(e, "type", None) != "file":
-            continue
-        path = getattr(e, "path", None)
-        if not path:
-            continue
-        size = getattr(e, "size", None)
-        sha256 = getattr(e, "lfs", {}).get("sha256", None) if getattr(e, "lfs", None) else None
-        files.append({"path": path, "size": size or 0, "sha256": sha256})
-
-    # Deterministic ordering for stable shard assignment
-    files.sort(key=lambda x: x["path"])
+    payload = {
+        "repo": args.repo,
+        "folder": folder,
+        "generated_at_utc": datetime.utcnow().isoformat() + "Z",
+        "files": files,
+        "count": len(files),
+    }
 
     with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(files, f, indent=2)
+        json.dump(payload, f, indent=2)
 
     print(f"Wrote {len(files)} files to {args.out}")
-
 
 if __name__ == "__main__":
     main()
