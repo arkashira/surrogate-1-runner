@@ -1,68 +1,91 @@
-#!/usr/bin/env bash
+# Accept MANIFEST_JSON env or arg.
+# Downloads via CDN (no auth/API) and projects to {prompt,response}.
+
 set -euo pipefail
 
-export HF_TOKEN="${HF_TOKEN:-}"
-export SHARD_ID="${SHARD_ID:-0}"
-MANIFEST="${1:-manifest-2026-05-03.json}"
-OUT_DIR="batches/public-merged/$(date +%F)"
+MANIFEST="${MANIFEST_JSON:-}"
+SHARD_ID="${SHARD_ID:-0}"
+TOTAL_SHARDS="${TOTAL_SHARDS:-16}"
+OUT_DIR="output"
 mkdir -p "$OUT_DIR"
-OUT_FILE="${OUT_DIR}/shard${SHARD_ID}-$(date +%H%M%S).jsonl"
 
-python3 -c "
-import json, hashlib, os, sys, time, requests
-from lib.dedup import DedupStore
+if [ -z "$MANIFEST" ] || [ ! -f "$MANIFEST" ]; then
+  echo "MANIFEST_JSON must point to a valid manifest file"
+  exit 1
+fi
 
-with open('$MANIFEST') as f:
-    data = json.load(f)
-files = data.get('files', [])
+# Deterministic shard assignment by file path hash
+python3 - "$MANIFEST" "$SHARD_ID" "$TOTAL_SHARDS" "$OUT_DIR" <<'PY'
+import json, hashlib, os, sys, subprocess, tempfile, itertools, pyarrow.parquet as pq
 
-dedup = DedupStore()
-shard_id = int('$SHARD_ID')
-out_path = '$OUT_FILE'
+manifest_path, shard_id, total_shards, out_dir = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+shard_id = int(shard_id)
 
-def assign_shard(slug: str) -> int:
-    return int(hashlib.sha256(slug.encode()).hexdigest(), 16) % 16
+with open(manifest_path) as f:
+    manifest = json.load(f)
 
-def project_to_pair(content: bytes, path: str):
-    # Replace with actual schema projection for your files.
-    # Must return dict with at least {'prompt':..., 'response':...}
-    # and optional 'md5' or 'hash' for dedup.
-    raise NotImplementedError('Implement projection per schema')
+files = manifest["files"]
+os.makedirs(out_dir, exist_ok=True)
 
-def robust_get(url, max_retries=3, backoff=360):
-    for attempt in range(max_retries):
+def assign_shard(path: str) -> int:
+    h = int(hashlib.md5(path.encode()).hexdigest(), 16)
+    return h % total_shards
+
+selected = [f for f in files if assign_shard(f["path"]) == shard_id]
+print(f"Shard {shard_id}/{total_shards}: processing {len(selected)} files")
+
+def normalize_to_pairs(file_info):
+    url = file_info["cdn_url"]
+    path = file_info["path"]
+    with tempfile.NamedTemporaryFile(suffix=os.path.splitext(path)[1], delete=False) as tmp:
+        # CDN download (no auth)
+        subprocess.run(["curl", "-fsSL", "-o", tmp.name, url], check=True)
+        tmp_path = tmp.name
+    try:
+        # Project to prompt/response only; ignore extra columns
+        if path.endswith(".parquet"):
+            table = pq.read_table(tmp_path, columns=["prompt", "response"])
+            df = table.to_pandas()
+        elif path.endswith(".jsonl"):
+            import pandas as pd
+            df = pd.read_json(tmp_path, lines=True)
+            if "prompt" not in df.columns or "response" not in df.columns:
+                # Best-effort column selection
+                df = df.rename(columns={c: c.lower() for c in df.columns})
+                if "prompt" not in df.columns or "response" not in df.columns:
+                    return []
+        else:
+            # CSV fallback
+            import pandas as pd
+            df = pd.read_csv(tmp_path)
+            df.columns = [c.lower() for c in df.columns]
+
+        pairs = []
+        for _, row in df.iterrows():
+            prompt = str(row.get("prompt", ""))
+            response = str(row.get("response", ""))
+            if prompt.strip() and response.strip():
+                pairs.append({"prompt": prompt, "response": response})
+        return pairs
+    finally:
         try:
-            resp = requests.get(url, timeout=60)
-            if resp.status_code == 429:
-                if attempt < max_retries - 1:
-                    print(f'429 on {url}, sleeping {backoff}s', file=sys.stderr)
-                    time.sleep(backoff)
-                    continue
-                else:
-                    resp.raise_for_status()
-            resp.raise_for_status()
-            return resp.content
-        except requests.RequestException:
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(backoff)
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
-with open(out_path, 'w') as out_f:
-    for entry in files:
-        slug = os.path.splitext(os.path.basename(entry['path']))[0]
-        if assign_shard(slug) != shard_id:
-            continue
+all_pairs = []
+for f in selected:
+    try:
+        pairs = normalize_to_pairs(f)
+        all_pairs.extend(pairs)
+    except Exception as exc:
+        print(f"Failed {f['path']}: {exc}")
 
-        content = robust_get(entry['cdn_url'])
-        try:
-            pair = project_to_pair(content, entry['path'])
-        except Exception as e:
-            print(f'Skip {entry[\"path\"]}: {e}', file=sys.stderr)
-            continue
+ts = manifest["created_at"].replace(":", "").split("T")[0]
+out_file = os.path.join(out_dir, f"shard{shard_id}-{ts}.jsonl")
+with open(out_file, "w", encoding="utf-8") as f:
+    for p in all_pairs:
+        f.write(json.dumps(p, ensure_ascii=False) + "\n")
 
-        key = pair.get('md5') or pair.get('hash')
-        if not dedup.seen(key):
-            out_f.write(json.dumps(pair) + '\n')
-            out_f.flush()
-print('Shard', shard_id, 'done ->', out_path)
-"
+print(f"Shard {shard_id} wrote {len(all_pairs)} pairs to {out_file}")
+PY
