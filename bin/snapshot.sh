@@ -1,68 +1,42 @@
 #!/usr/bin/env bash
-# bin/snapshot.sh
-# Pre-flight snapshot: list dataset files once → JSON for zero-API training
-# Usage: HF_TOKEN=... ./bin/snapshot.sh [--date YYYY-MM-DD] [--out snapshot.json]
-#   or:  ./bin/snapshot.sh 2026-05-02
-
 set -euo pipefail
 
+# Generate deterministic snapshot of dataset file list for a date folder
+# Usage: ./bin/snapshot.sh <date> [output-json]
+# Example: ./bin/snapshot.sh 2026-05-02 snapshot-2026-05-02.json
+
+DATE="${1:-$(date +%Y-%m-%d)}"
+OUT="${2:-snapshot-${DATE}.json}"
 REPO="axentx/surrogate-1-training-pairs"
-DATE=""
-OUT=""
 
-# Parse args: support both positional and flags
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --date|-d) DATE="$2"; shift 2 ;;
-    --out|-o)  OUT="$2";  shift 2 ;;
-    *)         DATE="$1"; shift ;;
-  esac
-done
+echo "[$(date -Iseconds)] Generating snapshot for ${DATE} -> ${OUT}"
 
-DATE="${DATE:-$(date +%Y-%m-%d)}"
-OUT="${OUT:-snapshot-$(date +%Y%m%d).json}"
+# Single API call: list top-level folder only (no recursion, no pagination pressure)
+# Uses gh CLI (authenticated) or falls back to curl with HF token
+if command -v gh &>/dev/null && gh auth status &>/dev/null; then
+  FILES=$(gh api "repos/${REPO}/contents/batches/public-merged/${DATE}" --paginate --jq '.[].name' 2>/dev/null || true)
+else
+  # Fallback: use HF API with token (rate-limited)
+  HF_TOKEN="${HF_TOKEN:-}"
+  if [ -z "$HF_TOKEN" ]; then
+    echo "ERROR: No gh CLI auth and no HF_TOKEN set" >&2
+    exit 1
+  fi
+  FILES=$(curl -s -H "Authorization: Bearer ${HF_TOKEN}" \
+    "https://huggingface.co/api/datasets/${REPO}/tree/batches/public-merged/${DATE}?recursive=false" \
+    | jq -r '.[].path' 2>/dev/null || true)
+fi
 
-echo "📸 Snapshotting ${REPO} for ${DATE} → ${OUT}"
+if [ -z "$FILES" ]; then
+  echo "WARNING: No files found for ${DATE}, creating empty snapshot"
+  FILES="[]"
+else
+  # Convert newline list to JSON array
+  FILES=$(echo "$FILES" | jq -R -s -c 'split("\n") | map(select(. != ""))')
+fi
 
-python3 - "$REPO" "$DATE" "$OUT" <<'PY'
-import os, json, sys
-from datetime import datetime, timezone
-from huggingface_hub import HfApi, hf_hub_url
+# Deterministic ordering for shard assignment
+echo "$FILES" | jq -c 'sort' > "${OUT}.tmp"
+mv "${OUT}.tmp" "${OUT}"
 
-repo = sys.argv[1]
-date = sys.argv[2]
-outfile = sys.argv[3]
-token = os.environ.get("HF_TOKEN") or os.environ.get("HF_API_TOKEN") or None
-
-api = HfApi(token=token)
-
-def list_files(path):
-    """List files at path (non-recursive) and return list of dicts."""
-    items = api.list_repo_tree(repo=repo, path=path, recursive=False)
-    files = []
-    for item in items:
-        if item.type == "file":
-            full = f"{path}/{item.path}" if path != item.path else item.path
-            cdn = hf_hub_url(repo_id=repo, filename=full, repo_type="dataset")
-            direct = cdn.replace("/api/", "/resolve/")
-            files.append({"path": full, "cdn_url": direct, "size": getattr(item, "size", None)})
-        elif item.type == "folder":
-            subpath = f"{path}/{item.path}" if path != item.path else item.path
-            files.extend(list_files(subpath))
-    return files
-
-files = list_files(date)
-
-result = {
-    "repo": repo,
-    "date": date,
-    "generated_at": datetime.now(timezone.utc).isoformat(),
-    "file_count": len(files),
-    "files": files
-}
-
-with open(outfile, "w") as f:
-    json.dump(result, f, indent=2)
-
-print(f"✅ Snapshot written to {outfile} ({len(files)} files)")
-PY
+echo "[$(date -Iseconds)] Snapshot written: ${OUT} ($(jq length "${OUT}") files)"
