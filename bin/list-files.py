@@ -1,78 +1,66 @@
 #!/usr/bin/env python3
 """
 Usage:
-  HF_TOKEN=... python bin/list-files.py \
-    --repo axentx/surrogate-1-training-pairs \
-    --out file-list.json \
-    [--folder batches/public-merged/2026-05-02]
+  python bin/list-files.py --repo axentx/surrogate-1-training-pairs \
+                           --folder batches/public-merged/2026-05-02 \
+                           --out file-list.json
 
-Writes:
-{
-  "repo": "...",
-  "folder": "...",
-  "generated_at_utc": "...",
-  "files": [
-    {"path": "...", "size": 123, "sha256": "...", "cdn_url": "..."},
-    ...
-  ],
-  "count": N
-}
+Produces:
+  {
+    "repo": "...",
+    "folder": "...",
+    "files": [
+      {"path": "...", "size": 12345, "sha": "...", "lfs": false},
+      ...
+    ]
+  }
 """
 
 import argparse
 import json
 import os
 import sys
-from datetime import datetime
-
-from huggingface_hub import HfApi, RepositoryTreeEntry
-
-CDN_BASE = "https://huggingface.co/datasets"
-
-def list_folder(api: HfApi, repo: str, folder: str) -> list[dict]:
-    entries = api.list_repo_tree(repo=repo, path=folder.rstrip("/"), recursive=False)
-    out = []
-    for e in entries:
-        if isinstance(e, RepositoryTreeEntry) and e.type == "file":
-            out.append({
-                "path": e.path,
-                "size": e.size or 0,
-                "lfs": getattr(e, "lfs", None) is not None,
-                "sha256": getattr(e, "sha256", None),
-                "cdn_url": f"{CDN_BASE}/{repo}/resolve/main/{e.path}"
-            })
-    out.sort(key=lambda x: x["path"])
-    return out
+from huggingface_hub import HfApi
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="List dataset files for CDN ingestion")
-    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
-    parser.add_argument("--out", default="file-list.json")
-    parser.add_argument("--folder", default="batches/public-merged")
+    parser = argparse.ArgumentParser(description="List repo folder (non-recursive) for CDN ingest.")
+    parser.add_argument("--repo", required=True, help="HF dataset repo, e.g. axentx/surrogate-1-training-pairs")
+    parser.add_argument("--folder", required=True, help="Folder path in repo (trailing slash optional)")
+    parser.add_argument("--out", required=True, help="Output JSON path")
     args = parser.parse_args()
 
-    token = os.environ.get("HF_TOKEN")
-    if not token:
-        print("ERROR: HF_TOKEN env var required", file=sys.stderr)
-        sys.exit(1)
-
-    api = HfApi(token=token)
-    folder = args.folder.rstrip("/")
+    api = HfApi()
+    folder = args.folder.rstrip("/") + "/"
 
     try:
-        files = list_folder(api, args.repo, folder)
+        entries = api.list_repo_tree(
+            repo_id=args.repo,
+            path=folder.rstrip("/"),
+            repo_type="dataset",
+            recursive=False,
+        )
     except Exception as exc:
-        print(f"ERROR listing repo tree: {exc}", file=sys.stderr)
+        print(f"ERROR listing {args.repo}@{folder}: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    files = [
+        {
+            "path": e.path,
+            "size": getattr(e, "size", 0),
+            "sha": getattr(e, "sha", ""),
+            "lfs": getattr(e, "lfs", False),
+        }
+        for e in entries
+        if getattr(e, "type", "file") == "file"
+    ]
 
     payload = {
         "repo": args.repo,
         "folder": folder,
-        "generated_at_utc": datetime.utcnow().isoformat() + "Z",
         "files": files,
-        "count": len(files),
     }
 
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
 
