@@ -1,38 +1,39 @@
 #!/usr/bin/env bash
-#
-# snapshot.sh — deterministic CDN manifest for a dataset date folder
-#
-# Usage:
-#   ./bin/snapshot.sh --repo axentx/surrogate-1-training-pairs --date 2026-04-29 [--out snapshot.json]
-#
-# Requires: python3, huggingface_hub
-
+# bin/snapshot.sh
+# Usage: HF_TOKEN=... ./bin/snapshot.sh axentx/surrogate-1-training-pairs 2026-05-03
 set -euo pipefail
 
-REPO=""
-DATE=""
-OUT="snapshot.json"
+REPO="${1:?repo required}"
+DATE="${2:?date required (YYYY-MM-DD)}"
+OUTDIR="snapshots/${DATE}"
+OUTFILE="${OUTDIR}/files.json"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --repo) REPO="$2"; shift 2 ;;
-    --date) DATE="$2"; shift 2 ;;
-    --out)  OUT="$2";  shift 2 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
-  esac
-done
+mkdir -p "${OUTDIR}"
 
-if [[ -z "$REPO" || -z "$DATE" ]]; then
-  echo "Usage: $0 --repo <repo> --date <YYYY-MM-DD> [--out <json>]" >&2
-  exit 1
-fi
+# One HF tree API call per date folder (non-recursive).
+# Rate-note: this is the only HF API call; CDN downloads do NOT count against limits.
+echo "Listing ${REPO} tree for ${DATE}..."
+TREE_JSON=$(curl -s \
+  -H "Authorization: Bearer ${HF_TOKEN:-}" \
+  -H "Content-Type: application/json" \
+  "https://huggingface.co/api/datasets/${REPO}/tree?path=${DATE}&recursive=false")
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PY_SCRIPT="${SCRIPT_DIR}/snapshot.py"
+# Extract filenames, sort for determinism, build CDN URLs.
+echo "${TREE_JSON}" \
+  | python3 -c "
+import sys, json, os
+tree = json.load(sys.stdin)
+items = sorted([item for item in tree if item.get('type') == 'file'], key=lambda x: x['path'])
+base = 'https://huggingface.co/datasets/${REPO}/resolve/main'
+out = []
+for it in items:
+    p = it['path']
+    out.append({
+        'path': p,
+        'basename': os.path.basename(p),
+        'cdn_url': f'{base}/{p}'
+    })
+print(json.dumps({'date': '${DATE}', 'repo': '${REPO}', 'files': out}, indent=2))
+" > "${OUTFILE}"
 
-if [[ ! -x "$PY_SCRIPT" ]]; then
-  echo "Python snapshot helper not found or not executable: $PY_SCRIPT" >&2
-  exit 1
-fi
-
-exec python3 "$PY_SCRIPT" --repo "$REPO" --date "$DATE" --out "$OUT"
+echo "Snapshot written to ${OUTFILE}"
