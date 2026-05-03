@@ -3,8 +3,8 @@ name: Ingest
 on:
   workflow_dispatch:
     inputs:
-      date:
-        description: 'Date folder to process'
+      slug:
+        description: 'Slug hash to ingest'
         required: true
 
 jobs:
@@ -13,9 +13,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run snapshot script
-        run: |
-          bin/snapshot.sh
-      - name: Run dataset-enrich script
+
+      - name: Set up Docker
+        uses: docker/setup-docker@v1
+
+      - name: Run ingest script
         run: |
           bin/dataset-enrich.sh
