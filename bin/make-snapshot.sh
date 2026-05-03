@@ -1,41 +1,25 @@
 #!/usr/bin/env bash
-# bin/make-snapshot.sh
+# Generate deterministic snapshot for a date folder.
 # Usage:
-#   HF_TOKEN=hf_xxx REPO=axentx/surrogate-1-training-pairs DATE=2026-05-02 ./bin/make-snapshot.sh
-#
-# Produces:
-#   snapshot/<date>/files.json  (deterministic list of file paths)
+#   HF_TOKEN=<token> ./make-snapshot.sh 2026-05-01 ./snapshots/file-list-2026-05-01-$(date +%H%M%S).json
 
 set -euo pipefail
 
-: "${HF_TOKEN:?required}"
-: "${REPO:?required}"
-: "${DATE:?required (YYYY-MM-DD)}"
+if [[ -z "${HF_TOKEN:-}" ]]; then
+  echo "ERROR: HF_TOKEN is required" >&2
+  exit 1
+fi
 
-OUTDIR="snapshot/${DATE}"
-OUTFILE="${OUTDIR}/files.json"
+if [[ $# -ne 2 ]]; then
+  echo "Usage: $0 <date_folder> <output.json>" >&2
+  exit 1
+fi
 
-mkdir -p "${OUTDIR}"
+DATE_FOLDER=$1
+OUT=$2
 
-python3 - <<PY > "${OUTFILE}.tmp"
-import os, json, sys
-from huggingface_hub import HfApi
+export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
 
-api = HfApi(token=os.environ["HF_TOKEN"])
-repo = os.environ["REPO"]
-date = os.environ["DATE"]
+mkdir -p "$(dirname "$OUT")"
 
-entries = api.list_repo_tree(repo=repo, path=date, recursive=False)
-
-files = []
-for e in entries:
-    # Keep only files (skip subfolders)
-    if getattr(e, "type", None) == "file" or (hasattr(e, "path") and "." in e.path):
-        files.append(e.path)
-
-files.sort()
-print(json.dumps({"date": date, "files": files}, indent=2))
-PY
-
-mv "${OUTFILE}.tmp" "${OUTFILE}"
-echo "Snapshot written to ${OUTFILE}"
+python3 tools/snapshot.py "$DATE_FOLDER" "$OUT"
