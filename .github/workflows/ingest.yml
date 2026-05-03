@@ -1,35 +1,102 @@
-- name: Compute shard matrix
-  id: matrix
-  run: |
-    FILE_LIST=$(cat file-list-${{ env.DATE }}.json)
-    TOTAL=$(echo "$FILE_LIST" | jq length)
-    SHARDS=16
-    # Produce JSON array of {shard_id, files} for each shard
-    python3 -c "
-import json, os, sys
-files = json.loads(os.environ['FILE_LIST'])
-shards = int(os.environ['SHARDS'])
-rows = []
-for i in range(shards):
-    rows.append({
-        'shard_id': i,
-        'files': [f for idx, f in enumerate(files) if idx % shards == i]
-    })
-print(json.dumps(rows))
-" > matrix.json
-    echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
-  env:
-    FILE_LIST: ${{ steps.checkout.outputs.file_list }}  # injected from artifact
-    SHARDS: 16
-    DATE: ${{ env.DATE }}
+name: surrogate-1-ingest
 
-- uses: actions/checkout@v4
-  with:
-    repository: <owner>/surrogate-1-runner
-    path: runner
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date partition (YYYY-MM-DD). If omitted, uses UTC today."
+        required: false
 
-- name: Upload file-list artifact
-  uses: actions/upload-artifact@v4
-  with:
-    name: file-list-${{ env.DATE }}
-    path: file-list-${{ env.DATE }}.json
+env:
+  DATASET_REPO: axentx/surrogate-1-training-pairs
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      date_part: ${{ steps.date.outputs.date_part }}
+      file_count: ${{ steps.list.outputs.file_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set date partition
+        id: date
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            echo "date_part=${{ github.event.inputs.date }}" >> $GITHUB_OUTPUT
+          else
+            echo "date_part=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: List date folder (non-recursive)
+        id: list
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DATE_PART: ${{ steps.date.outputs.date_part }}
+        run: |
+          python - <<'PY'
+          import os, json, sys
+          from huggingface_hub import HfApi
+          api = HfApi()
+          repo = os.environ["DATASET_REPO"]
+          date_part = os.environ["DATE_PART"]
+          try:
+              tree = api.list_repo_tree(repo=repo, path=date_part, recursive=False)
+              files = sorted([t.path for t in tree if t.type == "file"])
+          except Exception:
+              files = []
+          out = {"date": date_part, "files": files}
+          out_path = "file-list.json"
+          with open(out_path, "w") as f:
+              json.dump(out, f)
+          print(f"::set-output name=file_count::{len(files)}")
+          PY
+
+      - name: Fail fast if no files
+        if: steps.list.outputs.file_count == '0'
+        run: |
+          echo "No files found for date ${{ steps.date.outputs.date_part }} — nothing to ingest."
+          exit 1
+
+      - name: Upload file-list artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-list
+          path: file-list.json
+
+  ingest:
+    needs: preflight
+    strategy:
+      matrix:
+        shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    runs-on: ubuntu-latest
+    env:
+      SHARD_ID: ${{ matrix.shard_id }}
+      DATE_PART: ${{ needs.preflight.outputs.date_part }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download file-list
+        uses: actions/download-artifact@v4
+        with:
+          name: file-list
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run shard worker
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          bash bin/dataset-enrich.sh "$SHARD_ID" "$DATE_PART"
