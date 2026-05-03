@@ -1,57 +1,41 @@
-name: ingest
+name: surrogate-1-ingest
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: "*/30 * * * *"
   workflow_dispatch:
-    inputs:
-      date_override:
-        description: 'Optional date (YYYY-MM-DD) to backfill'
-        required: false
-        default: ''
 
 env:
-  HF_REPO: axentx/surrogate-1-training-pairs
-  N_SHARDS: 16
+  DATASET_REPO: axentx/surrogate-1-training-pairs
+  DATE_PARTITION: ${{ github.run_started_at && format('{0:yyyy}/{0:MM}/{0:dd}', github.run_started_at) || '1970/01/01' }}
 
 jobs:
-  prelist:
+  file-list:
     runs-on: ubuntu-latest
     outputs:
-      run_date: ${{ steps.date.outputs.run_date }}
-      folder: ${{ steps.date.outputs.folder }}
+      date_partition: ${{ steps.date.outputs.partition }}
+      file_list_json: ${{ steps.list.outputs.file_list }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set run date and folder
+      - name: Set date partition
         id: date
         run: |
-          if [ -n "${{ github.event.inputs.date_override }}" ]; then
-            RUN_DATE="${{ github.event.inputs.date_override }}"
-          else
-            RUN_DATE=$(date -u +%Y-%m-%d)
-          fi
-          FOLDER=$(echo "$RUN_DATE" | sed 's/-/\//g')
-          echo "run_date=$RUN_DATE" >> $GITHUB_OUTPUT
-          echo "folder=$FOLDER" >> $GITHUB_OUTPUT
+          PARTITION=$(date -u +"%Y/%m/%d")
+          echo "partition=$PARTITION" >> "$GITHUB_OUTPUT"
 
-      - name: Install huggingface_hub
-        run: pip install huggingface_hub
-
-      - name: List target folder (single API call)
+      - name: List repo tree (single API call)
+        id: list
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python -c "
-          from huggingface_hub import list_repo_tree
-          import json, os
-          folder = os.getenv('FOLDER')
-          tree = list_repo_tree('${{ env.HF_REPO }}', path=folder, repo_type='dataset')
-          files = [f.rfilename for f in tree if f.type == 'file']
-          with open('file-list.json', 'w') as f:
-              json.dump(files, f)
-          print(f'Found {len(files)} files in {folder}')
-          "
+          # One API call to list top-level tree (non-recursive to avoid pagination blowup)
+          # If files live under a subfolder, adjust path accordingly.
+          curl -s -H "Authorization: Bearer $HF_TOKEN" \
+            "https://huggingface.co/api/datasets/${{ env.DATASET_REPO }}/tree?recursive=false" \
+            | jq -c '.' > file-list.json
+
+          # If recursive needed but repo is large, list per folder instead.
+          # For now, assume top-level or small tree.
+          echo "file_list=$(cat file-list.json | jq -c '.')" >> "$GITHUB_OUTPUT"
 
       - name: Upload file-list artifact
         uses: actions/upload-artifact@v4
@@ -59,82 +43,38 @@ jobs:
           name: file-list
           path: file-list.json
 
-      - name: Create CDN training config stub
-        run: |
-          python -c "
-          import json, os
-          folder = os.getenv('FOLDER')
-          cfg = {
-            'dataset_base': 'axentx/surrogate-1-training-pairs',
-            'partition_folder': folder,
-            'use_cdn_only': True,
-            'file_list_artifact': 'file-list.json',
-            'shard_pattern': 'shard-{shard_id}-{date}-{ts}.jsonl',
-            'data_loader': {
-              'type': 'cdn_parquet',
-              'columns': ['input_ids', 'attention_mask', 'labels'],
-              'batch_size': 8
-            }
-          }
-          os.makedirs('batches/public-merged', exist_ok=True)
-          with open('batches/public-merged/train-cdn-config.json', 'w') as f:
-              json.dump(cfg, f, indent=2)
-          "
-
-      - name: Upload training config artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: train-cdn-config
-          path: batches/public-merged/train-cdn-config.json
-
-  shard:
-    needs: prelist
+  ingest-shard:
+    needs: file-list
     runs-on: ubuntu-latest
     strategy:
       matrix:
         shard_id: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
-    env:
-      SHARD_ID: ${{ matrix.shard_id }}
-      RUN_DATE: ${{ needs.prelist.outputs.run_date }}
-      FOLDER: ${{ needs.prelist.outputs.folder }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download file-list
+      - name: Download file-list artifact
         uses: actions/download-artifact@v4
         with:
           name: file-list
+          path: .
 
-      - name: Download training config
-        uses: actions/download-artifact@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: train-cdn-config
-          path: batches/public-merged/
+          python-version: "3.11"
 
       - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: Run shard worker (with retries)
+      - name: Run shard worker
         env:
+          SHARD_ID: ${{ matrix.shard_id }}
+          SHARD_TOTAL: 16
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DATE_PARTITION: ${{ needs.file-list.outputs.date_partition }}
         run: |
-          set -euo pipefail
-          max_retries=3
-          for i in $(seq 1 $max_retries); do
-            if bash bin/dataset-enrich.sh "$SHARD_ID" "$N_SHARDS" "$RUN_DATE" "$FOLDER"; then
-              echo "Shard $SHARD_ID succeeded"
-              exit 0
-            else
-              echo "Attempt $i failed for shard $SHARD_ID"
-              if [ $i -lt $max_retries ]; then sleep $(( 10 * i )); fi
-            fi
-          done
-          echo "Shard $SHARD_ID failed after $max_retries attempts"
-          exit 1
-
-      - name: Upload shard output as artifact (for inspection)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: shard-${{ matrix.shard_id }}-output
-          path: batches/public-merged/${{ env.FOLDER }}/
+          bash bin/dataset-enrich.sh \
+            --file-list file-list.json \
+            --shard-id "$SHARD_ID" \
+            --shard-total "$SHARD_TOTAL" \
+            --date-partition "$DATE_PARTITION"
