@@ -1,58 +1,57 @@
 #!/usr/bin/env python3
 """
-Generate manifest for surrogate-1-training-pairs.
-Run from Mac when HF API rate-limit window is clear.
-Writes manifest.json with CDN-ready paths.
+Generate manifest for one date folder.
+Usage:
+  python bin/manifest.py \
+    --repo axentx/surrogate-1-training-pairs \
+    --folder batches/public-raw/2026-05-03 \
+    --out manifest.json
 """
+import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+import time
+from typing import List, Dict
 
 from huggingface_hub import HfApi
 
-REPO_ID = "axentx/surrogate-1-training-pairs"
-OUTFILE = "manifest.json"
+CDN_TEMPLATE = "https://huggingface.co/datasets/{repo}/resolve/main/{path}"
 
-def main() -> None:
+def list_folder_files(repo: str, folder: str) -> List[Dict]:
     api = HfApi()
-    # Single non-recursive call per top-level folder (avoids 100x pagination)
-    folders = ["batches/public-raw", "batches/mirror-merged"]
-    entries = []
-    for folder in folders:
-        try:
-            items = api.list_repo_tree(
-                repo_id=REPO_ID,
-                path=folder,
-                recursive=False,
-                repo_type="dataset",
-            )
-        except Exception as exc:
-            print(f"Warning: failed to list {folder}: {exc}", file=sys.stderr)
-            continue
-        for item in items:
-            if getattr(item, "type", None) != "file":
-                continue
-            path = getattr(item, "path", None)
-            if not path:
-                continue
-            entries.append(
-                {
-                    "path": path,
-                    "cdn_url": f"https://huggingface.co/datasets/{REPO_ID}/resolve/main/{path}",
-                    "size": getattr(item, "size", None),
-                }
-            )
+    items = api.list_repo_tree(repo=repo, path=folder, recursive=False)
+    files = [i for i in items if i.type == "file"]
+    out = []
+    for f in files:
+        out.append({
+            "path": f.path,
+            "cdn_url": CDN_TEMPLATE.format(repo=repo, path=f.path),
+            "size": getattr(f, "size", None),
+        })
+    return out
+
+def build_manifest(repo: str, folder: str, out_path: str) -> None:
+    files = list_folder_files(repo, folder)
+    if not files:
+        print(f"No files in {repo}/{folder}", file=sys.stderr)
+        sys.exit(1)
 
     manifest = {
-        "repo_id": REPO_ID,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "entries": entries,
-        "count": len(entries),
+        "repo": repo,
+        "folder": folder,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "files": files,
     }
-    with open(OUTFILE, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2)
-    print(f"Wrote {OUTFILE} with {len(entries)} entries")
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, "w") as fh:
+        json.dump(manifest, fh, indent=2)
+    print(f"Manifest written to {out_path} ({len(files)} files)")
 
 if __name__ == "__main__":
-    main()
+    p = argparse.ArgumentParser()
+    p.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    p.add_argument("--folder", required=True)
+    p.add_argument("--out", default="manifest.json")
+    args = p.parse_args()
+    build_manifest(args.repo, args.folder, args.out)
