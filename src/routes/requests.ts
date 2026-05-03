@@ -1,48 +1,87 @@
-+ import { buildRequestsQuery } from '../lib/query';
+import { Router, Request, Response } from 'express';
+import { generatePublicUrl } from '../lib/url';
 
-// Example using a lightweight router (adapt to your framework)
-app.get('/requests', async (req, res) => {
-  try {
-+   const overdue = req.query.overdue === 'true';
-+   const filters = { overdue };
+const router = Router();
 
-+   const query = buildRequestsQuery(filters);
-+   const requests = await db.query(query);
+// In-memory store for example; replace with DB in production
+const requests: Array<{
+  id: string;
+  title: string;
+  type: string;
+  owner: string;
+  slaTarget?: string | null;
+  status: 'open' | 'in_progress' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+  publicUrl: string;
+}> = [];
 
-+   const results = requests.map((r: any) => {
-+     const timeRemainingSec = Number(r.time_remaining_seconds);
-+     const isOverdue = timeRemainingSec < 0;
-+     const absHours = Math.floor(Math.abs(timeRemainingSec) / 3600);
-+     const absMinutes = Math.floor((Math.abs(timeRemainingSec) % 3600) / 60);
+function isValidISODurationOrDate(value: string): boolean {
+  // Accept either ISO 8601 duration (PnYnMnDTnHnMnS) or date string
+  const isoDuration = /^P(?:\d+Y)?(?:\n?\d+M)?(?:\n?\d+W)?(?:\n?\d+D)?(?:T(?:\n?\d+H)?(?:\n?\d+M)?(?:\n?\d+S)?)?$/;
+  if (isoDuration.test(value)) return true;
+  // Valid date string that Date can parse and is not NaN
+  const d = new Date(value);
+  return !isNaN(d.getTime());
+}
 
-+     let timeRemainingLabel = '';
-+     if (isOverdue) {
-+       timeRemainingLabel = `Overdue by ${absHours}h${absMinutes > 0 ? ` ${absMinutes}m` : ''}`;
-+     } else {
-+       timeRemainingLabel = `Due in ${absHours}h${absMinutes > 0 ? ` ${absMinutes}m` : ''}`;
-+     }
+// POST /requests
+router.post('/', (req: Request, res: Response) => {
+  const { title, type, owner, slaTarget } = req.body;
 
-+     return {
-+       id: r.id,
-+       created_at: r.created_at,
-+       status: r.status,
-+       sla_hours: r.sla_hours,
-+       sla_deadline: r.sla_deadline,
-+       time_remaining: timeRemainingLabel,
-+       overdue: isOverdue,
-+       _raw: {
-+         time_remaining_seconds: timeRemainingSec
-+       }
-+     };
-+   });
-
-    res.json({
-      requests: results,
-+     count: results.length,
-+     overdue_count: results.filter((r: any) => r.overdue).length
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
+  if (!title || typeof title !== 'string' || title.trim() === '') {
+    return res.status(400).json({ error: 'Missing or invalid title' });
   }
+  if (!type || typeof type !== 'string' || type.trim() === '') {
+    return res.status(400).json({ error: 'Missing or invalid type' });
+  }
+  if (!owner || typeof owner !== 'string' || owner.trim() === '') {
+    return res.status(400).json({ error: 'Missing or invalid owner' });
+  }
+  if (slaTarget !== undefined && slaTarget !== null && !isValidISODurationOrDate(String(slaTarget))) {
+    return res.status(400).json({ error: 'Invalid SLA target' });
+  }
+
+  const id = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const now = new Date().toISOString();
+  const publicUrl = generatePublicUrl(title, type, owner, slaTarget);
+
+  const newRequest = {
+    id,
+    title: title.trim(),
+    type: type.trim(),
+    owner: owner.trim(),
+    slaTarget: slaTarget ? String(slaTarget).trim() : null,
+    status: 'open' as const,
+    createdAt: now,
+    updatedAt: now,
+    publicUrl,
+  };
+
+  requests.push(newRequest);
+
+  return res.status(201).json({
+    id: newRequest.id,
+    publicUrl: newRequest.publicUrl,
+    status: newRequest.status,
+  });
 });
+
+// GET /requests
+router.get('/', (_req: Request, res: Response) => {
+  return res.json(
+    requests.map((r) => ({
+      id: r.id,
+      title: r.title,
+      type: r.type,
+      owner: r.owner,
+      slaTarget: r.slaTarget,
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      publicUrl: r.publicUrl,
+    }))
+  );
+});
+
+export default router;
