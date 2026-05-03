@@ -1,20 +1,28 @@
-import json
-import os
-import random
-import requests
-from typing import Iterator, Dict
+#!/usr/bin/env bash
+# bin/dataset-enrich.sh
+# Usage: FILELIST=path/to/snapshot.json ./bin/dataset-enrich.sh
+set -euo pipefail
 
-def load_cdn_shard(filelist_path: str, repo: str, shard_id: int, n_shards: int) -> Iterator[Dict]:
-    with open(filelist_path) as f:
-        payload = json.load(f)
-    files = payload["files"]
+FILELIST="${FILELIST:-}"
+if [[ -n "$FILELIST" && -f "$FILELIST" ]]; then
+  echo "Using filelist: $FILELIST"
+  mapfile -t TARGET_FILES < <(jq -r '.files[]' "$FILELIST")
+else
+  echo "WARNING: No filelist provided; listing repo tree (may hit API limits)" >&2
+  # fallback to existing behavior
+fi
 
-    for path in files:
-        if hash(path) % n_shards != shard_id:
-            continue
-        url = f"https://huggingface.co/datasets/{repo}/resolve/main/{path}"
-        with requests.get(url, timeout=60) as r:
-            r.raise_for_status()
-            # project to {prompt, response} here
-            # yield {"prompt": ..., "response": ...}
-            yield {"url": url, "path": path, "raw": r.content}
+# Add retry/backoff for CDN downloads
+download_with_retry() {
+  local url="$1" outfile="$2" max_retries=3 backoff=1
+  for i in $(seq 1 "$max_retries"); do
+    if curl -f -s -o "$outfile" "$url"; then
+      return 0
+    fi
+    echo "Download failed (attempt $i/$max_retries): $url" >&2
+    sleep "$backoff"
+    backoff=$((backoff * 2))
+  done
+  echo "Failed to download after $max_retries attempts: $url" >&2
+  return 1
+}
