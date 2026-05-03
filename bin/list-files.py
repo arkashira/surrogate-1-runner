@@ -1,70 +1,79 @@
 #!/usr/bin/env python3
 """
-Usage:
-  python bin/list-files.py --repo axentx/surrogate-1-training-pairs \
-                           --folder batches/public-merged/2026-05-02 \
-                           --out file-list.json
+Generate deterministic file-list for a date folder in axentx/surrogate-1-training-pairs.
+Run from Mac/CI (after rate-limit window) and commit file-list.json alongside training code.
 
-Produces:
-  {
-    "repo": "...",
-    "folder": "...",
-    "files": [
-      {"path": "...", "size": 12345, "sha": "...", "lfs": false},
-      ...
-    ]
-  }
+Usage:
+  python bin/list-files.py --repo axentx/surrogate-1-training-pairs --path batches/public-merged --out file-list.json
 """
 
 import argparse
 import json
 import os
 import sys
+import time
+from datetime import datetime, timezone
+
 from huggingface_hub import HfApi
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="List repo folder (non-recursive) for CDN ingest.")
-    parser.add_argument("--repo", required=True, help="HF dataset repo, e.g. axentx/surrogate-1-training-pairs")
-    parser.add_argument("--folder", required=True, help="Folder path in repo (trailing slash optional)")
-    parser.add_argument("--out", required=True, help="Output JSON path")
-    args = parser.parse_args()
+HF_TOKEN = os.getenv("HF_TOKEN")
+API = HfApi(token=HF_TOKEN)
 
-    api = HfApi()
-    folder = args.folder.rstrip("/") + "/"
-
+def list_folder(repo_id: str, path: str):
+    """
+    Use list_repo_tree(recursive=False) per folder to avoid heavy pagination.
+    Returns list[dict] with keys: path, size, sha256 (if available), lfs.
+    """
+    entries = []
     try:
-        entries = api.list_repo_tree(
-            repo_id=args.repo,
-            path=folder.rstrip("/"),
-            repo_type="dataset",
-            recursive=False,
-        )
+        tree = API.list_repo_tree(repo_id=repo_id, path=path, recursive=False)
     except Exception as exc:
-        print(f"ERROR listing {args.repo}@{folder}: {exc}", file=sys.stderr)
-        sys.exit(1)
+        print(f"ERROR listing {repo_id}/{path}: {exc}", file=sys.stderr)
+        raise
 
-    files = [
-        {
-            "path": e.path,
-            "size": getattr(e, "size", 0),
-            "sha": getattr(e, "sha", ""),
-            "lfs": getattr(e, "lfs", False),
-        }
-        for e in entries
-        if getattr(e, "type", "file") == "file"
-    ]
+    for entry in tree:
+        entries.append({
+            "path": entry.path,
+            "size": getattr(entry, "size", None),
+            "sha256": getattr(entry, "sha256", None),
+            "lfs": getattr(entry, "lfs", None),
+        })
+    return entries
 
-    payload = {
-        "repo": args.repo,
-        "folder": folder,
-        "files": files,
+def build_file_list(repo_id: str, root: str):
+    """
+    Walk root/YYYY-MM-DD/* by listing each date folder once.
+    """
+    root_tree = API.list_repo_tree(repo_id=repo_id, path=root, recursive=False)
+    date_folders = [e.path for e in root_tree if e.type == "directory"]
+
+    out = {
+        "repo_id": repo_id,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "root": root,
+        "folders": {},
     }
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    for folder in sorted(date_folders):
+        print(f"Listing {folder}...")
+        entries = list_folder(repo_id, folder)
+        out["folders"][folder] = entries
+        # Be nice to API between folder listings
+        time.sleep(0.2)
 
-    print(f"Wrote {len(files)} files to {args.out}")
+    return out
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate CDN file-list for surrogate-1 dataset.")
+    parser.add_argument("--repo", default="axentx/surrogate-1-training-pairs")
+    parser.add_argument("--path", default="batches/public-merged")
+    parser.add_argument("--out", default="file-list.json")
+    args = parser.parse_args()
+
+    file_list = build_file_list(args.repo, args.path)
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(file_list, f, indent=2)
+    print(f"Wrote {args.out} ({len(file_list['folders'])} folders)")
 
 if __name__ == "__main__":
     main()
