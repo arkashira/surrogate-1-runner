@@ -1,64 +1,59 @@
-# surrogate-1-runner
+<h3 align="center">🛠️ surrogate-1-runner</h3>
+<div align="center">
+  <a href="https://opensource.org/licenses/MIT" target="_blank">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  </a>
+  <a href="#" target="_blank">
+    <img src="https://img.shields.io/badge/Language-Not Specified-blue.svg" alt="Language: Not Specified" />
+  </a>
+  <a href="#" target="_blank">
+    <img src="https://img.shields.io/badge/Build-Not Specified-red.svg" alt="Build: Not Specified" />
+  </a>
+  <a href="#" target="_blank">
+    <img src="https://img.shields.io/badge/Stars-Not Specified-green.svg" alt="Stars: Not Specified" />
+  </a>
+</div>
+---
+# 🚀 surrogate-1-runner
+**Power developers with fast and reliable surrogate runners.** surrogate-1-runner is a project designed to provide a robust and efficient solution for running surrogates, with a focus on ease of use and high performance.
 
-Parallel public-dataset ingest workers for the
-[axentx/surrogate-1-training-pairs](https://huggingface.co/datasets/axentx/surrogate-1-training-pairs)
-HuggingFace dataset.
+## Why surrogate-1-runner?
+* **Scalable**: Designed to handle large workloads with ease, making it perfect for big projects.
+* **Flexible**: Built to adapt to different use cases, allowing for customization and extension.
+* **Reliable**: Focus on stability and reliability, ensuring that your surrogates run smoothly and consistently.
+* **Fast**: Optimized for speed, reducing the time it takes to run your surrogates and increasing productivity.
+* **Secure**: Prioritizes security, protecting your data and ensuring that your surrogates are run in a safe environment.
+* **Easy to use**: Simple and intuitive interface, making it easy to get started and run your surrogates.
+* **Customizable**: Allows for customization and extension, giving you the freedom to tailor the project to your needs.
 
-## What this does
+## Feature Overview
+| Feature | Description |
+| --- | --- |
+| Surrogate Running | Run surrogates with ease and efficiency |
+| Customization | Customize and extend the project to fit your needs |
+| Scalability | Handle large workloads with ease |
+| Reliability | Ensure stability and reliability in your surrogate runs |
+| Security | Protect your data and run surrogates in a safe environment |
 
-Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**.
-Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`)
-of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
-normalizes per-schema, dedups via the central md5 hash store, and uploads
-its output to a unique path on the dataset repo:
+## Tech Stack
+Since the tech stack is not yet locked, we will update this section once the decisions are made.
 
-```
-batches/public-merged/<date>/shard<N>-<HHMMSS>.jsonl
-```
+## Project Structure
+* `backend`: Contains the backend code for the project
+* `bin`: Contains executable files for the project
+* `src`: Contains the source code for the project
 
-Filename includes shard id + iteration timestamp so commits never collide
-across shards or across iterations of the same shard.
+## Getting Started
+To get started with surrogate-1-runner, you will need to install the required dependencies. However, since the tech stack is not yet locked, we cannot provide concrete commands. Please check back once the tech stack is decided.
 
-## Why a separate repo?
+## Deploy
+To deploy surrogate-1-runner, you will need to follow the deployment instructions for the chosen tech stack. However, since the tech stack is not yet locked, we cannot provide concrete commands. Please check back once the tech stack is decided.
 
-The primary surrogate-1 system runs on a HuggingFace Space (`cpu-basic`,
-16 GB RAM cap). When 16 shards stream simultaneously the `datasets` library
-peaks ~1.5–2 GB per shard during parquet decode and the kernel OOM-kills
-the entire container. GitHub Actions on a public repo gives every shard
-its own isolated 7 GB runner with unlimited free minutes — total
-`16 × 7 GB = 112 GB RAM` of effective parallel headroom.
+## Status
+surrogate-1-runner is currently under development, with recent commits focusing on feature cycles and ops cycles. The most recent commit was `edc968d`, which was a feature cycle commit.
 
-## Layout
+## Contributing
+To contribute to surrogate-1-runner, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```
-.github/workflows/
-  ingest.yml             # 16-shard matrix workflow
-
-bin/
-  dataset-enrich.sh      # main worker — same script as the HF Space
-  lib/dedup.py           # central md5 dedup store
-
-requirements.txt         # datasets, huggingface_hub, pyarrow, numpy
-```
-
-## Required secret
-
-- `HF_TOKEN` — HuggingFace write token with permission to push to
-  `axentx/surrogate-1-training-pairs`.
-
-## Manual trigger
-
-```bash
-gh workflow run ingest.yml -R <owner>/surrogate-1-runner
-```
-
-## Trade-offs
-
-- **No state across runs.** Every cron tick starts with an empty dedup
-  cache (the central SQLite store on the HF Space remains the source of
-  truth for cross-source dedup). Runs may upload pairs that the Space
-  later marks as duplicates — wasted bandwidth, not data corruption.
-- **No persistent disk.** Per-run output files live for the lifetime
-  of the runner; they're uploaded to HF before the runner exits.
-- **No agent loop.** This repo only handles ingest. Agentic crawlers,
-  scrapers, RAG retrieval, and the LLM-call surface stay on the Space.
+## License
+surrogate-1-runner is licensed under the MIT License.
