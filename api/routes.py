@@ -1,37 +1,61 @@
-from __future__ import annotations
-
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import JSONResponse
-
-from .models import JobPayload, JobResponse, register_job
+from datetime import datetime
+from typing import Any, Dict, Optional
+from pydantic import BaseModel
+from enum import Enum
 
 router = APIRouter(prefix="/api/v1", tags=["jobs"])
 
-# --------------------------------------------------------------------------- #
-# POST /api/v1/jobs
-# --------------------------------------------------------------------------- #
+# In-memory job store for demo purposes
+# Key: job_id, Value: job data dict
+JOB_STORE: Dict[str, Dict[str, Any]] = {}
 
-@router.post(
-    "/jobs",
-    status_code=status.HTTP_201_CREATED,
-    response_model=JobResponse,
-    responses={
-        201: {"description": "Job queued successfully"},
-        409: {"description": "Duplicate job_id"},
-    },
-)
-async def submit_job(payload: JobPayload) -> JSONResponse:
+class JobStatus(str, Enum):
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+class JobResponse(BaseModel):
+    job_id: str
+    status: JobStatus
+    created_at: str
+    updated_at: str
+    result: Optional[Any] = None
+    error: Optional[str] = None
+
+@router.get("/jobs/{job_id}", response_model=JobResponse)
+async def get_job(job_id: str) -> JobResponse:
     """
-    Submit a background job. The job_id is deterministic – the same payload
-    cannot be queued twice.
+    Retrieve the current status and details of a job by its ID.
+
+    Parameters
+    ----------
+    job_id : str
+        The unique identifier of the job to retrieve.
+
+    Returns
+    -------
+    JobResponse
+        The job status and associated metadata.
+
+    Raises
+    ------
+    HTTPException
+        If the job_id does not exist in the store.
     """
-    try:
-        job_id = register_job(payload)
-    except ValueError:
+    job = JOB_STORE.get(job_id)
+    if not job:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Duplicate job_id",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with id '{job_id}' not found",
         )
-
-    response = JobResponse(job_id=job_id, status="queued")
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=response.dict())
+    return JobResponse(
+        job_id=job["job_id"],
+        status=JobStatus(job["status"]),
+        created_at=job["created_at"].isoformat() if isinstance(job["created_at"], datetime) else job["created_at"],
+        updated_at=job["updated_at"].isoformat() if isinstance(job["updated_at"], datetime) else job["updated_at"],
+        result=job.get("result"),
+        error=job.get("error"),
+    )
