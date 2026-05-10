@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Session Detail – {{ session.id }}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <!-- Header & Navigation -->
+  <header class="site-header">
+    <h1>Session Detail</h1>
+    <nav aria-label="Primary">
+      <a href="/diagnostics" class="back-link">← Back to Diagnostics</a>
+    </nav>
+  </header>
+
+  <!-- Session Overview -->
+  <section class="session-overview">
+    <h2>Session {{ session.id }}</h2>
+    <dl class="session-meta">
+      <dt>Date:</dt><dd>{{ session.created_at }}</dd>
+      <dt>Error Category:</dt><dd>{{ session.error_category }}</dd>
+      <dt>Resolution Status:</dt><dd>{{ session.resolution_status }}</dd>
+    </dl>
+  </section>
+
+  <!-- Resolution Details -->
+  <section class="resolution-details">
+    <h3>Resolution Details</h3>
+    <pre class="preformatted">{{ session.resolution_details | safe }}</pre>
+  </section>
+
+  <!-- Raw Diagnostics -->
+  <section class="raw-diagnostics">
+    <h3>Raw Diagnostics</h3>
+    <pre class="preformatted">{{ session.raw_diagnostics | safe }}</pre>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p>&copy; 2026 Axentx</p>
+  </footer>
+</body>
+</html>
