@@ -1,0 +1,28 @@
+# ----------------------------------------------------------------------
+# Refresh‑Rate Benchmark Configuration
+# ----------------------------------------------------------------------
+dataset:
+  path: "/data/benchmark/frames_10GB.bin"   # 10 GB mixed‑resolution frames
+  format: "raw"                             # Surrogate‑1 loader understands this
+  size_gb: 10
+
+environment:
+  cpu: "AMD EPYC 7742"
+  gpu: "NVIDIA RTX A6000"
+  os: "Ubuntu 22.04 LTS"
+
+refresh_rates_hz: [60, 120, 180, 240]
+
+# Pipeline tuning – these values are the ones that produced the results in
+# Candidate 1.  They can be overridden from the CLI if needed.
+pipeline:
+  parallelism: 32
+  frame_buffer_size: 1024
+
+# How long each run should last (seconds).  Five minutes = 300 s.
+run_duration_s: 300
+
+# Output locations
+output:
+  report_path: "../docs/performance_benchmarks.md"
+  raw_csv:    "../docs/performance_benchmarks_raw.csv"
