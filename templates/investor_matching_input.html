@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Match with Investors</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; margin-bottom: 0.5rem; }
+    select, input[type="text"] { width: 100%; padding: 0.5rem; }
+    button { padding: 0.75rem 1.5rem; font-size: 1rem; }
+    #results { margin-top: 2rem; }
+    .investor { margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Match with Investors</h1>
+  <form id="matchingForm">
+    <div class="form-group">
+      <label for="businessModel">Business Model</label>
+      <select id="businessModel" name="businessModel" required>
+        <option value="">-- Select --</option>
+        <option value="B2B">B2B</option>
+        <option value="B2C">B2C</option>
+        <option value="Marketplace">Marketplace</option>
+        <option value="Subscription">Subscription</option>
+        <option value="Freemium">Freemium</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="fundingStage">Funding Stage</label>
+      <select id="fundingStage" name="fundingStage" required>
+        <option value="">-- Select --</option>
+        <option value="Seed">Seed</option>
+        <option value="Series A">Series A</option>
+        <option value="Series B">Series B</option>
+        <option value="Series C">Series C</option>
+        <option value="Series D+">Series D+</option>
+        <option value="IPO">IPO</option>
+      </select>
+    </div>
+    <button type="submit">Find Investors</button>
+  </form>
+
+  <div id="results"></div>
+
+  <script>
+    document.getElementById('matchingForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        businessModel: document.getElementById('businessModel').value,
+        fundingStage: document.getElementById('fundingStage').value
+      };
+
+      try {
+        const response = await fetch('/api/match-investors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || 'Unknown error');
+        }
+
+        const data = await response.json();   // Array of investors
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '<h2>Matched Investors</h2>' +
+          data.map(i => `<div class="investor"><strong>${i.name}</strong> (${i.industry})</div>`).join('');
+      } catch (err) {
+        alert('Error matching investors: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
