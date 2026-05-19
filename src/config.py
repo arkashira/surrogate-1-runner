@@ -1,81 +1,64 @@
+"""
+Configuration module for the surrogate‑1 rollback system.
+"""
+
+import json
 import os
-import yaml
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
+import logging
+from pathlib import Path
+from typing import Dict, Any
+
+# Allow overrides via environment variables
+CONFIG_FILE = Path(os.getenv("SURROGATE_ROLLBACK_CONFIG", "/opt/axentx/surrogate-1/config/rollback_config.json"))
+
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "enabled": True,
+    "max_history": 10,
+    "rollback_delay_seconds": 5,
+    "external_action_endpoint": "https://api.external.com/actions",
+    "auth_token": "",
+}
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass
-class EmailSettings:
-    smtp_server: str = "localhost"
-    smtp_port: int = 1025
-    sender_email: str = "noreply@axentx.com"
-    sendgrid_api_key: Optional[str] = None
-    use_tls: bool = False
-    timeout_seconds: int = 30
-    max_retries: int = 2
-    retry_backoff_seconds: float = 1.0
+def _atomic_write(path: Path, data: str) -> None:
+    """Write *data* to *path* atomically."""
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(data, encoding="utf-8")
+    os.replace(tmp, path)  # atomic on POSIX
 
 
-@dataclass
-class NotificationToggles:
-    """All possible event types are optional – missing keys are treated as disabled."""
-    toggles: Dict[str, bool] = field(default_factory=dict)
+def load_config() -> Dict[str, Any]:
+    """Load rollback configuration from JSON file.
+    If the file does not exist, create it with defaults.
+    """
+    if not CONFIG_FILE.exists():
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        save_config(DEFAULT_CONFIG)
+        return DEFAULT_CONFIG.copy()
+
+    try:
+        with CONFIG_FILE.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to read config, falling back to defaults: %s", exc)
+        return DEFAULT_CONFIG.copy()
+
+    merged = DEFAULT_CONFIG.copy()
+    merged.update(data)
+    return merged
 
 
-@dataclass
-class AppConfig:
-    email: EmailSettings
-    notifications: NotificationToggles
+def save_config(data: Dict[str, Any]) -> None:
+    """Persist configuration to disk atomically."""
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write(CONFIG_FILE, json.dumps(data, indent=2))
+    logger.debug("Config written to %s", CONFIG_FILE)
 
-    @staticmethod
-    def _load_yaml(path: str) -> Dict[str, Any]:
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
 
-    @classmethod
-    def from_file(cls, path: str = "config.yaml") -> "AppConfig":
-        raw = cls._load_yaml(path)
-
-        # Environment overrides (most useful for secrets)
-        env_overrides = {
-            "email": {
-                "smtp_server": os.getenv("SMTP_SERVER"),
-                "smtp_port": os.getenv("SMTP_PORT"),
-                "sender_email": os.getenv("SENDER_EMAIL"),
-                "sendgrid_api_key": os.getenv("SENDGRID_API_KEY"),
-                "use_tls": os.getenv("SMTP_USE_TLS"),
-                "timeout_seconds": os.getenv("SMTP_TIMEOUT"),
-                "max_retries": os.getenv("EMAIL_MAX_RETRIES"),
-                "retry_backoff_seconds": os.getenv("EMAIL_RETRY_BACKOFF"),
-            },
-            "notifications": {
-                # Example: NOTIFY_DATA_INGEST_COMPLETE=true
-                # All keys are lower‑cased and prefixed with NOTIFY_
-                **{
-                    key.lower(): os.getenv(f"NOTIFY_{key.upper()}", "false").lower()
-                    == "true"
-                    for key in raw.get("notifications", {})
-                }
-            },
-        }
-
-        # Merge YAML + env (env wins when not None)
-        email_cfg = {**raw.get("email", {}), **{k: v for k, v in env_overrides["email"].items() if v is not None}}
-        notif_cfg = {**raw.get("notifications", {}), **{k: v for k, v in env_overrides["notifications"].items() if isinstance(v, bool)}}
-
-        # Cast types that come from env (they are strings)
-        if isinstance(email_cfg.get("smtp_port"), str):
-            email_cfg["smtp_port"] = int(email_cfg["smtp_port"])
-        if isinstance(email_cfg.get("use_tls"), str):
-            email_cfg["use_tls"] = email_cfg["use_tls"].lower() == "true"
-        if isinstance(email_cfg.get("timeout_seconds"), str):
-            email_cfg["timeout_seconds"] = int(email_cfg["timeout_seconds"])
-        if isinstance(email_cfg.get("max_retries"), str):
-            email_cfg["max_retries"] = int(email_cfg["max_retries"])
-        if isinstance(email_cfg.get("retry_backoff_seconds"), str):
-            email_cfg["retry_backoff_seconds"] = float(email_cfg["retry_backoff_seconds"])
-
-        return cls(
-            email=EmailSettings(**email_cfg),
-            notifications=NotificationToggles(toggles=notif_cfg),
-        )
+def update_config(updates: Dict[str, Any]) -> None:
+    """Update configuration with provided key/value pairs."""
+    cfg = load_config()
+    cfg.update(updates)
+    save_config(cfg)
