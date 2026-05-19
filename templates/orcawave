@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "The task references implementing templates in '/opt/axentx/surrogate-1/templates/orcawave/' but does not specify the exact directory layout, naming convention, or the CLI command interface for generating them.",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "Define the expected directory structure for templates and the CLI command interface for generating them."
+}
