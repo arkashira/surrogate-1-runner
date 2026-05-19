@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Review Report</title>
+<style>
+  body {font-family: Arial, sans-serif; margin: 20px;}
+  h1 {color: #333;}
+  .issue {border-bottom: 1px solid #ccc; padding: 10px 0;}
+  .issue-title {font-weight: bold;}
+  .issue-link {color: #0066cc;}
+  .issue-description {white-space: pre-wrap;}
+</style>
+</head>
+<body>
+<h1>Review Report</h1>
+{% if issues %}
+<ul>
+{% for id, description in issues %}
+<li class="issue">
+  <div class="issue-title">{{ id }}: {{ description|safe }}</div>
+  <div>File: {{ issue.file }}{% if issue.line %} (Line {{ issue.line }}){% endif %}</div>
+  {% if issue.link %}
+  <div><a class="issue-link" href="{{ issue.link }}" target="_blank">Open in editor</a></div>
+  {% endif %}
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No issues found.</p>
+{% endif %}
+</body>
+</html>
