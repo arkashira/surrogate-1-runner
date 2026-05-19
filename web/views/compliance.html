@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Compliance Scan Findings</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <style>
+    .compliance-table { width: 100%; border-collapse: collapse; }
+    .compliance-table th, .compliance-table td { border: 1px solid #ddd; padding: 8px; }
+    .compliance-table th { background-color: #f2f2f2; }
+    .severity-low { background-color: #e7f5e9; }
+    .severity-medium { background-color: #fff4e5; }
+    .severity-high { background-color: #ffe5e5; }
+    .action-btn { padding: 4px 8px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 4px; }
+  </style>
+  <script src="/static/js/compliance.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Compliance Scan Findings</h1>
+  </header>
+
+  <main>
+    {% if findings %}
+      <table class="compliance-table">
+        <thead>
+          <tr>
+            <th>Rule ID</th>
+            <th>Severity</th>
+            <th>Description</th>
+            <th>File</th>
+            <th>Line</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in findings %}
+          <tr class="severity-{{ f.severity|lower }}">
+            <td>{{ f.rule_id }}</td>
+            <td>{{ f.severity }}</td>
+            <td>{{ f.description }}</td>
+            <td>{{ f.file }}</td>
+            <td>{{ f.line }}</td>
+            <td>{{ f.status }}</td>
+            <td>
+              {% if f.can_remediate %}
+                <a class="action-btn" href="{{ url_for('remediate', finding_id=f.id) }}">Remediate</a>
+              {% elif f.remediation_url %}
+                <a href="{{ f.remediation_url }}" class="action-btn" target="_blank">Remediate</a>
+              {% else %}
+                <span class="text-muted">N/A</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="no-findings">No compliance issues detected.</p>
+    {% endif %}
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Axentx</p>
+  </footer>
+</body>
+</html>
