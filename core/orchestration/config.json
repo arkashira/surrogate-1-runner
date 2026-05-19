@@ -1,0 +1,52 @@
+{
+  "agents": [
+    {
+      "id": "root",
+      "name": "Root Agent",
+      "type": "composite",
+      "pause_on_start": false,
+      "resume_on_finish": true,
+      "children": [
+        {
+          "id": "subagent_a",
+          "name": "Subagent A",
+          "type": "leaf",
+          "pause_on_start": false,
+          "resume_on_finish": true
+        },
+        {
+          "id": "subagent_b",
+          "name": "Subagent B",
+          "type": "leaf",
+          "pause_on_start": true,
+          "resume_on_finish": false
+        },
+        {
+          "id": "subagent_c",
+          "name": "Subagent C",
+          "type": "composite",
+          "pause_on_start": true,
+          "resume_on_finish": true,
+          "children": [
+            {
+              "id": "subagent_c1",
+              "name": "Subagent C1",
+              "type": "leaf",
+              "pause_on_start": false,
+              "resume_on_finish": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "visualization": {
+      "enabled": true,
+      "theme": "light"
+    },
+    "execution": {
+      "max_concurrent": 4
+    }
+  }
+}
