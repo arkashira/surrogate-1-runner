@@ -1,18 +1,4 @@
-[package]
-name = "surrogate-1"
-version = "0.1.0"
-edition = "2021"
-description = "Demo of a robust clipboard‑paste fallback (AX → Cmd+V) for macOS"
-license = "MIT OR Apache-2.0"
-
-[dependencies]
-log = "0.4"
-env_logger = "0.10"
-# The `clipboard` crate is kept for future direct‑access use; it is not required
-# for the current osascript fallback but does no harm.
-clipboard = { version = "0.7", optional = true }
-
-# Development / testing helpers
 [dev-dependencies]
-assert_cmd = "2.0"
-predicates = "3.0"
+log        = "0.4"
+env_logger = "0.10"
+rand       = "0.8"
