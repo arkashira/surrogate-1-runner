@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Configure Alerts – Axentx Surrogate</title>
+<style>
+  body {font-family: Arial, sans-serif; margin: 2rem; max-width: 700px;}
+  h1 {margin-bottom: 1.5rem;}
+  form {display: grid; gap: 1rem;}
+  label {display: flex; flex-direction: column; font-weight: 600;}
+  input, select, textarea {padding: .6rem; font-size: 1rem; margin-top: .3rem;}
+  button {padding: .8rem 1.5rem; font-size: 1rem; cursor: pointer;}
+  .error {color: #b00; margin-top: .3rem;}
+  @media (max-width: 480px) {body {margin: 1rem;}}
+</style>
+</head>
+<body>
+<h1>Configure Alerts</h1>
+
+<form id="alertForm" action="/api/alerts" method="POST" novalidate>
+  <!-- CSRF token – server must render this value -->
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <label>
+    Alert Name
+    <input type="text" name="name" required autocomplete="off" aria-required="true">
+  </label>
+
+  <label>
+    Target Model
+    <input type="text" name="model" placeholder="e.g., gpt‑4" required autocomplete="off" aria-required="true">
+  </label>
+
+  <label>
+    API Endpoint
+    <input type="text" name="endpoint" placeholder="/v1/chat/completions" required autocomplete="off" aria-required="true">
+  </label>
+
+  <label>
+    Response Pattern
+    <select name="pattern_type" required aria-required="true">
+      <option value="regex">Regex</option>
+      <option value="jsonpath">JSON‑Path</option>
+    </select>
+    <input type="text" name="pattern" placeholder="e.g., \\berror\\b or $.prediction" required autocomplete="off" aria-required="true">
+  </label>
+
+  <label>
+    Threshold (% change)
+    <input type="number" name="threshold" min="0" max="100" step="1" value="10" required aria-required="true">
+  </label>
+
+  <label>
+    Notification Channel
+    <select name="channel" required aria-required="true">
+      <option value="email">Email</option>
+      <option value="slack">Slack</option>
+    </select>
+  </label>
+
+  <label>
+    Contact Details
+    <input type="text" name="contact" placeholder="email@example.com or #channel" required autocomplete="off" aria-required="true">
+  </label>
+
+  <button type="submit">Save Alert</button>
+  <div id="formError" class="error" role="alert" aria-live="assertive"></div>
+</form>
+
+<script>
+  (function(){
+    const form = document.getElementById('alertForm');
+    const errorDiv = document.getElementById('formError');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();          // intercept for JSON payload
+      errorDiv.textContent = '';   // clear previous errors
+
+      // Basic client‑side validation
+      if (!form.checkValidity()) {
+        errorDiv.textContent = 'Please fill out all required fields.';
+        return;
+      }
+
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        const resp = await fetch(form.action, {
+          method: form.method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+          const msg = await resp.text();
+          throw new Error(msg || 'Unknown error');
+        }
+
+        alert('Alert saved successfully!');
+        form.reset();
+      } catch (err) {
+        console.error(err);
+        errorDiv.textContent = 'Failed to save alert: ' + err.message;
+      }
+    });
+  })();
+</script>
+</body>
+</html>
