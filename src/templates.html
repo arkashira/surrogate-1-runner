@@ -1,32 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Component FPS Gains</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gamer's Guide Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .nav-link.active {
+            background-color: #0d6efd;
+            color: white !important;
+        }
+    </style>
 </head>
 <body>
-    <h1>Component FPS Gains</h1>
-    <form action="/" method="get">
-        <label for="filter_fps">Filter by FPS Gain:</label>
-        <input type="number" id="filter_fps" name="filter_fps">
-        <button type="submit">Filter</button>
-    </form>
-    <table>
-        <thead>
-            <tr>
-                <th><a href="?sort_by=name&order=asc">Name</a></th>
-                <th><a href="?sort_by=fps_gain&order=asc">FPS Gain</a></th>
-                <th><a href="?sort_by=cost&order=asc">Cost</a></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for component in components %}
-            <tr>
-                <td>{{ component.name }}</td>
-                <td>{{ component.fps_gain }}</td>
-                <td>{{ component.cost }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Gamer's Guide</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if active_page == 'home' else '' }}" href="/">Home</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ 'active' if active_page in ['hardware', 'upgrades'] else '' }}" 
+                           href="#" 
+                           id="hardwareDropdown" 
+                           data-bs-toggle="dropdown">
+                           Hardware
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="hardwareDropdown">
+                            <li><a class="dropdown-item" href="/hardware">Guides</a></li>
+                            <li><a class="dropdown-item" href="/hardware/upgrades">Upgrade Paths</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if active_page == 'games' else '' }}" href="/games">Game Recommendations</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if active_page == 'community' else '' }}" href="/community">Community Forums</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
