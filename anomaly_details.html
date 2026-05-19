@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Anomaly Details</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 2rem; }
+  h1   { color: #c0392b; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+  th, td { border: 1px solid #ddd; padding: 0.75rem; text-align: left; }
+  th { background-color: #f2f2f2; }
+  .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; color: #fff; font-size: 0.9rem; }
+  .critical { background-color: #e74c3c; }
+  .warning  { background-color: #f39c12; }
+  .info     { background-color: #3498db; }
+  .error    { color: #e74c3c; }
+</style>
+</head>
+<body>
+<h1>Anomaly Details</h1>
+<div id="anomaly-info"><p>Loading anomaly data…</p></div>
+
+<script>
+  // ---------- Configuration ----------
+  const API_URL = '/api/anomaly/latest';
+  const MOCK_DATA = {
+    id: "anomaly-00001",
+    account: "prod-aws-001",
+    region: "us-east-1",
+    service: "EC2",
+    detected_at: "2026-05-13T14:32:00Z",
+    severity: "high",
+    description: "Unexpected spike in EC2 instance usage due to a runaway instance.",
+    impacts: [
+      { resource: "EC2 Instances", cost: "$1,250.00" },
+      { resource: "EBS Volumes",   cost: "$200.00" }
+    ]
+  };
+
+  // ---------- Helper Functions ----------
+  function formatDate(iso) {
+    const opts = { year:'numeric', month:'short', day:'numeric',
+                   hour:'2-digit', minute:'2-digit', second:'2-digit' };
+    return new Date(iso).toLocaleString(undefined, opts);
+  }
+
+  function severityClass(sev) {
+    switch (sev.toLowerCase()) {
+      case 'critical': return 'critical';
+      case 'high':     return 'warning';
+      case 'medium':   return 'info';
+      default:         return 'info';
+    }
+  }
+
+  // ---------- Rendering ----------
+  function render(data) {
+    const container = document.getElementById('anomaly-info');
+    const impactRows = data.impacts?.map(i => `
+      <tr><td>${i.resource}</td><td>${i.cost}</td></tr>`).join('') || '';
+
+    container.innerHTML = `
+      <p><strong>ID:</strong> ${data.id}</p>
+      <p><strong>Account:</strong> ${data.account}</p>
+      <p><strong>Region:</strong> ${data.region}</p>
+      <p><strong>Service:</strong> ${data.service}</p>
+      <p><strong>Detected At:</strong> ${formatDate(data.detected_at)}</p>
+      <p><strong>Severity:</strong> 
+        <span class="badge ${severityClass(data.severity)}">${data.severity.toUpperCase()}</span>
+      </p>
+      <p><strong>Description:</strong> ${data.description}</p>
+      <h2>Cost Impact</h2>
+      <table>
+        <tr><th>Resource</th><th>Cost</th></tr>
+        ${impactRows}
+      </table>
+    `;
+  }
+
+  // ---------- Data Fetch ----------
+  async function loadAnomaly() {
+    try {
+      const resp = await fetch(API_URL, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      render(data);
+    } catch (e) {
+      console.warn('API fetch failed, using mock data:', e);
+      render(MOCK_DATA);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadAnomaly);
+</script>
+</body>
+</html>
