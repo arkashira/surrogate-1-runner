@@ -1,0 +1,131 @@
+# -------------------------------------------------------------
+# 1️⃣  Global configuration
+# -------------------------------------------------------------
+stages:
+  - lint
+  - test
+  - coverage
+  - artifacts
+
+variables:
+  PYTHON_VERSION: "3.11"
+  COVERAGE_THRESHOLD: "80"          # percent
+  ARTIFACT_RETENTION_DAYS: "30"
+
+# -------------------------------------------------------------
+# 2️⃣  Shared before_script
+# -------------------------------------------------------------
+before_script:
+  - python --version
+  - pip install -e .[dev]   # installs pytest, coverage, ruff, etc.
+
+# -------------------------------------------------------------
+# 3️⃣  Linting – can fail without blocking the pipeline
+# -------------------------------------------------------------
+lint:
+  stage: lint
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pip install ruff
+    - ruff check src/ tests/
+  allow_failure: true
+
+# -------------------------------------------------------------
+# 4️⃣  Full test matrix
+# -------------------------------------------------------------
+test:full:
+  stage: test
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pytest tests/ -v --tb=short
+  artifacts:
+    when: always
+    paths:
+      - test-results.xml
+    reports:
+      junit: test-results.xml
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+
+# -------------------------------------------------------------
+# 5️⃣  Filtering test – only the filtering logic
+# -------------------------------------------------------------
+test:filtering:
+  stage: test
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pytest tests/test_filtering.py -v
+    - python -c "
+        from src.gitlab_adapter import GitLabAdapter
+        adapter = GitLabAdapter()
+        adapter.report_filtering_results('filtering-results.json')
+      "
+  artifacts:
+    paths:
+      - filtering-results.json
+    reports:
+      junit: filtering-test-results.xml
+
+# -------------------------------------------------------------
+# 6️⃣  Coverage – only on default branch or MR
+# -------------------------------------------------------------
+coverage:report:
+  stage: coverage
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pytest tests/ --cov=src --cov-report=term --cov-report=xml:coverage.xml
+    - python -c "
+        from src.gitlab_adapter import GitLabAdapter
+        adapter = GitLabAdapter()
+        adapter.upload_coverage_report('coverage.xml')
+        adapter.set_pipeline_metadata('coverage', 'passed')
+      "
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - coverage.html
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# -------------------------------------------------------------
+# 7️⃣  Artifacts – filtering results + a tiny API endpoint
+# -------------------------------------------------------------
+artifacts:filtering:
+  stage: artifacts
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - python -c "
+        from src.gitlab_adapter import GitLabAdapter
+        adapter = GitLabAdapter()
+        results = adapter.get_filtering_results()
+        import json, pathlib
+        pathlib.Path('filtering-results.json').write_text(json.dumps(results, indent=2))
+        adapter.upload_artifact('filtering-results.json', 'filtering-results.json')
+      "
+  artifacts:
+    paths:
+      - filtering-results.json
+    expire_in: ${ARTIFACT_RETENTION_DAYS} days
+  needs:
+    - test:filtering
+
+deploy:api:
+  stage: artifacts
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - python -c "
+        from src.gitlab_adapter import GitLabAdapter
+        adapter = GitLabAdapter()
+        adapter.start_results_server(port=8080)
+      "
+  artifacts:
+    paths:
+      - api-endpoint.txt
+    expire_in: 1 hour
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
