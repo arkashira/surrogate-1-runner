@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "neptune-db:connect",
+        "neptune-db:query"
+      ],
+      "Resource": [
+        "arn:aws:neptune-db:*:*:db/*"
+      ]
+    }
+  ]
+}
