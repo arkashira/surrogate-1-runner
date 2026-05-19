@@ -1,11 +1,13 @@
-import { configureStore } from '@reduxjs/toolkit';
-import rulesReducer from './rulesSlice';
+import { createStore, combineReducers, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import notificationReducer from '../reducers/notificationReducer';
 
-export const store = configureStore({
-  reducer: {
-    rules: rulesReducer,
-  },
+const rootReducer = combineReducers({
+  notifications: notificationReducer,
 });
 
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
+export type RootState = ReturnType<typeof rootReducer>;
+
+const store = createStore(rootReducer, applyMiddleware(thunk));
+
+export default store;

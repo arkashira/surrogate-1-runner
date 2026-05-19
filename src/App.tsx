@@ -1,14 +1,15 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
+import { Provider } from 'react-redux';
+import store from './store';
+import NotificationSystem from './components/NotificationSystem';
 
-const App = () => {
+const App: React.FC = () => {
   return (
-    <Router>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-      </Switch>
-    </Router>
+    <Provider store={store}>
+      <div className="App">
+        <NotificationSystem />
+      </div>
+    </Provider>
   );
 };
 
