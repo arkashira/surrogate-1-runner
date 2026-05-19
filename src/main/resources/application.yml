@@ -1,0 +1,11 @@
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 5
+
+# Workflow status configuration
+workflow:
+  status:
+    enabled: true
+    reportInterval: 5000 # milliseconds
