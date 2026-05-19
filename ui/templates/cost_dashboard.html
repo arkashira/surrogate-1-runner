@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Cost Dashboard</h1>
+    <h2>Recent Anomalies</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Severity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for anomaly in anomalies %}
+            <tr style="color: {{ 'red' if anomaly.severity == 'high' else 'orange' if anomaly.severity == 'medium' else 'green' }}">
+                <td>{{ anomaly.date }}</td>
+                <td>{{ anomaly.severity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <h2>30-Day Forecast vs Actual Spend</h2>
+    <canvas id="forecastChart"></canvas>
+    <script>
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        const forecastData = {{ forecast_data|tojson }};
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: forecastData.dates,
+                datasets: [{
+                    label: 'Forecast',
+                    data: forecastData.forecast,
+                    borderColor: 'blue',
+                    fill: false
+                }, {
+                    label: 'Actual',
+                    data: forecastData.actual,
+                    borderColor: 'green',
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Spend'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
