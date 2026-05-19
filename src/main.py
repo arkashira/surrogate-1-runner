@@ -1,6 +1,16 @@
+"""
+Main entry point for the surrogate-1 FastAPI application.
+"""
+
 from fastapi import FastAPI
-from src.health_check import router as health_check_router
+from monitoring.metrics import router as metrics_router
+# Import other routers or modules as needed
+# from api import router as api_router
 
-app = FastAPI()
+app = FastAPI(title="Surrogate-1 Service")
 
-app.include_router(health_check_router)
+# Include the metrics router
+app.include_router(metrics_router)
+
+# Include other routers (placeholder)
+# app.include_router(api_router)
