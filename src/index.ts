@@ -1,12 +1,9 @@
-import express from 'express';
-import requestsRouter from './routes/requests';
+import telemetry from './services/Telemetry';
 
-const app = express();
-app.use(express.json());
+// Initialize telemetry
+telemetry.start();
 
-app.use('/requests', requestsRouter);
-
-const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, () => {
-  console.log(`Requests service listening on port ${PORT}`);
-});
+// Example usage:
+telemetry.suggestionRequested({ suggestionId: '123' });
+telemetry.suggestionAccepted({ suggestionId: '123', timeTaken: 5000 });
+telemetry.suggestionRejected({ suggestionId: '123', reason: 'not_relevant' });
