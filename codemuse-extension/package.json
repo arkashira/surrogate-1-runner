@@ -1,0 +1,45 @@
+{
+  "name": "codemuse-extension",
+  "displayName": "CodeMuse",
+  "description": "Enhance your coding experience with AI-powered suggestions.",
+  "version": "1.0.0",
+  "publisher": "axentx",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codemuse.helloWorld",
+        "title": "Hello World"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.0",
+    "@types/vscode": "^1.63.0",
+    "typescript": "^4.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-repo-url.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-repo-url/issues"
+  },
+  "homepage": "https://github.com/your-repo-url",
+  "icon": "images/icon.png"
+}

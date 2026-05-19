@@ -1,0 +1,69 @@
+name: UI CI
+
+# Trigger on pushes or PRs to main
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Run on the latest Ubuntu runner
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Test against the two most common LTS Node releases
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+      fail-fast: false          # let all matrix jobs finish
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Node.js (v3 is the latest stable action)
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'          # Cache npm dependencies
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4️⃣ Lint the code
+      - name: Lint
+        run: npm run lint
+
+      # 5️⃣ Type‑check (TypeScript or Flow)
+      - name: Type check
+        run: npm run type-check
+
+      # 6️⃣ Run unit tests
+      - name: Test
+        run: npm test
+
+      # 7️⃣ Build the production bundle
+      - name: Build
+        run: npm run build
+
+      # 8️⃣ Upload build artifacts (optional but handy for debugging)
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-${{ matrix.node-version }}
+          path: |
+            dist/
+            public/
+
+      # 9️⃣ Upload coverage report to Codecov (if you use it)
+      - name: Upload coverage
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
