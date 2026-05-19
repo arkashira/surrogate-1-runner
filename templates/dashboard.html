@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connected Repositories</title>
+</head>
+<body>
+    <h1>GitHub Repositories</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Owner / Repo</th>
+                <th>Connected At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for repo in repositories %}
+            <tr>
+                <td><a href="{{ repo.url }}">{{ repo.name }}</a></td>
+                <td>{{ repo.connected_at }}</td>
+                <td><button>Disconnect</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
