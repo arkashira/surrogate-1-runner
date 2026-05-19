@@ -1,14 +1,12 @@
-class Task {
-  constructor(id, title, description, status) {
-    this.id = id;
-    this.title = title;
-    this.description = description;
-    this.status = status;
-  }
+const mongoose = require('mongoose');
 
-  updateStatus(newStatus) {
-    this.status = newStatus;
-  }
-}
+const taskSchema = new mongoose.Schema({
+  title: String,
+  description: String,
+  status: { type: String, default: 'pending' },
+  assignee: String,
+});
 
-export default Task;
+const Task = mongoose.model('Task', taskSchema);
+
+module.exports = Task;
