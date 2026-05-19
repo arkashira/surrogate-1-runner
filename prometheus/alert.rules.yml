@@ -1,0 +1,19 @@
+groups:
+  - name: decision_alerts
+    rules:
+      - alert: HighDecisionLatency
+        expr: decision_latency_seconds > 2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High decision latency detected"
+          description: "Decision latency is greater than 2 seconds."
+      - alert: HighErrorRate
+        expr: rate(decision_error_total[5m]) / rate((decision_success_total + decision_error_total)[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is greater than 5%."
