@@ -1,0 +1,18 @@
+validation:
+  strict: false
+  timeout: 30s
+  exclude:
+    - "*.test.yaml"
+    - "**/node_modules/**"
+
+tokens:
+  required_env_vars:
+    - DATABASE_URL
+    - API_SECRET
+  allowed_patterns:
+    - "^sk-[a-zA-Z0-9]+$"
+    - "^ghp_[a-zA-Z0-9]+$"
+
+output:
+  format: text
+  file: tokenguard-results.json
