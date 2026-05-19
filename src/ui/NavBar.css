@@ -1,0 +1,114 @@
+
+/* -------------------------------------------------
+   Base NavBar styling
+--------------------------------------------------- */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  position: relative;
+  z-index: 10;
+  height: 60px; /* Ensures consistent height */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Adds subtle shadow for depth */
+}
+
+.navbar .logo {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Desktop navigation links */
+.nav-links {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 1.5rem; /* Improved spacing between links */
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: #333;
+  font-size: 1rem;
+  padding: 0.5rem 0;
+  font-weight: 500; /* Matches font weight for consistency */
+}
+
+/* Hamburger button – hidden on desktop */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+/* Hamburger icon lines */
+.hamburger span {
+  display: block;
+  width: 25px;
+  height: 3px;
+  background: #333;
+  margin: 5px 0;
+  transition: 0.3s;
+  border-radius: 2px; /* Rounded edges for better aesthetics */
+}
+
+/* Full-screen mobile menu – hidden by default */
+.mobile-menu {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.95); /* Slightly transparent background */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem; /* Spacing between menu items */
+  z-index: 1000; /* Ensures it appears above other elements */
+}
+
+/* Links inside the mobile overlay */
+.mobile-menu a {
+  font-size: 1.5rem;
+  color: #333;
+  text-decoration: none;
+  padding: 0.75rem 0;
+  min-height: 48px; /* Ensures touch-friendly tap targets */
+  display: flex;
+  align-items: center;
+}
+
+/* When the menu is toggled open */
+.mobile-menu.open {
+  display: flex;
+}
+
+/* -------------------------------------------------
+   Responsive behavior (viewport < 768px)
+--------------------------------------------------- */
+@media (max-width: 767px) {
+  /* Hide desktop links */
+  .nav-links {
+    display: none;
+  }
+
+  /* Show hamburger icon */
+  .hamburger {
+    display: flex;
+  }
+
+  /* When the overlay is active, show it */
+  .mobile-menu.open {
+    display: flex;
+  }
+
+  /* Ensure touch targets are at least 48px */
+  .mobile-menu a,
+  .hamburger span {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
