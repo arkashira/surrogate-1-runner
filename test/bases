@@ -1,0 +1,15 @@
+smartgrid/
+├── src/
+│   └── test/
+│       ├── __init__.py
+│       ├── environments.py   ← loads YAML configs & creates mock objects
+│       └── test_grid_api.py  ← pytest test module
+├── test/
+│   ├── bases/
+│   │   ├── mock_systems.json
+│   │   └── setup.sh
+│   └── environments/
+│       ├── system1.yaml
+│       └── system2.yaml
+└── bin/
+    └── setup_test_environments.sh
