@@ -1,0 +1,67 @@
+.seo-dashboard {
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f9fafb; /* Light gray background for contrast */
+  border-radius: 8px;
+}
+
+.seo-dashboard h2 {
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  color: #111827;
+  font-weight: 600;
+}
+
+.metrics-grid {
+  display: grid;
+  /* Responsive grid: creates as many columns as fit, minimum 200px wide */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.metric-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.metric-icon {
+  font-size: 2rem;
+  margin-right: 16px;
+  background: #f3f4f6;
+  padding: 10px;
+  border-radius: 50%;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-title {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.seo-dashboard-loading {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+}
