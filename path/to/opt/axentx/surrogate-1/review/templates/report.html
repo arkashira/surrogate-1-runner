@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review Report</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <h1>Review Report</h1>
+  <ul>
+    <!-- Loop through issues and generate list items -->
+    {% for issue in issues %}
+      <li>
+        <a href="{{ issue.link }}">{{ issue.title }}</a>
+        <p>{{ issue.description }}</p>
+      </li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
