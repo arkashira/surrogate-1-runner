@@ -1,63 +1,51 @@
 package com.axentx.surrogate1.orchestration;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 /**
- * Represents a workflow definition consisting of a root agent node.
- *
- * <p>The workflow can be validated to ensure all required agents are present
- * and that the hierarchy is well-formed.</p>
+ * WorkflowDefinition defines the structure of a workflow:
+ * - A list of child agent roles to delegate to
+ * - Parameters for each child agent
+ * - Optional metadata for the entire workflow
  */
 public class WorkflowDefinition {
 
-    private final String workflowId;
-    private final AgentNode root;
+    private final List<ChildAgentSpec> childAgents;
+    private final Map<String, Object> workflowMetadata;
 
-    public WorkflowDefinition(String workflowId, AgentNode root) {
-        this.workflowId = Objects.requireNonNull(workflowId, "workflowId must not be null");
-        this.root = Objects.requireNonNull(root, "root agent node must not be null");
+    public WorkflowDefinition(List<ChildAgentSpec> childAgents,
+                              Map<String, Object> workflowMetadata) {
+        this.childAgents = childAgents;
+        this.workflowMetadata = workflowMetadata;
     }
 
-    public String getWorkflowId() {
-        return workflowId;
+    public List<ChildAgentSpec> getChildAgents() {
+        return childAgents;
     }
 
-    public AgentNode getRoot() {
-        return root;
+    public Map<String, Object> getWorkflowMetadata() {
+        return workflowMetadata;
     }
 
     /**
-     * Returns a flattened list of all agent nodes in the workflow.
-     *
-     * @return unmodifiable list of all nodes
+     * ChildAgentSpec encapsulates a single child agent's role and its parameters.
      */
-    public List<AgentNode> getAllNodes() {
-        List<AgentNode> all = new ArrayList<>();
-        traverse(root, all);
-        return Collections.unmodifiableList(all);
-    }
+    public static class ChildAgentSpec {
+        private final String role;
+        private final Map<String, Object> parameters;
 
-    private void traverse(AgentNode node, List<AgentNode> accumulator) {
-        accumulator.add(node);
-        for (AgentNode child : node.getChildren()) {
-            traverse(child, accumulator);
+        public ChildAgentSpec(String role, Map<String, Object> parameters) {
+            this.role = role;
+            this.parameters = parameters;
         }
-    }
 
-    /**
-     * Validates the entire workflow hierarchy.
-     *
-     * @throws IllegalStateException if validation fails
-     */
-    public void validate() {
-        root.validate();
-    }
+        public String getRole() {
+            return role;
+        }
 
-    @Override
-    public String toString() {
-        return "WorkflowDefinition{workflowId='" + workflowId + "', root=" + root + "}";
+        public Map<String, Object> getParameters() {
+            return parameters;
+        }
     }
 }
