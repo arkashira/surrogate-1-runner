@@ -1,43 +1,115 @@
-import base64
-import os
-import keyring
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+"""
+Utility helpers for the surrogate‑1 API.
+"""
 
-SERVICE_NAME = "markdown_sync"
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-def _derive_key(password: bytes, salt: bytes = b"markdown_sync_salt") -> bytes:
+logger = logging.getLogger(__name__)
+
+# ----------------------------------------------------------------------
+# Public API
+# ----------------------------------------------------------------------
+def get_excerpt(content: Optional[str], length: int = 100) -> str:
     """
-    Derive a 32‑byte Fernet key from an arbitrary password.
+    Return the first `length` characters of `content`.
+
+    If `content` is None, empty, or not a string, an empty string is returned.
+
+    Parameters
+    ----------
+    content: Optional[str]
+        The raw document text.
+    length: int
+        Maximum number of characters to return (default 100).
+
+    Returns
+    -------
+    str
+        The truncated excerpt.
     """
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=200_000,  # 200k is a good balance for most machines
-    )
-    return base64.urlsafe_b64encode(kdf.derive(password))
+    if not isinstance(content, str) or not content:
+        return ""
+    return content[:length]
 
-def get_or_create_key(password: str | None = None) -> bytes:
+
+def get_recent_documents(limit: int = 5) -> List[Dict[str, Any]]:
     """
-    Return a Fernet key.
+    Return the most recently updated documents.
 
-    * If a password is supplied, derive a key from it and store it in the OS keyring.
-    * If no password is supplied, try to read a previously stored key.
-    * If no key exists, generate a random one, store it, and return it.
+    Each entry contains:
+
+    * ``title`` – document title
+    * ``updated_at`` – ISO‑8601 timestamp (UTC, ``Z`` suffix)
+    * ``excerpt`` – first ``length`` characters of the document body
+
+    The implementation currently uses a placeholder list.
+    In production this should be replaced with a real DB/ORM query that:
+
+    * filters to the desired set of documents,
+    * orders by ``updated_at`` descending,
+    * limits to ``limit`` rows.
+
+    Parameters
+    ----------
+    limit: int
+        Number of documents to return (default 5).
+
+    Returns
+    -------
+    List[Dict[str, Any]]
+        List of document dictionaries.
     """
-    if password is not None:
-        key = _derive_key(password.encode())
-        keyring.set_password(SERVICE_NAME, "user_key", key.decode())
-        return key
+    # ------------------------------------------------------------------
+    # TODO: replace the dummy data below with an actual DB query.
+    #   Example (pseudo‑SQL):
+    #
+    #   SELECT id, title, updated_at, content
+    #   FROM documents
+    #   ORDER BY updated_at DESC
+    #   LIMIT :limit;
+    # ------------------------------------------------------------------
+    _NOW = datetime.now(timezone.utc).replace(tzinfo=None)  # naive for dummy string
+    dummy_docs = [
+        {
+            "title": "SOP Overview",
+            "updated_at": _NOW.isoformat() + "Z",
+            "content": "This is a sample procedure document describing how to perform task X. It includes steps, safety notes, and references.",
+        },
+        {
+            "title": "Data Ingestion Guide",
+            "updated_at": _NOW.isoformat() + "Z",
+            "content": "The ingestion pipeline processes sharded JSONL files, normalizes schema, and stores results in the central dataset repository.",
+        },
+        {
+            "title": "Dedup Strategy",
+            "updated_at": _NOW.isoformat() + "Z",
+            "content": "Deduplication uses an MD5 hash of the document content to ensure uniqueness across shards and iterations.",
+        },
+        {
+            "title": "Runner Configuration",
+            "updated_at": _NOW.isoformat() + "Z",
+            "content": "Each runner operates on a deterministic slice of the dataset list, defined by the slug-hash bucket in `bin/dataset-enrich.sh`.",
+        },
+        {
+            "title": "Error Handling",
+            "updated_at": _NOW.isoformat() + "Z",
+            "content": "Workers catch exceptions, log stack traces, and retry transient failures to ensure reliable batch production.",
+        },
+    ]
 
-    # Try to read a stored key
-    stored = keyring.get_password(SERVICE_NAME, "user_key")
-    if stored:
-        return stored.encode()
+    # Slice to the requested limit (in a real query this is done by the DB)
+    docs = dummy_docs[:limit]
 
-    # No key – generate a random one
-    from cryptography.fernet import Fernet
-    key = Fernet.generate_key()
-    keyring.set_password(SERVICE_NAME, "user_key", key.decode())
-    return key
+    # Build the response payload
+    result: List[Dict[str, Any]] = []
+    for doc in docs:
+        result.append({
+            "title": doc["title"],
+            "updated_at": doc["updated_at"],
+            "excerpt": get_excerpt(doc.get("content"), length=100),
+        })
+
+    logger.debug("Fetched %d recent documents", len(result))
+    return result
