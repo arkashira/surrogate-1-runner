@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "index": {
+    "enabled": true,
+    "paths": [
+      {
+        "path": "/docs/migration-guide.md",
+        "category": "Getting Started",
+        "searchable": true,
+        "weight": 1.0,
+        "aliases": ["migration", "upgrade", "guide"]
+      },
+      {
+        "path": "/docs/getting-started/",
+        "category": "Getting Started",
+        "searchable": true,
+        "weight": 0.8,
+        "include_subdirs": true
+      }
+    ],
+    "categories": {
+      "Getting Started": {
+        "priority": 1,
+        "search_boost": 1.2
+      }
+    }
+  },
+  "search": {
+    "enabled": true,
+    "index_fields": ["title", "content", "category", "aliases"],
+    "full_text_search": true,
+    "fuzzy_match": true,
+    "max_results": 50
+  },
+  "migration_guide": {
+    "enabled": true,
+    "prominent": true,
+    "location": "main-docs-page",
+    "search_indexed": true
+  }
+}
