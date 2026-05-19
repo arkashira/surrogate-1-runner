@@ -1,13 +1,13 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 import store from './store';
-import NotificationSystem from './components/NotificationSystem';
+import InvoiceSummaryDashboard from './components/InvoiceSummaryDashboard';
 
 const App: React.FC = () => {
   return (
     <Provider store={store}>
       <div className="App">
-        <NotificationSystem />
+        <InvoiceSummaryDashboard />
       </div>
     </Provider>
   );

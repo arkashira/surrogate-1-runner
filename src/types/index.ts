@@ -1,6 +1,8 @@
-export interface Notification {
+export interface InvoiceSummary {
   id: string;
-  title: string;
-  message: string;
-  acknowledged: boolean;
+  invoiceNumber: string;
+  date: string;
+  amount: number;
+  status: string;
+  recommendedAction: string;
 }

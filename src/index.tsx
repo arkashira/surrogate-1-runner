@@ -1,17 +1,10 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { Provider } from 'react-redux';
-import { store } from './store';
-import './store/persist'; // registers the subscription
-import RuleConfig from './components/RuleConfig';
-import 'antd/dist/reset.css';
+import ReactDOM from 'react-dom';
+import App from './App';
 
-const App = () => (
-  <Provider store={store}>
-    <div style={{ padding: 24 }}>
-      <RuleConfig />
-    </div>
-  </Provider>
+ReactDOM.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+  document.getElementById('root')
 );
-
-ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
