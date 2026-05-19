@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quality Metrics Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Simple styling -->
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background:#f5f5f5; }
+    h1 { text-align:center; }
+    .container { max-width:1200px; margin:auto; background:white; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    table { width:100%; border-collapse:collapse; margin-top:20px; }
+    th, td { padding:12px; border:1px solid #ddd; text-align:center; }
+    th { background:#f0f0f0; }
+    #chartContainer { margin-top:40px; }
+  </style>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Training Pair Quality Metrics</h1>
+    <p>Below is a summary of error rates for training pairs over time. The table shows the latest error rates, while the chart visualizes trends.</p>
+
+    <!-- Table for latest error rates -->
+    <table id="errorTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Error Rate (%)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rows will be injected by JS -->
+      </tbody>
+    </table>
+
+    <!-- Chart container -->
+    <div id="chartContainer">
+      <canvas id="errorChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // Fetch metrics from backend API
+    async function fetchMetrics() {
+      try {
+        const response = await fetch('/api/quality-metrics');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const data = await response.json(); // Expect [{date: 'YYYY-MM-DD', errorRate: 0.12}, ...]
+        return data;
+      } catch (err) {
+        console.error('Failed to fetch metrics:', err);
+        return [];
+      }
+    }
+
+    // Populate table with latest 10 entries
+    function populateTable(metrics) {
+      const tbody = document.querySelector('#errorTable tbody');
+      tbody.innerHTML = '';
+      const latest = metrics.slice(-10).reverse();
+      latest.forEach(entry => {
+        const tr = document.createElement('tr');
+        const tdDate = document.createElement('td');
+        const tdRate = document.createElement('td');
+        tdDate.textContent = entry.date;
+        tdRate.textContent = (entry.errorRate * 100).toFixed(2) + '%';
+        tr.appendChild(tdDate);
+        tr.appendChild(tdRate);
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Render line chart of error rates over time
+    function renderChart(metrics) {
+      const ctx = document.getElementById('errorChart').getContext('2d');
+      const labels = metrics.map(m => m.date);
+      const dataPoints = metrics.map(m => m.errorRate * 100);
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Error Rate (%)',
+            data: dataPoints,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.parsed.y.toFixed(2) + '%';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Main init
+    (async () => {
+      const metrics = await fetchMetrics();
+      if (metrics.length === 0) {
+        document.querySelector('#errorTable tbody').innerHTML = '<tr><td colspan="2">No data available</td></tr>';
+        return;
+      }
+      populateTable(metrics);
+      renderChart(metrics);
+    })();
+  </script>
+</body>
+</html>
