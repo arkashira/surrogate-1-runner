@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game Optimization Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .game-detected { background-color: #e8f5e8; padding: 15px; border-radius: 5px; }
+        .no-game { background-color: #ffe8e8; padding: 15px; border-radius: 5px; }
+        h2 { color: #2c5aa0; }
+        ul { margin-top: 10px; }
+        li { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Active Game Detection</h1>
+    <div id="game-content">
+        <!-- Content will be populated by JavaScript -->
+    </div>
+
+    <script>
+        // Fetch game data from API
+        async function loadGameInfo() {
+            try {
+                const response = await fetch('/api/monitor');
+                const data = await response.json();
+                
+                const contentDiv = document.getElementById('game-content');
+                
+                if (data.game) {
+                    contentDiv.innerHTML = `
+                        <div class="game-detected">
+                            <h2>Detected Game: ${data.game.name}</h2>
+                            <h3>Optimization Suggestions:</h3>
+                            <ul>
+                                ${data.game.suggestions.map(s => `<li>${s}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    contentDiv.innerHTML = `
+                        <div class="no-game">
+                            <p>No game detected. Launch a supported game to get optimization suggestions.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading game info:', error);
+                document.getElementById('game-content').innerHTML = 
+                    '<div class="no-game"><p>Error loading game information.</p></div>';
+            }
+        }
+
+        // Load initial data and set up periodic refresh
+        loadGameInfo();
+        setInterval(loadGameInfo, 5000); // Refresh every 5 seconds
+    </script>
+</body>
+</html>
