@@ -1,0 +1,12 @@
+[project]
+name = "cicd-client"
+version = "0.1.0"
+description = "Unified client for GitLab pipelines and GitHub Actions"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q"
+testpaths = ["tests"]
