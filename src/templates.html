@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Component FPS Gains</title>
+</head>
+<body>
+    <h1>Component FPS Gains</h1>
+    <form action="/" method="get">
+        <label for="filter_fps">Filter by FPS Gain:</label>
+        <input type="number" id="filter_fps" name="filter_fps">
+        <button type="submit">Filter</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th><a href="?sort_by=name&order=asc">Name</a></th>
+                <th><a href="?sort_by=fps_gain&order=asc">FPS Gain</a></th>
+                <th><a href="?sort_by=cost&order=asc">Cost</a></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for component in components %}
+            <tr>
+                <td>{{ component.name }}</td>
+                <td>{{ component.fps_gain }}</td>
+                <td>{{ component.cost }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
