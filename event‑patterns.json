@@ -1,0 +1,36 @@
+{
+  "patterns": [
+    {
+      "type": "application.error",
+      "message_template": "[{severity}] {service} encountered an unexpected error.",
+      "services": ["auth", "payment", "search"],
+      "severity_weights": { "info": 10, "warning": 20, "error": 70 },
+      "hosts": ["app-01", "app-02", "app-03"],
+      "regions": ["us-east-1", "us-west-2"]
+    },
+    {
+      "type": "application.warning",
+      "message_template": "[{severity}] {service} latency threshold exceeded.",
+      "services": ["auth", "payment", "search", "profile"],
+      "severity_weights": { "info": 30, "warning": 60, "error": 10 },
+      "hosts": ["app-01", "app-02", "app-03"],
+      "regions": ["us-east-1", "eu-central-1"]
+    },
+    {
+      "type": "application.info",
+      "message_template": "[{severity}] {service} processed request successfully.",
+      "services": ["auth", "payment", "search", "profile", "notification"],
+      "severity_weights": { "info": 80, "warning": 15, "error": 5 },
+      "hosts": ["app-01", "app-02", "app-03", "app-04"],
+      "regions": ["us-east-1", "us-west-2", "eu-west-1"]
+    },
+    {
+      "type": "system.event",
+      "message_template": "[{severity}] System event on {service}.",
+      "services": ["database", "cache", "queue"],
+      "severity_weights": { "info": 70, "warning": 20, "error": 10 },
+      "hosts": ["sys-01", "sys-02"],
+      "regions": ["us-east-1", "ap-southeast-2"]
+    }
+  ]
+}
