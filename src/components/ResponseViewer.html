@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Response Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #response-list {
+            height: 400px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        .response-item {
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Model Responses</h1>
+    <form>
+        <label for="model">Filter by Model:</label>
+        <select id="model">
+            <option value="">All Models</option>
+            <!-- Add more model options as needed -->
+        </select>
+        <label for="endpoint">Filter by Endpoint:</label>
+        <input type="text" id="endpoint" placeholder="Enter endpoint...">
+        <label for="startTime">Filter by Start Time:</label>
+        <input type="datetime-local" id="startTime">
+        <label for="endTime">Filter by End Time:</label>
+        <input type="datetime-local" id="endTime">
+        <button type="button" onclick="filterResponses()">Filter Responses</button>
+    </form>
+    <div id="response-list"></div>
+
+    <script>
+        const responseList = document.getElementById('response-list');
+        const modelSelect = document.getElementById('model');
+        const endpointInput = document.getElementById('endpoint');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+
+        let responses = [];
+
+        function addResponse(response) {
+            responses.push(response);
+            filterAndDisplayResponses();
+        }
+
+        function filterAndDisplayResponses() {
+            responseList.innerHTML = '';
+            const filteredResponses = responses.filter(response => {
+                const modelSelected = modelSelect.value === '' || response.model === modelSelect.value;
+                const endpointMatch = !endpointInput.value || response.endpoint.includes(endpointInput.value);
+                const startTimeValid = !startTimeInput.value || new Date(response.timestamp) >= new Date(startTimeInput.value);
+                const endTimeValid = !endTimeInput.value || new Date(response.timestamp) <= new Date(endTimeInput.value);
+
+                return modelSelected && endpointMatch && startTimeValid && endTimeValid;
+            });
+
+            filteredResponses.forEach(response => {
+                const item = document.createElement('div');
+                item.className = 'response-item';
+                item.textContent = `Model: ${response.model}, Endpoint: ${response.endpoint}, Timestamp: ${response.timestamp}, Response: ${JSON.stringify(response.data)}`;
+                responseList.appendChild(item);
+            });
+        }
+
+        function filterResponses() {
+            filterAndDisplayResponses();
+        }
+
+        // Simulate real-time data stream
+        setInterval(() => {
+            fetch('/api/responses')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(addResponse);
+                });
+        }, 1000);
+    </script>
+</body>
+</html>
