@@ -1,0 +1,32 @@
+
+{
+  "sources": [
+    {
+      "name": "price_data_feed_1",
+      "type": "API",
+      "url": "https://api.example.com/price_data",
+      "productIdField": "product_id",
+      "priceField": "current_price",
+      "demandField": "units_sold",
+      "headers": {
+        "Authorization": "Bearer TOKEN_HERE"
+      }
+    },
+    {
+      "name": "demand_data_feed_1",
+      "type": "API", 
+      "url": "https://api.example.com/demand_data",
+      "productIdField": "sku",
+      "priceField": "price",
+      "demandField": "quantity_demanded"
+    },
+    {
+      "name": "market_trends_csv",
+      "type": "CSV",
+      "url": "https://data.example.com/market_trends.csv",
+      "productIdField": "item_code",
+      "priceField": "msrp",
+      "demandField": "weekly_sales"
+    }
+  ]
+}
