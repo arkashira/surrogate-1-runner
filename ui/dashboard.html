@@ -3,65 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Providers Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css">
+    <title>Surrogate-1 Dashboard</title>
+    <script src="dashboard.js" defer></script>
 </head>
 <body>
-    <div class="dashboard-container">
-        <header>
-            <h1>Cloud Providers Dashboard</h1>
-        </header>
-        <main>
-            <section id="providers-list">
-                <input type="text" id="filter-input" placeholder="Filter providers...">
-                <table id="providers-table">
-                    <thead>
-                        <tr>
-                            <th>Provider Name</th>
-                            <th>Resource Utilization</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Cloud providers data will be dynamically inserted here -->
-                    </tbody>
-                </table>
-            </section>
-        </main>
-    </div>
-    <script>
-        // Mock data for demonstration purposes
-        const cloudProviders = [
-            { name: 'AWS', utilization: '75%' },
-            { name: 'Azure', utilization: '60%' },
-            { name: 'Google Cloud', utilization: '80%' }
-        ];
-
-        function renderProviders() {
-            const tableBody = document.getElementById('providers-table').getElementsByTagName('tbody')[0];
-            tableBody.innerHTML = ''; // Clear existing rows
-
-            cloudProviders.forEach(provider => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${provider.name}</td>
-                    <td>${provider.utilization}</td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-
-        function filterProviders(event) {
-            const filterValue = event.target.value.toLowerCase();
-            const filteredProviders = cloudProviders.filter(provider => 
-                provider.name.toLowerCase().includes(filterValue)
-            );
-            cloudProviders.length = 0;
-            cloudProviders.push(...filteredProviders);
-            renderProviders();
-        }
-
-        document.getElementById('filter-input').addEventListener('input', filterProviders);
-        renderProviders();
-    </script>
+    <div id="alerts-container"></div>
+    <div id="cost-details"></div>
 </body>
 </html>
