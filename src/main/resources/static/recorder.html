@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Radio Stream Recorder</title>
+</head>
+<body>
+    <h1>Select a Radio Stream to Record</h1>
+    <form id="streamForm">
+        <select id="streamSelect">
+            <!-- Options will be populated dynamically -->
+        </select>
+        <button type="submit">Start Recording</button>
+    </form>
+
+    <h2>Recorded Streams</h2>
+    <ul id="recordedList">
+        <!-- Recorded streams will be listed here -->
+    </ul>
+
+    <script>
+        document.getElementById('streamForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const selectedStream = document.getElementById('streamSelect').value;
+            // Send request to start recording the selected stream
+        });
+    </script>
+</body>
+</html>
