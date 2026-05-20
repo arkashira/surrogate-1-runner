@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "The task references '/opt/axentx/surrogate-1/security' as a target path, but the project context shows this is a 'surrogate-1-runner' dataset ingestion project with no existing security directory. The task mentions 'shell access service' but the project is about parallel dataset workers. I cannot write concrete security code without knowing: 1) existing project structure and files, 2) what security measures are actually needed for this data ingestion pipeline, 3) what compliance standards apply to this specific project",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "Concrete file paths to create/modify in /opt/axentx/surrogate-1 with specific security implementation details (e.g., 'create /opt/axentx/surrogate-1/security/audit_logger.py that implements X, Y, Z')"
+}
