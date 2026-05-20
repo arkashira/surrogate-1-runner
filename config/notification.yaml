@@ -1,0 +1,5 @@
+# Notification configuration schema
+# Defines the Slack webhook URL used for high‑severity violation alerts.
+# The `webhook_url` field must be a non‑empty string and a valid HTTPS URI.
+slack:
+  webhook_url: "<slack-webhook>"
