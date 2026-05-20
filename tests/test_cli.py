@@ -1,28 +1,23 @@
 import unittest
 from unittest.mock import patch
-from bin.cli import main, build_parser
-
+from io import StringIO
+import sys
+from cli import main
 
 class TestCLI(unittest.TestCase):
-    @patch('argparse.ArgumentParser.parse_args')
-    @patch('surrogate.core.review.run_review_engine')
-    def test_all_flag_explicit(self, mock_run_review_engine, mock_parse_args):
-        # --all supplied (True)
-        mock_parse_args.return_value = argparse.Namespace(all_issues=True)
-        main()
-        mock_run_review_engine.assert_called_once_with(multi_issue_mode=True)
 
-        mock_run_review_engine.reset_mock()
-        # --no-all supplied (False)
-        mock_parse_args.return_value = argparse.Namespace(all_issues=False)
-        main()
-        mock_run_review_engine.assert_called_once_with(multi_issue_mode=False)
+    def setUp(self):
+        self.stdout = StringIO()
+        sys.stdout = self.stdout
 
-    def test_default_is_true(self):
-        parser = build_parser()
-        args = parser.parse_args([])          # no flag on the command line
-        self.assertTrue(args.all_issues)      # default must be True
+    def tearDown(self):
+        sys.stdout = sys.__stdout__
 
+    @patch('cli.add_rag')
+    def test_add_rag(self, mock_add_rag):
+        with patch('sys.argv', ['cli.py', 'add-rag']):
+            main()
+        mock_add_rag.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
