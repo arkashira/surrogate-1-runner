@@ -1,25 +1,23 @@
-import unittest
-from unittest.mock import Mock
-from unittest.mock import patch
-from opt.axentx.surrogate-1.auth.oauth import OAuth2Client
-from opt.axentx.surrogate-1.auth.providers import OAuth2Provider
+import pytest
+from src.user_management import UserDB, User
+from src.auth import authenticate_user
 
-class TestOAuth2Provider(unittest.TestCase):
-    def test_get_authorization_url(self):
-        provider = OAuth2Provider('test', 'client_id', 'client_secret', 'https://example.com/authorize', 'https://example.com/token')
-        self.assertEqual(provider.get_authorization_url(), 'https://example.com/authorize?client_id=client_id&response_type=code&redirect_uri=urn:ietf:wg:oauth:2.0:oob')
+def test_valid_authentication():
+    db = UserDB()
+    user = db.create_user("testuser", "SecurePass123!")
+    assert authenticate_user("testuser", "SecurePass123!") is True
 
-    def test_fetch_token(self):
-        provider = OAuth2Provider('test', 'client_id', 'client_secret', 'https://example.com/authorize', 'https://example.com/token')
-        with patch('requests_oauthlib.OAuth2Session.fetch_token') as mock_fetch_token:
-            mock_fetch_token.return_value = {'access_token': 'token'}
-            token = provider.fetch_token('https://example.com/authorize?code=code')
-            self.assertEqual(token, {'access_token': 'token'})
+def test_invalid_password():
+    db = UserDB()
+    db.create_user("testuser", "SecurePass123!")
+    assert authenticate_user("testuser", "wrongpassword") is False
 
-    def test_get_access_token(self):
-        provider = OAuth2Provider('test', 'client_id', 'client_secret', 'https://example.com/authorize', 'https://example.com/token')
-        token = {'access_token': 'token'}
-        self.assertEqual(provider.get_access_token(token), 'token')
+def test_nonexistent_user():
+    assert authenticate_user("nonexistent", "any password") is False
 
-if __name__ == '__main__':
-    unittest.main()
+def test_password_hashing():
+    db = UserDB()
+    user = db.create_user("hashuser", "HashPass123!")
+    assert user.password_hash.startswith("$2b$")  # Bcrypt hash prefix
+    assert user.check_password("HashPass123!") is True
+    assert user.check_password("wrong") is False

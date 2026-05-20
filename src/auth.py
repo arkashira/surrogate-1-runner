@@ -1,17 +1,25 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from .database import get_db
-from .models import User
+import bcrypt
+from .user_management import UserDB
+import secrets
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == 1).first()  # Simplified for example
+def authenticate_user(username: str, password: str) -> bool:
+    """Authenticate user credentials with hashed password verification"""
+    user_db = UserDB()
+    user = user_db.get_user(username)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
+        return False
+    
+    # Verify hashed password using bcrypt
+    return bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8'))
+
+def create_user_session(username: str) -> str:
+    """Create isolated session token for authenticated user"""
+    if not authenticate_user(username, input("Enter password: ")):
+        raise PermissionError("Authentication failed")
+    
+    # Generate cryptographically secure session token
+    session_token = secrets.token_urlsafe(32)
+    
+    # In production, this would store in secure session store
+    # with expiration and isolation controls
+    return session_token
