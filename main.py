@@ -1,18 +1,11 @@
-from logging import getLogger
-from access_logger import access_logger
+"""
+FastAPI application entry point.
+"""
 
-def handle_shell_access(user, session_id, ip_address):
-    # Original shell handling logic...
-    
-    # Log access event
-    access_logger.info(
-        "Shell session initiated",
-        extra={
-            'user': user,
-            'session_id': session_id,
-            'action': 'shell_access',
-            'ip': ip_address
-        }
-    )
-    
-    # Continue with session establishment
+from fastapi import FastAPI
+
+from .api.aws_integration import router as aws_router
+
+app = FastAPI(title="Surrogate‑1 API")
+
+app.include_router(aws_router)
