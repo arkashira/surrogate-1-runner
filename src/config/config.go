@@ -2,111 +2,78 @@ package config
 
 import (
 	"encoding/json"
-	"io"
+	"errors"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 )
 
-// ---------------------------------------------------------------------
-// Public structs
-// ---------------------------------------------------------------------
+// Config holds all runtime configuration needed by surrogate‑1.
+type Config struct {
+	// SlackWebhookURL is the full webhook URL to post alerts to.
+	SlackWebhookURL string `json:"slack_webhook_url"`
 
-// RedisConfig holds everything needed to create a go‑redis client.
-type RedisConfig struct {
-	Addr         string        // host:port
-	Password     string        // optional password
-	DB           int           // Redis DB number
-	DialTimeout  time.Duration // connection timeout
-	ReadTimeout  time.Duration // read timeout
-	WriteTimeout time.Duration // write timeout
+	// DriftAlertSuppressionWindow defines how long duplicate drift alerts
+	// for the same service+hash are ignored.
+	DriftAlertSuppressionWindow time.Duration `json:"drift_alert_suppression_window"`
 }
 
-// AppConfig is the top‑level configuration object.  At the moment it only
-// contains Redis settings, but it can be expanded later without breaking
-// the API.
-type AppConfig struct {
-	Redis RedisConfig `json:"redis"`
-}
-
-// ---------------------------------------------------------------------
-// Loading helpers
-// ---------------------------------------------------------------------
-
-// LoadFromEnv builds an AppConfig from environment variables.  All
-// variables are optional – sensible defaults are supplied.
-func LoadFromEnv() *AppConfig {
-	rc := RedisConfig{
-		Addr:         getEnv("REDIS_ADDR", "localhost:6379"),
-		Password:     os.Getenv("REDIS_PASSWORD"), // empty string = no password
-		DB:           getEnvInt("REDIS_DB", 0),
-		DialTimeout:  getEnvDuration("REDIS_DIAL_TIMEOUT", 5*time.Second),
-		ReadTimeout:  getEnvDuration("REDIS_READ_TIMEOUT", 3*time.Second),
-		WriteTimeout: getEnvDuration("REDIS_WRITE_TIMEOUT", 3*time.Second),
+// Load reads configuration from the environment first and, if a file path is
+// supplied, falls back to a JSON file.  This gives you the flexibility of
+// container‑style env vars *and* the convenience of a static config file.
+func Load(envFile string) (*Config, error) {
+	// 1️⃣  Environment variables – highest priority.
+	url := os.Getenv("SLACK_WEBHOOK_URL")
+	if url == "" {
+		return nil, ErrMissingEnvVar("SLACK_WEBHOOK_URL")
 	}
-	return &AppConfig{Redis: rc}
-}
 
-// LoadFromFile reads a JSON file (e.g. /etc/surrogate/config.json) and
-// unmarshals it into an AppConfig.  If the file cannot be read the
-// function returns an error – callers can decide whether to fall back
-// to env‑based defaults.
-func LoadFromFile(path string) (*AppConfig, error) {
-	f, err := os.Open(path)
+	windowStr := os.Getenv("DRIFT_ALERT_SUPPRESSION_WINDOW")
+	if windowStr == "" {
+		windowStr = "10m" // sensible default
+	}
+	window, err := time.ParseDuration(windowStr)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	var cfg AppConfig
-	dec := json.NewDecoder(io.LimitReader(f, 1<<20)) // 1 MiB limit
-	if err := dec.Decode(&cfg); err != nil {
+	// 2️⃣  Optional JSON file – only used for values we didn't get from env.
+	if envFile != "" {
+		if fileCfg, err := loadFromFile(envFile); err == nil {
+			// Merge – file values only override if they are non‑zero.
+			if fileCfg.SlackWebhookURL != "" {
+				url = fileCfg.SlackWebhookURL
+			}
+			if fileCfg.DriftAlertSuppressionWindow != 0 {
+				window = fileCfg.DriftAlertSuppressionWindow
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			// If the file exists but can't be read, surface the error.
+			return nil, err
+		}
+	}
+
+	return &Config{
+		SlackWebhookURL:               url,
+		DriftAlertSuppressionWindow:   window,
+	}, nil
+}
+
+// loadFromFile reads a JSON file into a Config struct.
+func loadFromFile(path string) (*Config, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg Config
+	if err := json.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
 }
 
-// DefaultConfig returns a fully populated config that works out of the
-// box for local development.
-func DefaultConfig() *AppConfig {
-	return &AppConfig{
-		Redis: RedisConfig{
-			Addr:         "localhost:6379",
-			Password:     "",
-			DB:           0,
-			DialTimeout:  5 * time.Second,
-			ReadTimeout:  3 * time.Second,
-			WriteTimeout: 3 * time.Second,
-		},
-	}
-}
+// ErrMissingEnvVar is returned when a required environment variable is absent.
+type ErrMissingEnvVar string
 
-// ---------------------------------------------------------------------
-// Internal helpers (env parsing)
-// ---------------------------------------------------------------------
-
-func getEnv(key, def string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return def
-}
-
-func getEnvInt(key string, def int) int {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		if i, err := strconv.Atoi(v); err == nil {
-			return i
-		}
-	}
-	return def
-}
-
-func getEnvDuration(key string, def time.Duration) time.Duration {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			return d
-		}
-	}
-	return def
+func (e ErrMissingEnvVar) Error() string {
+	return "missing required environment variable: " + string(e)
 }
