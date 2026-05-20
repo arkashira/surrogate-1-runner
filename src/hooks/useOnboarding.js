@@ -1,30 +1,24 @@
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  nextStep,
-  prevStep,
-  skipStep,
-  completeOnboarding,
-  resetOnboarding,
-  setPreferences,
-} from '../store/onboardingSlice';
-import { steps } from '../config/onboardingSteps';
+import { nextStep, prevStep, completeTutorial, skipTutorial, resetTutorial } from '../redux/onboardingSlice';
 
 export const useOnboarding = () => {
   const dispatch = useDispatch();
-  const { step, isComplete, preferences } = useSelector((s) => s.onboarding);
+  const { tutorialCompleted, currentStep, isSkipped } = useSelector((state) => state.onboarding);
 
-  const currentStep = steps[step];
+  const handleNext = () => dispatch(nextStep());
+  const handlePrev = () => dispatch(prevStep());
+  const handleComplete = () => dispatch(completeTutorial());
+  const handleSkip = () => dispatch(skipTutorial());
+  const handleReset = () => dispatch(resetTutorial());
 
   return {
-    step,
-    isComplete,
-    preferences,
+    tutorialCompleted,
     currentStep,
-    nextStep: () => dispatch(nextStep()),
-    prevStep: () => dispatch(prevStep()),
-    skipStep: () => dispatch(skipStep()),
-    completeOnboarding: () => dispatch(completeOnboarding()),
-    resetOnboarding: () => dispatch(resetOnboarding()),
-    setPreferences: (prefs) => dispatch(setPreferences(prefs)),
+    isSkipped,
+    handleNext,
+    handlePrev,
+    handleComplete,
+    handleSkip,
+    handleReset,
   };
 };
