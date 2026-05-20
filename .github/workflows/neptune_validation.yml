@@ -1,0 +1,31 @@
+name: Neptune Connectivity Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight
+
+jobs:
+  validate-neptune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3
+
+      - name: Run Neptune connectivity validation
+        run: python scripts/validate_neptune_connectivity.py
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          NEPTUNE_ENDPOINT: ${{ secrets.NEPTUNE_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
