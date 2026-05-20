@@ -1,36 +1,13 @@
-const axios = require('axios');
+import axios from 'axios';
 
-class ApiClient {
-  constructor(baseUrl, token) {
-    this.client = axios.create({
-      baseURL: baseUrl,
-      timeout: 10000, // Prevent hanging requests
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+const API_BASE_URL = 'https://api.axentx.com';
+
+export const getInstanceData = async (instanceId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/instances/${instanceId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching instance data:', error);
+    throw error;
   }
-
-  async get(endpoint, params = {}) {
-    try {
-      const response = await this.client.get(endpoint, { params });
-      return response.data;
-    } catch (err) {
-      console.error(`API GET ${endpoint} error:`, err.message);
-      throw err;
-    }
-  }
-
-  async post(endpoint, body = {}) {
-    try {
-      const response = await this.client.post(endpoint, body);
-      return response.data;
-    } catch (err) {
-      console.error(`API POST ${endpoint} error:`, err.message);
-      throw err;
-    }
-  }
-}
-
-module.exports = ApiClient;
+};
