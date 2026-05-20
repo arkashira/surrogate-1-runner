@@ -1,13 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Surrogate-1 Dashboard</title>
-    <script src="dashboard.js" defer></script>
+  <meta charset="UTF-8">
+  <title>AxentX Surrogate-1 Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #cost-recommendations { margin-top: 30px; }
+    .recommendation { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+    .recommendation h4 { margin: 0 0 5px 0; }
+    .recommendation .savings { color: green; font-weight: bold; }
+    .error { color: red; }
+  </style>
 </head>
 <body>
-    <div id="alerts-container"></div>
-    <div id="cost-details"></div>
+  <h1>Surrogate-1 Dashboard</h1>
+
+  <!-- Existing dashboard content would be here -->
+
+  <section id="cost-recommendations">
+    <h2>Cost Optimization Recommendations</h2>
+    <div id="recommendations-container">
+      <p>Loading recommendations...</p>
+    </div>
+  </section>
+
+  <script src="dashboard.js"></script>
 </body>
 </html>
