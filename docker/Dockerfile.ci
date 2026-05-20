@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies and markdown utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    wget \
+    pandoc \
+    markdown \
+    grip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies for documentation processing
+RUN pip install --no-cache-dir \
+    mistune \
+    pygments \
+    markdown
+
+# Copy requirements if exists
+COPY requirements.txt /tmp/requirements.txt 2>/dev/null || true
+RUN if [ -s /tmp/requirements.txt ]; then pip install --no-cache-dir -r /tmp/requirements.txt; fi
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]

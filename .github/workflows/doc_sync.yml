@@ -1,0 +1,38 @@
+name: DocSync
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  doc-sync:
+    runs-on: ubuntu-latest
+    container:
+      image: axentx/surrogate-1-ci:latest
+    env:
+      DOC_SYNC_TOKEN: ${{ secrets.DOC_SYNC_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run DocSync script
+        run: |
+          set -e
+          bash scripts/doc_sync.sh
+        env:
+          DOC_SYNC_TOKEN: ${{ secrets.DOC_SYNC_TOKEN }}
+
+      - name: Upload preview artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-preview
+          path: doc-preview.html
+          retention-days: 7
+
+      - name: Report failure details
+        if: failure()
+        run: |
+          echo "::error::DocSync failed. Check logs above for details."
+          exit 1
