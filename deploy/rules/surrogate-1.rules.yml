@@ -1,0 +1,24 @@
+groups:
+- name: surrogate-1.rules
+  rules:
+  - alert: RatApiRequestsTotalMissing
+    expr: changes(rat_api_requests_total[1m]) == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Rat API requests total metric missing"
+  - alert: RatApiLatencySecondsMissing
+    expr: changes(rat_api_latency_seconds[1m]) == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Rat API latency seconds metric missing"
+  - alert: RatWorkerSuccessTotalMissing
+    expr: changes(rat_worker_success_total[1m]) == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Rat worker success total metric missing"
