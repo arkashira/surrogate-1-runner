@@ -1,28 +1,33 @@
-import os
-import psutil
-from utils.memory_monitor import get_memory_usage
+import time
+from utils.resource_manager import ResourceManager
 
-def adaptive_batch_size(data):
-    memory_threshold = 0.8  # 80% memory usage threshold
-    available_memory = psutil.virtual_memory().available * (1 - memory_threshold)
-    batch_size = min(len(data), available_memory // (sys.getsizeof(data[0]) * 1.2))  # 20% overhead
-    return batch_size
+class BatchProcessor:
+    def __init__(self, base_batch_size=100, item_size=1024):
+        self.base_batch_size = base_batch_size
+        self.item_size = item_size
+        self.resource_manager = ResourceManager()
 
-def process_data(data):
-    batch_size = adaptive_batch_size(data)
-    for i in range(0, len(data), batch_size):
-        batch = data[i:i + batch_size]
-        # process batch here
-        pass
+    def process_batch(self, items):
+        """Process a batch of items"""
+        # Simulate processing time
+        time.sleep(0.1)
+        return [self._process_item(item) for item in items]
 
-# /opt/axentx/surrogate-1/src/utils/memory_monitor.py
-import psutil
+    def _process_item(self, item):
+        """Process a single item"""
+        # Simulate item processing
+        return item.upper()
 
-def get_memory_usage():
-    return psutil.virtual_memory().percent
+    def get_optimal_batch_size(self):
+        """Get optimal batch size based on current memory conditions"""
+        return self.resource_manager.calculate_optimal_batch_size(
+            self.base_batch_size,
+            self.item_size
+        )
 
-# Summary:
-# - Implemented adaptive batch sizing algorithm in batch_processor.py
-# - Updated memory_monitor.py to return memory usage percentage
-# - Batch size now adjusts based on available memory, staying below 80% threshold
-# - Processing speed improvement depends on the specific processing task and data size
+    def monitor_memory_usage(self):
+        """Monitor memory usage and adjust batch size if needed"""
+        memory_usage = self.resource_manager.get_memory_usage_percentage()
+        if memory_usage > 80:
+            # Reduce batch size if memory usage is too high
+            self.base_batch_size = max(10, self.base_batch_size // 2)
