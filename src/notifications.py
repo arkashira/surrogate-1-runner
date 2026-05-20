@@ -1,61 +1,121 @@
+"""
+Simple notification service for the surrogate-1 dashboard.
+
+Supports sending emails via SMTP and Slack messages via webhook.
+Configuration is read from environment variables:
+
+EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM
+SLACK_WEBHOOK_URL
+"""
+
 import os
-import json
-import logging
 import smtplib
+import ssl
+from email.message import EmailMessage
+import json
 import requests
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Optional, Dict, Any
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-class NotificationManager:
-    def __init__(self):
-        self.config = self._load_config()
-        self.notification_channels = self._initialize_channels()
-        
-    def _load_config(self) -> Dict[str, Any]:
-        """Load notification configuration from environment variables."""
-        config = {
-            'email': {
-                'enabled': os.getenv('NOTIFICATIONS_EMAIL_ENABLED', 'false').lower() == 'true',
-                'smtp_server': os.getenv('NOTIFICATIONS_EMAIL_SMTP_SERVER', 'smtp.gmail.com'),
-                'smtp_port': int(os.getenv('NOTIFICATIONS_EMAIL_SMTP_PORT', '587')),
-                'username': os.getenv('NOTIFICATIONS_EMAIL_USERNAME', ''),
-                'password': os.getenv('NOTIFICATIONS_EMAIL_PASSWORD', ''),
-                'recipients': os.getenv('NOTIFICATIONS_EMAIL_RECIPIENTS', '').split(','),
-            },
-            'slack': {
-                'enabled': os.getenv('NOTIFICATIONS_SLACK_ENABLED', 'false').lower() == 'true',
-                'webhook_url': os.getenv('NOTIFICATIONS_SLACK_WEBHOOK_URL', ''),
-                'channel': os.getenv('NOTIFICATIONS_SLACK_CHANNEL', '#alerts'),
-            },
-            'log_level': os.getenv('NOTIFICATIONS_LOG_LEVEL', 'INFO'),
+class NotificationError(Exception):
+    """Raised when a notification fails to send."""
+
+
+class NotificationService:
+    """
+    A lightweight notification service that can send emails and Slack messages.
+    """
+
+    def __init__(
+        self,
+        email_config: Optional[Dict[str, Any]] = None,
+        slack_config: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize the service.
+
+        :param email_config: Optional dict with keys host, port, user, pass, from_addr.
+        :param slack_config: Optional dict with key webhook_url.
+        """
+        # Load defaults from environment
+        self.email_config = email_config or {
+            "host": os.getenv("EMAIL_HOST", "localhost"),
+            "port": int(os.getenv("EMAIL_PORT", "25")),
+            "user": os.getenv("EMAIL_USER"),
+            "pass": os.getenv("EMAIL_PASS"),
+            "from_addr": os.getenv("EMAIL_FROM", "noreply@axentx.com"),
         }
-        return config
-    
-    def _initialize_channels(self) -> Dict[str, Any]:
-        """Initialize notification channels based on configuration."""
-        channels = {}
-        
-        if self.config['email']['enabled']:
-            channels['email'] = EmailChannel(self.config['email'])
-            
-        if self.config['slack']['enabled']:
-            channels['slack'] = SlackChannel(self.config['slack'])
-            
-        return channels
-    
-    def send_notification(self, title: str, message: str, container_name: str, 
-                         error_details: Optional[str] = None, logs: Optional[str] = None) -> bool:
-        """Send notification through all enabled channels."""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        full_message = f"**Container:** {container_name}\n"
-        full_message += f"**Timestamp:** {timestamp}\n\n"
-        full_message += f"**Message:** {message}\n\n"
-        
-        if error_details:
-            full_message += f"**Error Details:**\n
+        self.slack_config = slack_config or {
+            "webhook_url": os.getenv("SLACK_WEBHOOK_URL")
+        }
+
+    # ----------------------------------------------------------------------
+    # Email helpers
+    # ----------------------------------------------------------------------
+    def _build_email(self, to: str, subject: str, body: str) -> EmailMessage:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = self.email_config["from_addr"]
+        msg["To"] = to
+        msg.set_content(body)
+        return msg
+
+    def send_email(self, to: str, subject: str, body: str) -> None:
+        """
+        Send an email using the configured SMTP server.
+
+        Raises NotificationError on failure.
+        """
+        msg = self._build_email(to, subject, body)
+        try:
+            context = ssl.create_default_context()
+            with smtplib.SMTP(self.email_config["host"], self.email_config["port"]) as server:
+                if self.email_config["user"] and self.email_config["pass"]:
+                    server.starttls(context=context)
+                    server.login(self.email_config["user"], self.email_config["pass"])
+                server.send_message(msg)
+        except Exception as exc:
+            raise NotificationError(f"Failed to send email: {exc}") from exc
+
+    # ----------------------------------------------------------------------
+    # Slack helpers
+    # ----------------------------------------------------------------------
+    def send_slack(self, channel: str, message: str) -> None:
+        """
+        Send a message to a Slack channel via webhook.
+
+        Raises NotificationError on failure.
+        """
+        if not self.slack_config["webhook_url"]:
+            raise NotificationError("Slack webhook URL not configured")
+
+        payload = {
+            "channel": channel,
+            "text": message,
+        }
+        try:
+            resp = requests.post(
+                self.slack_config["webhook_url"],
+                data=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+                timeout=5,
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            raise NotificationError(f"Failed to send Slack message: {exc}") from exc
+
+    # ----------------------------------------------------------------------
+    # Unified notification
+    # ----------------------------------------------------------------------
+    def notify(self, recipients: Dict[str, str], message: str) -> None:
+        """
+        Send notifications to a mix of email and Slack recipients.
+
+        :param recipients: dict mapping recipient type to address.
+            Supported keys: 'email', 'slack'.
+        :param message: The message body.
+        """
+        if "email" in recipients:
+            self.send_email(recipients["email"], "Surrogate-1 Notification", message)
+        if "slack" in recipients:
+            self.send_slack(recipients["slack"], message)
