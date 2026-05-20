@@ -1,0 +1,8 @@
+
+CREATE TABLE session (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT,
+  session_token BLOB,
+  last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES user(id)
+);
