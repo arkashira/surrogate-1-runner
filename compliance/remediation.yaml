@@ -1,0 +1,20 @@
+# Top‑level key is optional – the loader accepts both styles.
+remediation:
+  s3_public_access:
+    - "Disable public access on the bucket."
+    - "Enable a bucket policy that restricts access to authorized IAM roles."
+    - "Enable S3 Block Public Access at the account level."
+  iam_unused_roles:
+    - "Identify the unused role and its attached policies."
+    - "Detach policies and delete the role if no longer needed."
+    - "Document the removal for audit purposes."
+  ec2_unencrypted_volumes:
+    - "Enable encryption for the affected EBS volumes."
+    - "Create a new encrypted volume, migrate data, and replace the unencrypted volume."
+    - "Update launch configurations or templates to enforce encryption by default."
+  s3_bucket_encryption:
+    - "Enable default encryption for the bucket via the AWS Console or CLI."
+    - "Set the bucket's 'BucketKeyEnabled' to true for SSE‑KMS."
+  iam_password_policy:
+    - "Configure a strong password policy: minimum length 14, require symbols, numbers, uppercase and lowercase."
+    - "Enable password expiration and reuse prevention."
