@@ -1,40 +1,28 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from src.main.metrics_store import InMemoryMetricsStore
 
-from flask import Flask, request, jsonify
-from uuid import uuid4
-from src.main.metrics_store import MetricsStore
+app = FastAPI()
 
-app = Flask(__name__)
-metrics_store = MetricsStore()
+metrics_store = InMemoryMetricsStore()
 
-@app.route('/api/v1/events', methods=['POST'])
-def send_event():
-    data = request.get_json()
-    event_id = str(uuid4())
-    # Process event data and store it or send it to other systems
-    # For now, just return a mock event ID
-    return jsonify({'event_id': event_id}), 200
+class Metric(BaseModel):
+    name: str
+    value: float
+    metric_type: str
 
-@app.route('/api/v1/series', methods=['POST'])
-def send_metric():
-    data = request.get_json()
-    metric_type = data.get('type')
-    metric_name = data.get('metric')
-    value = data.get('value')
+@app.post('/api/v1/series')
+async def store_metric(metric: Metric):
+    metrics_store.store_metric(metric.name, metric.value, metric.metric_type)
+    return {'message': 'Metric stored successfully'}
 
-    if metric_type not in ['count', 'gauge', 'timer']:
-        return jsonify({'error': 'Unsupported metric type'}), 400
+@app.get('/api/v1/series')
+async def get_all_metrics():
+    return {'metrics': metrics_store.get_all_metrics()}
 
-    metrics_store.store_metric(metric_name, metric_type, value)
-    return jsonify({'status': 'ok'}), 200
-
-@app.route('/api/v1/series', methods=['GET'])
-def get_metrics():
-    metric = request.args.get('metric')
-    if not metric:
-        return jsonify({'error': 'Missing metric parameter'}), 400
-
-    metrics = metrics_store.get_metrics(metric)
-    return jsonify(metrics), 200
-
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.get('/api/v1/series/{metric_name}')
+async def get_metric(metric_name: str):
+    try:
+        return {'metric': metrics_store.get_metric(metric_name)}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail='Metric not found')
