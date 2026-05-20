@@ -2,24 +2,10 @@ CREATE TABLE IF NOT EXISTS workflows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
-    steps TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    steps TEXT, -- Stored as JSON array e.g. ["step1", "step2"]
+    documentation_url TEXT
 );
 
-CREATE TABLE IF NOT EXISTS workflow_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workflow_id INTEGER NOT NULL,
-    version INTEGER NOT NULL,
-    steps TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (workflow_id) REFERENCES workflows (id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS process_documentation (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workflow_id INTEGER NOT NULL,
-    documentation TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (workflow_id) REFERENCES workflows (id) ON DELETE CASCADE
-);
+-- Indexes for fast searching
+CREATE INDEX IF NOT EXISTS idx_workflows_name ON workflows(name);
+CREATE INDEX IF NOT EXISTS idx_workflows_description ON workflows(description);
