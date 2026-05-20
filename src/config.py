@@ -1,79 +1,126 @@
-import os
+"""
+Configuration handling for the surrogate-1 runner.
+
+This module defines a `Config` dataclass that stores user‑defined
+notification preferences and health‑check intervals.  It also
+provides helpers for loading from / saving to a JSON file,
+as well as validation logic that is used by the UI layer.
+"""
+
+from __future__ import annotations
+
+import json
 import re
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-import yaml
+# Regular expression for a very permissive email validation
+_EMAIL_RE = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
 
-# Simple regex to sanity‑check MySQL/MariaDB DSNs.
-_CONNECTION_STRING_REGEX = re.compile(
-    r'^(mysql|mariadb)://[^/@\s]+(?::[^/@\s]+)?@[^/:]+(?::\d+)?/[^/\s]+(\?.*)?$',
-    re.IGNORECASE,
-)
-
-
-@dataclass(frozen=True)
-class DBConfig:
-    """Configuration for a single database endpoint."""
-    connection_string: str
+# Regular expression for a very permissive URL validation
+_URL_RE = re.compile(r"^https?://[^\s/$.?#].[^\s]*$")
 
 
-@dataclass(frozen=True)
-class AppConfig:
-    """Top‑level configuration loaded from a YAML file."""
-    mysql: Optional[DBConfig] = None
-    mariadb: Optional[DBConfig] = None
+@dataclass
+class Config:
+    """
+    Configuration for automated feedback and health checks.
 
+    Attributes
+    ----------
+    notification_email : Optional[str]
+        Email address to send notifications to.
+    notification_webhook : Optional[str]
+        HTTP(S) webhook URL for notifications.
+    health_check_interval_minutes : int
+        Interval in minutes between health‑check runs.
+    """
 
-def _validate_connection_string(name: str, value: str) -> None:
-    """Raise a ValueError with a clear message if *value* is not a valid DSN."""
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"'{name}.connection_string' must be a non‑empty string")
-    if not _CONNECTION_STRING_REGEX.match(value):
-        raise ValueError(
-            f"'{name}.connection_string' is not a valid MySQL/MariaDB DSN: {value}"
+    notification_email: Optional[str] = None
+    notification_webhook: Optional[str] = None
+    health_check_interval_minutes: int = 30
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a serialisable dictionary representation."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Config":
+        """Create a Config instance from a dictionary."""
+        return cls(
+            notification_email=data.get("notification_email"),
+            notification_webhook=data.get("notification_webhook"),
+            health_check_interval_minutes=int(
+                data.get("health_check_interval_minutes", 30)
+            ),
         )
 
+    def validate(self) -> None:
+        """Validate the configuration values.
 
-def _parse_section(section: Optional[dict], name: str) -> Optional[DBConfig]:
-    """Parse a single top‑level section (mysql or mariadb)."""
-    if section is None:
-        return None
-    cs = section.get("connection_string")
-    _validate_connection_string(name, cs)
-    return DBConfig(connection_string=cs)
+        Raises
+        ------
+        ValueError
+            If any value is invalid.
+        """
+        if self.notification_email is not None:
+            if not _EMAIL_RE.match(self.notification_email):
+                raise ValueError(
+                    f"Invalid email address: {self.notification_email}"
+                )
+
+        if self.notification_webhook is not None:
+            if not _URL_RE.match(self.notification_webhook):
+                raise ValueError(
+                    f"Invalid webhook URL: {self.notification_webhook}"
+                )
+
+        if not isinstance(self.health_check_interval_minutes, int):
+            raise ValueError(
+                f"Health check interval must be an integer, got {type(self.health_check_interval_minutes)}"
+            )
+        if self.health_check_interval_minutes <= 0:
+            raise ValueError(
+                f"Health check interval must be > 0, got {self.health_check_interval_minutes}"
+            )
 
 
-def load_config(path: Optional[str] = None) -> AppConfig:
+def load_config(path: Path) -> Config:
+    """Load configuration from a JSON file.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the configuration file.
+
+    Returns
+    -------
+    Config
+        Loaded configuration.  If the file does not exist, a default
+        configuration is returned.
     """
-    Load configuration from *path* (YAML). If *path* is ``None`` the function
-    looks for the ``DBCOMPARE_CONFIG`` environment variable. When no file is
-    supplied the function returns an ``AppConfig`` with ``None`` for both
-    databases (the tool will fall back to its internal defaults).
+    if not path.is_file():
+        return Config()
 
-    The YAML file must contain optional top‑level ``mysql`` and ``mariadb``
-    mappings, each with a ``connection_string`` key.
+    with path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    Example ``config.yaml``::
+    cfg = Config.from_dict(data)
+    cfg.validate()
+    return cfg
 
-        mysql:
-          connection_string: "mysql://user:pass@host:3306/dbname"
-        mariadb:
-          connection_string: "mariadb://user:pass@host:3306/dbname"
+
+def save_config(cfg: Config, path: Path) -> None:
+    """Persist configuration to a JSON file.
+
+    Parameters
+    ----------
+    cfg : Config
+        Configuration to save.
+    path : Path
+        Destination file path.
     """
-    # Resolve path from argument → env var → None
-    if path is None:
-        path = os.getenv("DBCOMPARE_CONFIG")
-
-    if path:
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"Config file not found: {path}")
-        with open(path, "r", encoding="utf-8") as fh:
-            raw = yaml.safe_load(fh) or {}
-    else:
-        raw = {}
-
-    mysql_cfg = _parse_section(raw.get("mysql"), "mysql")
-    mariadb_cfg = _parse_section(raw.get("mariadb"), "mariadb")
-
-    return AppConfig(mysql=mysql_cfg, mariadb=mariadb_cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(cfg.to_dict(), f, indent=2, sort_keys=True)
