@@ -1,0 +1,57 @@
+name: CI Integration with Coverage Analyzer
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run tests
+        run: |
+          # Your test commands here
+          echo "Running tests..."
+          pytest
+
+  coverage-analysis:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Call Coverage Analyzer API
+        id: coverage-analyzer
+        env:
+          COVERAGE_API_URL: ${{ secrets.COVERAGE_API_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Assuming the coverage report is generated in a file named 'coverage.xml'
+          curl -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -F "file=@coverage.xml" $COVERAGE_API_URL
+
+      - name: Attach coverage report as a comment
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the coverage report URL from the previous step
+          COVERAGE_REPORT_URL=$(echo "${{ steps.coverage-analyzer.outputs.url }}")
+          # Create a comment with the coverage report URL
+          COMMENT="Coverage report: $COVERAGE_REPORT_URL"
+          gh pr comment --body "$COMMENT"
+
+      - name: Configure step via YAML option
+        run: |
+          # Example configuration via YAML option
+          echo "Configuring step via YAML option..."
+          echo "Option value: ${{ github.event.inputs.option }}"
