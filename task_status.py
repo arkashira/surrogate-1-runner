@@ -1,105 +1,93 @@
-"""
-Task status management for surrogate-1.
+import asyncio
+import websockets
+import json
+from datetime import datetime
+from typing import Dict, List, Set
+from flask import Flask, jsonify
+from flask_socketio import SocketIO, emit
 
-This module defines the `TaskStatus` enum, a lightweight `Task` data model,
-and helper functions to transition tasks between states.  The primary
-behaviour required by the PRD is the ability to automatically mark a
-task as completed once the user indicates that it has been finished.
-"""
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-from __future__ import annotations
+class TaskStatusManager:
+    def __init__(self):
+        self.tasks: Dict[str, Dict] = {}
+        self.milestones: Dict[str, List] = {}
+        self.active_connections: Set = set()
+        self.lock = asyncio.Lock()
 
-import enum
-from dataclasses import dataclass, field
-from typing import Optional, List, Iterable
+    async def connect(self, websocket):
+        self.active_connections.add(websocket)
+        try:
+            await self._send_initial_state(websocket)
+            await websocket.wait_closed()
+        finally:
+            self.active_connections.remove(websocket)
 
+    async def _send_initial_state(self, websocket):
+        await websocket.send(json.dumps({
+            "type": "INITIAL_STATE",
+            "tasks": self.tasks,
+            "milestones": self.milestones
+        }))
 
-class TaskStatus(enum.Enum):
-    """
-    Enumeration of possible task states.
+    async def update_task(self, task_id: str, status: str, deadline: str = None, milestone: str = None):
+        async with self.lock:
+            self.tasks[task_id] = {
+                "id": task_id,
+                "status": status,
+                "deadline": deadline or self.tasks.get(task_id, {}).get("deadline"),
+                "milestone": milestone or self.tasks.get(task_id, {}).get("milestone"),
+                "last_updated": datetime.utcnow().isoformat()
+            }
 
-    * PENDING – Task is created but not yet assigned.
-    * ASSIGNED – Task has been assigned to a user but not yet completed.
-    * COMPLETED – Task has been finished and marked as such.
-    """
-    PENDING = "pending"
-    ASSIGNED = "assigned"
-    COMPLETED = "completed"
+            if milestone:
+                if task_id not in self.milestones:
+                    self.milestones[task_id] = []
+                self.milestones[task_id].append({
+                    "milestone": milestone,
+                    "timestamp": datetime.utcnow().isoformat()
+                })
 
-    def __str__(self) -> str:
-        return self.value
+        await self._broadcast_update()
 
-
-@dataclass
-class Task:
-    """
-    Lightweight representation of a task.
-
-    Attributes
-    ----------
-    id : int
-        Unique identifier for the task.
-    title : str
-        Short description of the task.
-    status : TaskStatus
-        Current status of the task.
-    assigned_to : Optional[str]
-        Username of the user the task is assigned to.
-    """
-    id: int
-    title: str
-    status: TaskStatus = TaskStatus.PENDING
-    assigned_to: Optional[str] = None
-
-    def assign(self, user: str) -> None:
-        """Assign the task to a user and transition status to ASSIGNED."""
-        self.assigned_to = user
-        self.status = TaskStatus.ASSIGNED
-
-    def complete(self) -> None:
-        """Mark the task as completed."""
-        if self.status != TaskStatus.ASSIGNED:
-            raise ValueError(
-                f"Cannot complete task {self.id} because it is not assigned."
+    async def _broadcast_update(self):
+        message = json.dumps({
+            "type": "TASK_UPDATE",
+            "tasks": self.tasks,
+            "milestones": self.milestones
+        })
+        if self.active_connections:
+            await asyncio.gather(
+                *[conn.send(message) for conn in self.active_connections]
             )
-        self.status = TaskStatus.COMPLETED
+        socketio.emit('task_update', message)
 
-    def is_completed(self) -> bool:
-        """Return True if the task is completed."""
-        return self.status == TaskStatus.COMPLETED
+    @app.route('/api/tasks', methods=['GET'])
+    def get_tasks():
+        return jsonify({
+            "tasks": manager.tasks,
+            "milestones": manager.milestones
+        })
 
+manager = TaskStatusManager()
 
-def auto_mark_completed(tasks: Iterable[Task]) -> List[Task]:
-    """
-    Iterate over a collection of tasks and automatically mark any that
-    have been flagged as completed by the user.
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
 
-    The function expects that a task is considered "completed" if it
-    has an `assigned_to` value and its status is still ASSIGNED.  In
-    real-world usage this could be replaced by a check against a
-    completion flag or external event.
+async def websocket_handler(websocket, path):
+    await manager.connect(websocket)
 
-    Parameters
-    ----------
-    tasks : Iterable[Task]
-        Collection of tasks to process.
+def start_websocket_server():
+    start_server = websockets.serve(
+        websocket_handler,
+        "0.0.0.0",
+        8765,
+        ping_interval=20
+    )
+    asyncio.get_event_loop().run_until_complete(start_server)
+    asyncio.get_event_loop().run_forever()
 
-    Returns
-    -------
-    List[Task]
-        List of tasks that were updated to COMPLETED.
-    """
-    updated: List[Task] = []
-    for task in tasks:
-        # In this simplified model we assume that any assigned task
-        # with a non-empty `assigned_to` field is ready to be marked
-        # as completed.  The caller can provide additional logic
-        # (e.g., checking a `completed_flag` attribute).
-        if task.status == TaskStatus.ASSIGNED and task.assigned_to:
-            try:
-                task.complete()
-                updated.append(task)
-            except ValueError:
-                # Should not happen in this context; ignore.
-                pass
-    return updated
+if __name__ == "__main__":
+    start_websocket_server()

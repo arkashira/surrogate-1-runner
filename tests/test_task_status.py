@@ -1,45 +1,42 @@
-"""
-Unit tests for the task status module.
-"""
-
 import pytest
+import asyncio
+import websockets
+import json
+from datetime import datetime, timedelta
+from task_status import TaskStatusManager, app
 
-from task_status import Task, TaskStatus, auto_mark_completed
+@pytest.mark.asyncio
+async def test_realtime_updates():
+    manager = TaskStatusManager()
 
+    # Test initial state
+    async with websockets.connect("ws://localhost:8765") as websocket:
+        response = await websocket.recv()
+        data = json.loads(response)
+        assert data["type"] == "INITIAL_STATE"
+        assert len(data["tasks"]) == 0
 
-def test_task_assignment_and_completion():
-    task = Task(id=1, title="Test task")
-    assert task.status == TaskStatus.PENDING
-    assert task.assigned_to is None
+        # Update task and verify broadcast
+        task_id = "T-001"
+        await manager.update_task(
+            task_id,
+            "IN_PROGRESS",
+            deadline=(datetime.utcnow() + timedelta(days=7)).isoformat(),
+            milestone="RESEARCH_PHASE"
+        )
 
-    # Assign the task
-    task.assign("alice")
-    assert task.status == TaskStatus.ASSIGNED
-    assert task.assigned_to == "alice"
+        response = await websocket.recv()
+        data = json.loads(response)
+        assert data["type"] == "TASK_UPDATE"
+        assert task_id in data["tasks"]
+        assert data["tasks"][task_id]["status"] == "IN_PROGRESS"
+        assert "milestone" in data["tasks"][task_id]
+        assert len(data["milestones"][task_id]) == 1
 
-    # Complete the task
-    task.complete()
-    assert task.status == TaskStatus.COMPLETED
-    assert task.is_completed()
-
-
-def test_auto_mark_completed():
-    # Create a mix of tasks
-    tasks = [
-        Task(id=1, title="Pending task"),
-        Task(id=2, title="Assigned task", status=TaskStatus.ASSIGNED, assigned_to="bob"),
-        Task(id=3, title="Completed task", status=TaskStatus.COMPLETED, assigned_to="carol"),
-        Task(id=4, title="Assigned but no user", status=TaskStatus.ASSIGNED),
-    ]
-
-    updated = auto_mark_completed(tasks)
-
-    # Only the second task should be updated
-    assert len(updated) == 1
-    assert updated[0].id == 2
-    assert updated[0].status == TaskStatus.COMPLETED
-
-    # Ensure other tasks remain unchanged
-    assert tasks[0].status == TaskStatus.PENDING
-    assert tasks[2].status == TaskStatus.COMPLETED
-    assert tasks[3].status == TaskStatus.ASSIGNED
+def test_rest_api():
+    client = app.test_client()
+    response = client.get('/api/tasks')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "tasks" in data
+    assert "milestones" in data
