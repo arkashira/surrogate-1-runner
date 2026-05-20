@@ -1,0 +1,10 @@
+tasks:
+  - name: task1
+    func: monitor_task_execution
+    interval: 1
+  - name: task2
+    func: control_task_execution
+    interval: 2
+  - name: task3
+    func: maintain_task_logs
+    interval: 3
