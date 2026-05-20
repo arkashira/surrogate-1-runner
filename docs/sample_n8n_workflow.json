@@ -1,0 +1,55 @@
+{
+  "name": "Axentx Surrogate-1 Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/dataset.json"
+      },
+      "name": "Get Dataset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        100,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionName": "parseJson"
+      },
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        300,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "file": "={{$json["filename"]}}"
+      },
+      "name": "Upload to Dataset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        500,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Get Dataset": {
+      "main": [
+        "Parse JSON"
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        "Upload to Dataset"
+      ]
+    }
+  }
+}
