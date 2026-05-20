@@ -1,28 +1,23 @@
-"""
-A minimal, self‑contained CLI that prints the battery health score,
-a timestamp, and a recommendation.  It exits with 0 if the score is
-≥ 50, otherwise 1.
-"""
+import argparse
+from telemetry import send_telemetry
+from config import get_config
 
-import sys
-from datetime import datetime
-from .health import get_battery_health_score
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', help='Command to execute')
+    parser.add_argument('--disable-telemetry', action='store_true', help='Disable telemetry')
+    args = parser.parse_args()
 
-def main(argv=None) -> int:
-    score = get_battery_health_score()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    recommendation = (
-        "Replace the battery soon."
-        if score < 50
-        else "Battery is in good condition."
-    )
-    print(
-        f"Battery health score: {score} "
-        f"({'OK' if score >= 50 else 'CRITICAL'})\n"
-        f"Last updated: {timestamp}\n"
-        f"Recommendation: {recommendation}"
-    )
-    return 0 if score >= 50 else 1
+    if args.disable_telemetry:
+        config = get_config()
+        config.telemetry_enabled = False
+        config.save()
 
-if __name__ == "__main__":
-    sys.exit(main())
+    # Execute command
+    print(f'Executing command: {args.command}')
+
+    # Send telemetry
+    send_telemetry(args.command, '2023-03-01 12:00:00', 'Ubuntu 20.04')
+
+if __name__ == '__main__':
+    main()
