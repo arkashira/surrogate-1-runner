@@ -1,9 +1,8 @@
-export interface InvestorCriteria {
-  industry: string;
-  fundingStage: string;
-  geographicFocus: string;
-}
-
-export interface InvestorCriteriaFormData extends InvestorCriteria {
-  isValid: boolean;
+export interface Variant {
+  id: string;
+  name: string;
+  openaiCompatibility: 'full' | 'partial' | 'none';
+  modelContextProtocolVersion: string;
+  containerizationRequirements: string[];
+  harnessPatternType: 'serverless' | 'streaming' | 'batch';
 }
