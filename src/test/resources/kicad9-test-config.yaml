@@ -1,0 +1,15 @@
+kicad:
+  version: "9.0.0"
+  api_url: "http://localhost:8080/api/v1"
+  timeout_ms: 5000
+  retries: 3
+test:
+  workflow:
+    name: "kicad9-compatibility-test"
+    steps:
+      - name: "Initialize KiCAD 9 API"
+        action: "initialize"
+      - name: "Execute Compatibility Check"
+        action: "check_compatibility"
+      - name: "Validate Results"
+        action: "validate_results"
