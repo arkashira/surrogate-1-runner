@@ -1,51 +1,25 @@
-name: Ingest
+name: Ingest Public Datasets
+
 on:
-  workflow_call:
-    inputs:
-      source_url:
-        required: true
-        type: string
-      target_path:
-        required: true
-        type: string
-      schema:
-        required: false
-        type: string   # JSON‑Schema string (or path to file)
-      batch_size:
-        required: false
-        type: number
-        default: 1000
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 minutes
+  workflow_dispatch:
+
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    strategy:
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install utilities
-        run: |
-          python -m pip install --quiet pandas jsonschema tqdm
-
-      - name: Download source
-        env:
-          SRC: ${{ inputs.source_url }}
-        run: |
-          mkdir -p ${{ inputs.target_path }}
-          curl -L "$SRC" -o raw_data.tmp
-          # If the source is a CSV/JSON stream we pipe through tqdm for progress
-          # (replace with your own downloader if needed)
-
-      - name: Validate & Normalize (optional)
-        if: inputs.schema != ''
-        run: |
-          python scripts/validate_schema.py \
-            --input raw_data.tmp \
-            --schema "${{ inputs.schema }}" \
-            --output ${{ inputs.target_path }}/normalized.parquet \
-            --batch-size ${{ inputs.batch_size }}
-
-      - name: Upload raw artifact
-        uses: actions/upload-artifact@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: raw-data
-          path: ${{ inputs.target_path }}/
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run shard
+        env:
+          SHARD_ID: ${{ matrix.shard }}
+        run: python bin/dataset‑enrich.py
