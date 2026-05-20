@@ -1,27 +1,69 @@
-from typing import List
+import paramiko
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+from .security_alerts import trigger_security_alert
 
 class TerminalSession:
-    def __init__(self, session_id: str, owner: str):
-        self.session_id = session_id
-        self.owner = owner
-        self.users: List[str] = [owner]
-        self.output_buffer = []
+    def __init__(self, host, port=22):
+        self.host = host
+        self.port = port
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    def add_user(self, user: str):
-        if user not in self.users:
-            self.users.append(user)
+    def register_ssh_key(self, public_key_str):
+        # Simulate admin approval process
+        approved = self._admin_approval(public_key_str)
+        if not approved:
+            raise Exception("SSH key registration failed due to lack of admin approval.")
+        
+        # Store the approved public key
+        self.public_key = serialization.load_ssh_public_key(
+            public_key_str.encode(),
+            backend=default_backend()
+        )
 
-    def remove_user(self, user: str):
-        if user in self.users:
-            self.users.remove(user)
+    def _admin_approval(self, public_key_str):
+        # Placeholder for actual admin approval logic
+        return True  # Assume admin always approves for demo purposes
 
-    def add_output(self, data: str):
-        self.output_buffer.append(data)
-        self.broadcast(data)
+    def create_encrypted_tunnel(self):
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()
+        )
+        pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        self.client.connect(self.host, self.port, pkey=private_key)
 
-    def broadcast(self, data: str):
-        # In a real implementation, this would send data to all connected users
-        pass
+    def validate_ssh_tunnel(self):
+        try:
+            stdin, stdout, stderr = self.client.exec_command('whoami')
+            response = stdout.read().decode()
+            if 'root' in response:
+                return True
+            else:
+                trigger_security_alert("Failed login attempt detected.")
+                return False
+        except Exception as e:
+            trigger_security_alert(f"Exception during SSH tunnel validation: {str(e)}")
+            return False
 
-    def get_output(self) -> List[str]:
-        return self.output_buffer.copy()
+    def close(self):
+        self.client.close()
+
+# Example usage
+if __name__ == "__main__":
+    session = TerminalSession('example.com')
+    public_key = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD...'
+    session.register_ssh_key(public_key)
+    session.create_encrypted_tunnel()
+    if session.validate_ssh_tunnel():
+        print("SSH tunnel validated successfully.")
+    else:
+        print("SSH tunnel validation failed.")
+    session.close()
