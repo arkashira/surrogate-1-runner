@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost Alert Notification</title>
+<style>
+    /* Base container – subtle yellow background, golden border */
+    .notification {
+        border: 1px solid #ffcc00;
+        background-color: #fff3cd;
+        padding: 20px;
+        margin: 20px auto;
+        border-radius: 5px;
+        max-width: 600px;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    .notification-title {
+        color: #856404;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    .notification-message {
+        margin-top: 10px;
+        font-size: 1rem;
+    }
+    .notification-details {
+        margin-top: 10px;
+        font-size: 0.9rem;
+        color: #5a5a5a;
+    }
+</style>
+</head>
+<body>
+<div class="notification">
+    <div class="notification-title">Cost Alert Notification</div>
+    <div class="notification-message" id="notification-message">
+        <!-- Message will be inserted here by JavaScript -->
+    </div>
+    <div class="notification-details" id="notification-details">
+        <!-- Details will be inserted here by JavaScript -->
+    </div>
+</div>
+
+<script>
+/**
+ * Populate the notification with real data.
+ * The backend should inject the values into the script block
+ * or expose them via a global variable / API call.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    // Example data – replace with dynamic values from your backend
+    const message = "Your cloud costs have exceeded the threshold of $1,000 for the current billing period.";
+    const details = "Current cost: $1,250.00 | Threshold: $1,000.00 | Period: May 2023";
+
+    document.getElementById('notification-message').textContent = message;
+    document.getElementById('notification-details').textContent = details;
+});
+</script>
+</body>
+</html>
