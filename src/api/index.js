@@ -1,15 +1,14 @@
+const express = require('express');
+const prometheusExporter = require('./monitoring/prometheusExporter');
 
-import Vue from 'vue'
-import VueAxios from 'vue-axios'
-import CostData from './costData'
+const app = express();
 
-Vue.use(VueAxios, axios)
+// Add your existing API routes here
+app.get('/api/endpoint', (req, res) => {
+  res.json({ message: 'API response' });
+});
 
-export default new Vue({
-  data: {
-    costData: null
-  },
-  created() {
-    this.costData = CostData.fetchCostData()
-  }
-})
+// Mount Prometheus exporter
+app.use('/metrics', prometheusExporter);
+
+module.exports = app;
