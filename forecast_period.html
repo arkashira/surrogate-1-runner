@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Future Cost Forecast</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1   { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .controls { margin-bottom: 15px; }
+    label { margin-right: 10px; }
+    select { padding: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    #loading { display: none; font-style: italic; }
+    /* Accessibility: focus outline for keyboard users */
+    select:focus, button:focus { outline: 2px solid #005fcc; }
+  </style>
+</head>
+<body>
+  <h1>Future Cost Forecast</h1>
+
+  <div class="controls">
+    <label for="period-select">Forecast Period:</label>
+    <select id="period-select" aria-label="Select forecast period">
+      <option value="7">7 days</option>
+      <option value="30">30 days</option>
+      <option value="90">90 days</option>
+      <option value="180">180 days</option>
+    </select>
+  </div>
+
+  <div id="loading" role="status" aria-live="polite">
+    Loading forecast data…
+  </div>
+
+  <table id="forecast-table" aria-live="polite">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Estimated Cost ($)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    /* ---------- Utility: Show / hide loading indicator ---------- */
+    const loadingEl = document.getElementById('loading');
+    const setLoading = (visible) => {
+      loadingEl.style.display = visible ? 'block' : 'none';
+    };
+
+    /* ---------- Fetch and render forecast data ---------- */
+    async function fetchForecast(period) {
+      setLoading(true);
+      const tbody = document.querySelector('#forecast-table tbody');
+      tbody.innerHTML = ''; // clear previous rows
+
+      try {
+        const res = await fetch(`/api/forecast?period=${period}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json(); // expected: [{date: 'YYYY‑MM‑DD', cost: 123.45}, ...]
+
+        data.forEach(entry => {
+          const tr = document.createElement('tr');
+
+          const dateTd = document.createElement('td');
+          dateTd.textContent = entry.date; // safe: no innerHTML
+          tr.appendChild(dateTd);
+
+          const costTd = document.createElement('td');
+          costTd.textContent = entry.cost.toFixed(2);
+          tr.appendChild(costTd);
+
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Failed to load forecast:', err);
+        tbody.innerHTML = '<tr><td colspan="2">Error loading forecast data.</td></tr>';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /* ---------- Event listeners ---------- */
+    const periodSelect = document.getElementById('period-select');
+    periodSelect.addEventListener('change', () => fetchForecast(periodSelect.value));
+
+    /* ---------- Initial load ---------- */
+    fetchForecast(periodSelect.value);
+  </script>
+</body>
+</html>
