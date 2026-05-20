@@ -1,44 +1,53 @@
 import os
 import json
+import csv
 import unittest
-from datetime import datetime
-from src.storage import PerformanceMetricsStorage
+from storage import SecureLogStorage
 
-class TestPerformanceMetricsStorage(unittest.TestCase):
+class TestSecureLogStorage(unittest.TestCase):
     def setUp(self):
-        self.storage = PerformanceMetricsStorage("test_performance_metrics")
-        self.test_workflow_id = "test_workflow_123"
-        self.test_metrics = {
-            "execution_time": 10.5,
-            "memory_usage": 2048,
-            "status": "completed"
-        }
+        self.storage = SecureLogStorage(log_dir="test_logs")
+        self.user_details = {"username": "admin", "role": "IT Administrator"}
+        self.model_access = {"model_name": "AI Model", "access_type": "read"}
 
     def tearDown(self):
-        for file_name in os.listdir(self.storage.storage_path):
-            os.remove(os.path.join(self.storage.storage_path, file_name))
-        os.rmdir(self.storage.storage_path)
+        for f in os.listdir(self.storage.log_dir):
+            os.remove(os.path.join(self.storage.log_dir, f))
+        os.rmdir(self.storage.log_dir)
 
-    def test_save_metrics(self):
-        self.storage.save_metrics(self.test_workflow_id, self.test_metrics)
-        files = os.listdir(self.storage.storage_path)
-        self.assertEqual(len(files), 1)
-        with open(os.path.join(self.storage.storage_path, files[0]), 'r') as f:
-            saved_metrics = json.load(f)
-        self.assertEqual(saved_metrics["workflow_id"], self.test_workflow_id)
-        self.assertEqual(saved_metrics["execution_time"], self.test_metrics["execution_time"])
-        self.assertEqual(saved_metrics["memory_usage"], self.test_metrics["memory_usage"])
-        self.assertEqual(saved_metrics["status"], self.test_metrics["status"])
+    def test_log_access(self):
+        self.storage.log_access(self.user_details, self.model_access)
+        log_files = [f for f in os.listdir(self.storage.log_dir) if f.endswith('.json')]
+        self.assertEqual(len(log_files), 1)
+        with open(os.path.join(self.storage.log_dir, log_files[0]), 'r') as f:
+            log_entry = json.load(f)
+        self.assertEqual(log_entry["user_details"], self.user_details)
+        self.assertEqual(log_entry["model_access"], self.model_access)
 
-    def test_load_metrics(self):
-        self.storage.save_metrics(self.test_workflow_id, self.test_metrics)
-        loaded_metrics = self.storage.load_metrics(self.test_workflow_id)
-        self.assertEqual(len(loaded_metrics), 1)
-        for file_name, metrics in loaded_metrics.items():
-            self.assertEqual(metrics["workflow_id"], self.test_workflow_id)
-            self.assertEqual(metrics["execution_time"], self.test_metrics["execution_time"])
-            self.assertEqual(metrics["memory_usage"], self.test_metrics["memory_usage"])
-            self.assertEqual(metrics["status"], self.test_metrics["status"])
+    def test_export_logs_csv(self):
+        self.storage.log_access(self.user_details, self.model_access)
+        output_file = "test_access_logs.csv"
+        self.storage.export_logs("csv", output_file)
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, 'r') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["user_details"], json.dumps(self.user_details))
+        self.assertEqual(rows[0]["model_access"], json.dumps(self.model_access))
+        os.remove(output_file)
 
-if __name__ == '__main__':
+    def test_export_logs_json(self):
+        self.storage.log_access(self.user_details, self.model_access)
+        output_file = "test_access_logs.json"
+        self.storage.export_logs("json", output_file)
+        self.assertTrue(os.path.exists(output_file))
+        with open(output_file, 'r') as f:
+            logs = json.load(f)
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["user_details"], self.user_details)
+        self.assertEqual(logs[0]["model_access"], self.model_access)
+        os.remove(output_file)
+
+if __name__ == "__main__":
     unittest.main()

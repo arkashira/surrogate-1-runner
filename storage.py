@@ -1,51 +1,49 @@
-from __future__ import annotations
-from abc import ABC, abstractmethod
-from typing import Dict, Iterable, Optional
-from task import Task
+import os
+import json
+import csv
+from datetime import datetime
+from typing import Dict, List, Union
 
+class SecureLogStorage:
+    def __init__(self, log_dir: str = "logs"):
+        self.log_dir = log_dir
+        os.makedirs(self.log_dir, exist_ok=True)
 
-class TaskStore(ABC):
-    """Abstract interface for task persistence."""
+    def log_access(self, user_details: Dict[str, str], model_access: Dict[str, str]) -> None:
+        timestamp = datetime.now().isoformat()
+        log_entry = {
+            "timestamp": timestamp,
+            "user_details": user_details,
+            "model_access": model_access
+        }
+        log_file = os.path.join(self.log_dir, f"access_log_{timestamp.replace(':', '-')}.json")
+        with open(log_file, 'w') as f:
+            json.dump(log_entry, f, indent=4)
 
-    @abstractmethod
-    def add(self, task: Task) -> Task: ...
+    def export_logs(self, export_format: str, output_file: str) -> None:
+        log_files = [f for f in os.listdir(self.log_dir) if f.endswith('.json')]
+        logs = []
+        for log_file in log_files:
+            with open(os.path.join(self.log_dir, log_file), 'r') as f:
+                logs.append(json.load(f))
 
-    @abstractmethod
-    def get(self, task_id: str) -> Optional[Task]: ...
+        if export_format.lower() == 'csv':
+            with open(output_file, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=["timestamp", "user_details", "model_access"])
+                writer.writeheader()
+                for log in logs:
+                    writer.writerow(log)
+        elif export_format.lower() == 'json':
+            with open(output_file, 'w') as f:
+                json.dump(logs, f, indent=4)
+        else:
+            raise ValueError("Unsupported export format. Use 'csv' or 'json'.")
 
-    @abstractmethod
-    def list(self, *, user_id: Optional[str] = None) -> Iterable[Task]: ...
-
-    @abstractmethod
-    def update(self, task_id: str, **changes) -> Optional[Task]: ...
-
-    @abstractmethod
-    def delete(self, task_id: str) -> bool: ...
-
-
-class InMemoryTaskStore(TaskStore):
-    """Simple in‑memory store – replace with DB in prod."""
-
-    def __init__(self) -> None:
-        self._store: Dict[str, Task] = {}
-
-    def add(self, task: Task) -> Task:
-        self._store[task.id] = task
-        return task
-
-    def get(self, task_id: str) -> Optional[Task]:
-        return self._store.get(task_id)
-
-    def list(self, *, user_id: Optional[str] = None) -> Iterable[Task]:
-        if user_id:
-            return (t for t in self._store.values() if t.assignee == user_id)
-        return self._store.values()
-
-    def update(self, task_id: str, **changes) -> Optional[Task]:
-        task = self._store.get(task_id)
-        if task:
-            task.update(**changes)
-        return task
-
-    def delete(self, task_id: str) -> bool:
-        return self._store.pop(task_id, None) is not None
+# Example usage
+if __name__ == "__main__":
+    storage = SecureLogStorage()
+    user_details = {"username": "admin", "role": "IT Administrator"}
+    model_access = {"model_name": "AI Model", "access_type": "read"}
+    storage.log_access(user_details, model_access)
+    storage.export_logs("csv", "access_logs.csv")
+    storage.export_logs("json", "access_logs.json")
