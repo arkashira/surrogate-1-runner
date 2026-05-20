@@ -1,0 +1,83 @@
+name: LLMIntegrationPattern
+version: 1.0.0
+description: A reusable LLM integration pattern with versioning support
+properties:
+  name:
+    type: string
+    description: Unique identifier for the pattern
+    example: "openai-chat-completion"
+  version:
+    type: string
+    description: Semantic version of the pattern
+    example: "1.0.0"
+  description:
+    type: string
+    description: Human-readable description of the pattern
+    example: "OpenAI Chat Completions API integration"
+  config:
+    type: object
+    description: Configuration parameters for the LLM integration
+    properties:
+      model:
+        type: string
+        description: LLM model to use
+        example: "gpt-4"
+      temperature:
+        type: number
+        description: Sampling temperature
+        minimum: 0
+        maximum: 2
+        example: 0.7
+      max_tokens:
+        type: integer
+        description: Maximum number of tokens to generate
+        example: 1000
+    required:
+      - model
+  inputs:
+    type: array
+    description: List of input parameters expected by the pattern
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the input parameter
+        type:
+          type: string
+          description: Type of the input (string, number, boolean, array, object)
+        required:
+          type: boolean
+          description: Whether this input is required
+        description:
+          type: string
+          description: Description of the input parameter
+      required:
+        - name
+        - type
+        - required
+  outputs:
+    type: array
+    description: List of output parameters provided by the pattern
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the output parameter
+        type:
+          type: string
+          description: Type of the output (string, number, boolean, array, object)
+        description:
+          type: string
+          description: Description of the output parameter
+      required:
+        - name
+        - type
+required:
+  - name
+  - version
+  - description
+  - config
+  - inputs
+  - outputs
