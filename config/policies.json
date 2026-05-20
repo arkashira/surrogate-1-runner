@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "name": "Data Privacy",
+    "description": "Enforce data privacy rules.",
+    "rules": [
+      {
+        "type": "data_access",
+        "allowed_users": ["admin", "data_scientist"]
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Model Usage",
+    "description": "Control how models are used.",
+    "rules": [
+      {
+        "type": "model_execution",
+        "allowed_models": ["model1", "model2"]
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Access Controls",
+    "description": "Manage access permissions.",
+    "rules": [
+      {
+        "type": "access_control",
+        "allowed_ips": ["192.168.1.1", "192.168.1.2"]
+      }
+    ]
+  }
+]
