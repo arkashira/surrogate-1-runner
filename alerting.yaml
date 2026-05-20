@@ -1,0 +1,9 @@
+# Configuration for drift detection alerting to Slack
+slack:
+  webhook_url: "http://localhost:9000/webhook"
+  channel: "#oncall-drift"
+  # Rate limit: Slack allows 1 message per second per bot
+  rate_limit_delay: 1.0
+  # Retry configuration
+  max_retries: 3
+  retry_base_delay: 1.0  # seconds, exponential backoff multiplier
