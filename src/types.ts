@@ -1,14 +1,7 @@
-export interface CostAnomaly {
+export interface OptimizationSuggestion {
   id: string;
-  severity: string;
-  type: string;
-  timestamp: string;
+  title: string;
   description: string;
-  remediation: string;
-}
-
-export interface CostAnomalyFilter {
-  severity?: string;
-  type?: string;
-  timeRange?: string;
+  action: string;
+  acknowledged?: boolean; // added by API
 }
