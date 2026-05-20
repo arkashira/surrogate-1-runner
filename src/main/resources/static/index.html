@@ -1,17 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Performance Comparison</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        .dashboard {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .resource-type {
+            margin-bottom: 10px;
+        }
+        .cost-data {
+            margin-bottom: 5px;
+        }
+        #chart {
+            width: 100%;
+            height: 400px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
 </head>
 <body>
-  <h1>Current Rig's Performance</h1>
-  <div id="current-rig-data"></div>
+    <div class="dashboard">
+        <h1>Cost Breakdown by Resource Type</h1>
+        <div id="cost-breakdown"></div>
+        <canvas id="chart"></canvas>
+        <table id="table">
+            <thead>
+                <tr>
+                    <th>Resource Type</th>
+                    <th>Cost (USD)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 
-  <h1>Proposed Upgrade's Performance</h1>
-  <div id="proposed-upgrade-data"></div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Mock data structure for demonstration purposes
+        const costData = [
+            { resourceType: 'Compute', cost: 1500 },
+            { resourceType: 'Storage', cost: 800 },
+            { resourceType: 'Networking', cost: 300 },
+            // Add more resource types as needed
+        ];
 
-  <script src="app.js"></script>
+        async function fetchCostData() {
+            try {
+                const res = await fetch('/api/costs'); // endpoint should return JSON array [{type, cost}]
+                if (!res.ok) throw new Error('Network response was not ok');
+                return await res.json();
+            } catch (e) {
+                console.error('Failed to fetch cost data:', e);
+                return [];
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('chart').getContext('2d');
+            const labels = data.map(d => d.type);
+            const costs = data.map(d => d.cost);
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: costs,
+                        backgroundColor: [
+                            '#4caf50', '#2196f3', '#ff9800', '#f44336', '#9c27b0',
+                            '#3f51b5', '#00bcd4', '#8bc34a', '#ffeb3b', '#795548'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.querySelector('#table tbody');
+            tbody.innerHTML = '';
+            data.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${d.type}</td><td>${d.cost.toFixed(2)}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateDashboard() {
+            const costBreakdownDiv = document.getElementById('cost-breakdown');
+            costBreakdownDiv.innerHTML = ''; // Clear existing content
+
+            costData.forEach(data => {
+                const resourceTypeDiv = document.createElement('div');
+                resourceTypeDiv.className = 'resource-type';
+                resourceTypeDiv.innerHTML = `
+                    <strong>${data.resourceType}:</strong>
+                    <span class="cost-data">$${data.cost.toFixed(2)}</span>
+                `;
+                costBreakdownDiv.appendChild(resourceTypeDiv);
+            });
+        }
+
+        async function init() {
+            const data = await fetchCostData();
+            renderChart(data);
+            renderTable(data);
+            updateDashboard();
+        }
+
+        // Poll every 30 seconds for real‑time updates
+        init();
+        setInterval(init, 30000);
+    </script>
 </body>
 </html>
