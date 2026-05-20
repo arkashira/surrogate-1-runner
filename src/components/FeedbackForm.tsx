@@ -1,28 +1,60 @@
 import React, { useState } from 'react';
+import { storeFeedback } from '../utils/feedbackStorage';
+import { analyzeFeedback } from '../utils/feedbackAnalysis';
 
 interface FeedbackFormProps {
-  onSubmit: (feedback: string) => void;
+  onSuccess?: (result: any) => void;
+  onError?: (error: any) => void;
 }
 
-export const FeedbackForm: React.FC<FeedbackFormProps> = ({ onSubmit }) => {
-  const [feedback, setFeedback] = useState<string>('');
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ onSuccess, onError }) => {
+  const [feedback, setFeedback] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(feedback);
-    setFeedback('');
+    if (!feedback.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const stored = await storeFeedback(feedback);
+      const analysed = await analyzeFeedback(feedback);
+      setAnalysis(analysed);
+      onSuccess?.({ stored, analysed });
+    } catch (err) {
+      onError?.(err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="feedback-form">
-      <h2>Provide Feedback</h2>
-      <textarea
-        value={feedback}
-        onChange={(e) => setFeedback(e.target.value)}
-        placeholder="Enter your feedback here..."
-        required
-      />
-      <button type="submit">Submit Feedback</button>
+      <label htmlFor="feedback">
+        Feedback:
+        <textarea
+          id="feedback"
+          name="feedback"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          required
+          rows={5}
+          cols={40}
+        />
+      </label>
+      <button type="submit" disabled={submitting}>
+        {submitting ? 'Submitting…' : 'Submit'}
+      </button>
+
+      {analysis && (
+        <div className="feedback-analysis">
+          <h4>Analysis Result</h4>
+          <pre>{JSON.stringify(analysis, null, 2)}</pre>
+        </div>
+      )}
     </form>
   );
 };
+
+export default FeedbackForm;
