@@ -1,35 +1,55 @@
-import sys
-from tool_setup import setup_tools, display_tooltips
+import os
+from tool_setup import ToolSetup
 
-def main():
-    print("Welcome to the AxentX Setup Wizard!")
-    print("This process will guide you through setting up your tools.\n")
+class SetupWizard:
+    def __init__(self):
+        self.tool_setup = ToolSetup()
+        self.selected_tools = []
+    
+    def run(self):
+        print("🚀 Welcome to AxentX Tool Setup Wizard!")
+        print("This will take less than 5 minutes. Let's get you started...")
+        
+        if not self.select_tools():
+            return False
+        if not self.configure_settings():
+            return False
+        if not self.finalize_setup():
+            return False
+            
+        print("\n✅ Setup complete! Your tools are ready to use.")
+        return True
+    
+    def select_tools(self):
+        print("\n1️⃣ Step 1: Select Tools")
+        print("Available tools:")
+        for i, tool in enumerate(self.tool_setup.available_tools, 1):
+            print(f"  {i}. {tool['name']} - {tool['description']}")
+            
+        while True:
+            choice = input("\nEnter numbers separated by spaces (or 'q' to quit): ")
+            if choice.lower() == 'q':
+                return False
+                
+            try:
+                indices = [int(x)-1 for x in choice.split()]
+                self.selected_tools = [self.tool_setup.available_tools[i] for i in indices if 0 <= i < len(self.tool_setup.available_tools)]
+                return True
+            except:
+                print("❌ Invalid selection. Try again.")
 
-    # Step 1: Introduction
-    print("Step 1: Introduction")
-    print("-------------------")
-    print("The setup process will take less than 5 minutes.")
-    print("You will be guided through each step with clear instructions.\n")
-    input("Press Enter to continue...")
-
-    # Step 2: Tool Setup
-    print("\nStep 2: Tool Setup")
-    print("------------------")
-    print("We will now set up the necessary tools for you.")
-    print("Follow the on-screen instructions.\n")
-    setup_tools()
-
-    # Step 3: Tooltips and Instructions
-    print("\nStep 3: Tooltips and Instructions")
-    print("-------------------------------")
-    print("Here are some helpful tooltips to get you started:")
-    display_tooltips()
-
-    # Step 4: Completion
-    print("\nStep 4: Completion")
-    print("------------------")
-    print("Congratulations! Your tools have been set up successfully.")
-    print("You can now start creating content right away.\n")
+    def configure_settings(self):
+        print("\n2️⃣ Step 2: Configure Settings")
+        # Add actual configuration logic here
+        return True
+    
+    def finalize_setup(self):
+        print("\n3️⃣ Step 3: Finalizing Setup")
+        for tool in self.selected_tools:
+            print(f"Installing {tool['name']}...")
+            self.tool_setup.install_tool(tool['name'])
+        return True
 
 if __name__ == "__main__":
-    main()
+    wizard = SetupWizard()
+    wizard.run()
