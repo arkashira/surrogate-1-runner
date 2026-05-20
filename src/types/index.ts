@@ -1,20 +1,23 @@
-export interface PricingData {
-  price: number;
-  currency: string;
-  source: string;
-  timestamp: string;
+export interface Dashboard {
+  id: number;
+  name: string;
 }
 
-export interface TrendData {
-  trend: 'upward' | 'downward' | 'stable';
-  volume: number;
-  category: string;
-  timestamp: string;
+export interface Alert {
+  id: number;
+  name: string;
 }
 
-export interface ApiConfig {
-  apiKey: string;
-  baseUrl: string;
-  timeout?: number;
-  retries?: number;
+/** Description of a pricing tier */
+export interface TierFeatures {
+  /** Human readable name */
+  name: string;
+  /** Number of dashboards – `unlimited` or a concrete count */
+  dashboards: number | 'unlimited';
+  /** Number of alerts – `-1` means unlimited */
+  alerts: number;
+  /** Is API access included? */
+  apiAccess: boolean;
+  /** Is the web UI included? */
+  webInterface: boolean;
 }
