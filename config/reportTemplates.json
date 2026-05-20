@@ -1,0 +1,25 @@
+{
+  "complianceReport": {
+    "template": "Compliance Report for {{startDate}} to {{endDate}}\n\nToken usage by model:\n{{#tokenUsage}}\n- {{model}}: {{tokens}} tokens\n{{/tokenUsage}}\n\nBudget alerts:\n{{#budgetAlerts}}\n- {{model}}: {{alertMessage}}\n{{/budgetAlerts}}",
+    "data": {
+      "startDate": "{{startDate}}",
+      "endDate": "{{endDate}}",
+      "tokenUsage": [
+        {
+          "model": "model1",
+          "tokens": 1000000
+        },
+        {
+          "model": "model2",
+          "tokens": 500000
+        }
+      ],
+      "budgetAlerts": [
+        {
+          "model": "model1",
+          "alertMessage": "Budget exceeded by 20%"
+        }
+      ]
+    }
+  }
+}
