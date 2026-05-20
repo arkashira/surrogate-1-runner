@@ -1,42 +1,37 @@
-name: CI
+# Dockerfile
+# -------------------------------------------------------------
+# Build image for the surrogate‑1 English module
+# -------------------------------------------------------------
+FROM python:3.11-slim
 
-on:
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+# Avoid creating .pyc files and keep logs to stdout
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-jobs:
-  compliance-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+# Install system deps needed for building wheels
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+# Install Poetry (pin to a stable version)
+RUN pip install --no-cache-dir poetry==1.8.3
 
-      - name: Set up Helm
-        run: |
-          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-          chmod 700 get_helm.sh
-          ./get_helm.sh
+# Work‑dir
+WORKDIR /app
 
-      - name: Run Compliance-Scan
-        id: compliance
-        uses: axentx/compliance-scan-action@v1
-        with:
-          scan-targets: 'terraform/,helm/'
-          output-format: 'github'
-          auto-remediate: true
+# Copy Poetry lockfiles first – Docker cache hit if deps unchanged
+COPY pyproject.toml poetry.lock ./
 
-      - name: Upload findings as PR comment
-        if: steps.compliance.outputs.findings_summary
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          message: |
-            ### 🔍 Compliance Scan Results
-            ${{ steps.compliance.outputs.findings_summary }}
-            
-            🛠️ Auto-remediation has been applied for fixable issues.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+# Install Python deps (no‑dev for production image)
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-dev
+
+# Copy the rest of the code
+COPY . .
+
+# Expose the default port (adjust if your app uses a different one)
+EXPOSE 8000
+
+# Default command – change to your entry‑point
+CMD ["python", "-m", "surrogate1.runner"]
