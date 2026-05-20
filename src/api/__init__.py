@@ -1,3 +1,5 @@
-from .diff_api import app
+from fastapi import APIRouter
+from .submit_template import router as submit_template_router
 
-__all__ = ['app']
+api_router = APIRouter()
+api_router.include_router(submit_template_router)
