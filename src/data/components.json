@@ -1,0 +1,20 @@
+[
+    {
+        "name": "Component A",
+        "cpu": "Intel i7",
+        "gpu": "NVIDIA GTX 1080",
+        "ram": "16GB"
+    },
+    {
+        "name": "Component B",
+        "cpu": "AMD Ryzen 5",
+        "gpu": "AMD Radeon RX 580",
+        "ram": "8GB"
+    },
+    {
+        "name": "Component C",
+        "cpu": "Intel i5",
+        "gpu": "NVIDIA GTX 1060",
+        "ram": "16GB"
+    }
+]
