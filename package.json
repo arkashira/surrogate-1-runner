@@ -1,20 +1,16 @@
 {
-  "name": "api-emulator",
-  "version": "1.0.0",
-  "main": "src/emulator/server.js",
-  "scripts": {
-    "start": "node src/emulator/server.js",
-    "dev": "nodemon src/emulator/server.js"
-  },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "express-rate-limit": "^6.8.1",
-    "helmet": "^7.0.0"
+    "dompurify": "^2.4.0",
+    "@types/dompurify": "^2.3.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "nodemon": "^3.0.1",
-    "typescript": "^5.0.0"
+    "@testing-library/react": "^13.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
   }
 }
