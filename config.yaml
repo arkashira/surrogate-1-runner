@@ -1,10 +1,53 @@
-email_service:
-  host: smtp.example.com
-  port: 587
-  username: your_email@example.com
-  password: your_email_password
-  from_email: no-reply@example.com
-  confirmation_subject: "Please confirm your email"
-  confirmation_template: "confirmation_email.html"
-  login_subject: "Welcome to our service"
-  login_template: "login_email.html"
+# Email template configuration for weekly marketing plan notifications
+
+email:
+  weekly_marketing_plan:
+    enabled: true
+    schedule:
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    
+    recipients:
+      - role: "founder"
+        template: "marketing_plan_weekly"
+    
+    template:
+      name: "marketing_plan_weekly"
+      subject: "Your Weekly Marketing Plan - {{ week_start_date }}"
+      from_address: "axentx@axentx.com"
+      from_name: "Axentx Marketing Assistant"
+      
+      body_template: |
+        Hi {{ founder_name }},
+
+        Here's your weekly marketing plan for {{ week_start_date }} to {{ week_end_date }}:
+
+        {{#items}}
+        ### {{ description }}
+        
+        **Expected Impact:** {{ expected_impact }}
+        
+        **Completion Checklist:**
+        {{#checklist_items}}
+        - [ ] {{ item }}
+        {{/checklist_items}}
+        ---
+        {{/items}}
+
+        Best,
+        Axentx Team
+
+      items_template:
+        min_count: 3
+        item_fields:
+          - description
+          - expected_impact
+          - checklist_items
+          - priority
+          - due_date
+
+    attachments:
+      - type: "dashboard_link"
+        url: "/dashboard/marketing-plans"
+        label: "View Full Plan"
