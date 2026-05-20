@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contract Change Dashboard</title>
+    <script src="https://cdn.plotly.com/plotly-2.4.2.min.js"></script>
+</head>
+<body>
+    {{ html.H1('Contract Change Dashboard') }}
+    {{ dcc.Interval(
+        id='interval-component',
+        interval=1*1000, # in milliseconds
+        n_intervals=0
+    ) }}
+    {{ html.Div(id='output-container') }}
+    <script>
+        Plotly.newPlot('myDiv', [
+            {
+                x: [1, 2, 3],
+                y: [1, 2, 3],
+                type: 'scatter'
+            }
+        ], {
+            title: 'Contract Changes',
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Change Count' }
+        }, 'myDiv');
+    </script>
+</body>
+</html>
