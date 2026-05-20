@@ -1,27 +1,33 @@
 name: CI
-
-on: [push, pull_request]
-
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Install Rust
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source $HOME/.cargo/env
-    - name: Build
-      run: |
-        source $HOME/.cargo/env
-        cargo build --release
-    - name: Test
-      run: |
-        source $HOME/.cargo/env
-        cargo test
-    - name: Verify Java Removal
-      run: |
-        if command -v java &> /dev/null; then
-          echo "Error: Java is still installed. Please remove it to ensure optimal performance."
-          exit 1
-        fi
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Run integration tests
+        run: |
+          python -m unittest discover -s tests/integration -p 'test_*.py'
+      - name: Measure code coverage
+        run: |
+          coverage run --source=. -m unittest discover -s tests -p 'test_*.py'
+          coverage run --source=. -m unittest discover -s tests/integration -p 'test_*.py'
+          coverage report -m
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage-report.txt
