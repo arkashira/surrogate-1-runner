@@ -1,19 +1,12 @@
 import os
-from pydantic import BaseSettings, Field
+from dotenv import load_dotenv
 
-class Settings(BaseSettings):
-    # Core
-    provider: str = Field("azure", env="COST_PROVIDER")
-    # Azure
-    subscription_id: str = Field(..., env="AZURE_SUBSCRIPTION_ID")
-    tenant_id: str = Field(..., env="AZURE_TENANT_ID")
-    client_id: str = Field(..., env="AZURE_CLIENT_ID")
-    client_secret: str = Field(..., env="AZURE_CLIENT_SECRET")
-    # DB
-    audit_db_url: str = Field(..., env="AUDIT_DB_URL")
-    # Cache
-    redis_url: str = Field(..., env="REDIS_URL")
-    # Prometheus
-    prometheus_port: int = Field(8001, env="PROMETHEUS_PORT")
+load_dotenv()  # pulls .env into os.environ
 
-settings = Settings()
+class Config:
+    SLACK_BOT_TOKEN: str = os.getenv("SLACK_BOT_TOKEN", "")
+    SLACK_APP_TOKEN: str = os.getenv("SLACK_APP_TOKEN", "")
+    SLACK_SIGNING_SECRET: str = os.getenv("SLACK_SIGNING_SECRET", "")
+    SLACK_TASK_CHANNEL_ID: str = os.getenv("SLACK_TASK_CHANNEL_ID", "")
+    SLACK_PORT: int = int(os.getenv("SLACK_PORT", "3000"))
+    SLACK_SOCKET_MODE: bool = os.getenv("SLACK_SOCKET_MODE", "true").lower() in ("true", "1")
