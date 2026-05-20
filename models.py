@@ -1,19 +1,21 @@
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
-db = SQLAlchemy()
+Base = declarative_base()
 
-class Recommendation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    # other fields...
+class Pipeline(Base):
+    __tablename__ = 'pipelines'
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    # other fields...
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    statuses = relationship("PipelineStatus", back_populates="pipeline")
 
-class Feedback(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    recommendation_id = db.Column(db.Integer, db.ForeignKey('recommendation.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    feedback_text = db.Column(db.Text)
-    rating = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+class PipelineStatus(Base):
+    __tablename__ = 'pipeline_statuses'
+
+    id = Column(Integer, primary_key=True)
+    pipeline_id = Column(Integer, ForeignKey('pipelines.id'))
+    status = Column(String, nullable=False)
+    timestamp = Column(DateTime, nullable=False)
+    pipeline = relationship("Pipeline", back_populates="statuses")
