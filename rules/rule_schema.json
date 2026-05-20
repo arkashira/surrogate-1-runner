@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Rule Definition Schema",
+  "description": "Schema for defining compliance rules.",
+  "type": "object",
+  "properties": {
+    "rule_id": {
+      "description": "Unique identifier for the rule.",
+      "type": "string"
+    },
+    "rule_name": {
+      "description": "Name of the rule.",
+      "type": "string"
+    },
+    "rule_description": {
+      "description": "Detailed description of the rule.",
+      "type": "string"
+    },
+    "rule_type": {
+      "description": "Type of the rule (e.g., SEC, FINRA, GDPR).",
+      "type": "string"
+    },
+    "severity": {
+      "description": "Severity level of the rule violation.",
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "conditions": {
+      "description": "Conditions that define when the rule is violated.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "description": "Field name to check.",
+            "type": "string"
+          },
+          "operator": {
+            "description": "Operator to apply (e.g., equals, not_equals, contains).",
+            "type": "string"
+          },
+          "value": {
+            "description": "Value to compare against.",
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          }
+        },
+        "required": ["field", "operator", "value"]
+      }
+    }
+  },
+  "required": ["rule_id", "rule_name", "rule_description", "rule_type", "severity", "conditions"]
+}
