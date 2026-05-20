@@ -1,19 +1,17 @@
-# surrogate-1-runner
-
-Parallel public-dataset ingest workers for the
-[axentx/surrogate-1-training-pairs](https://huggingface.co/datasets/axentx/surrogate-1-training-pairs)
-HuggingFace dataset.
-
-## What this does
-
-Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**.
-Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`)
-of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
-normalizes per-schema, dedups via the central md5 hash store, and uploads
-its output to a unique path on the dataset repo:
-
-## CLI Usage
-
-The surrogate-1 CLI provides commands to manage dataset sources:
-
-### Add a new dataset source
+surrogate-1/
+├── bin/
+│   ├── dataset-enrich.sh    # Dataset list and enrichment logic
+│   ├── ingest.sh            # Per-shard ingestion script
+│   └── normalize.sh         # Schema normalization
+├── src/
+│   ├── dedup.go             # MD5 deduplication client
+│   ├── stream.go            # Dataset streaming
+│   └── upload.go            # HuggingFace upload
+├── examples/
+│   └── sample_app.py        # Sample integration app
+├── config.json              # Optional configuration file
+├── requirements.txt         # Python dependencies
+├── .github/
+│   └── workflows/
+│       └── ingest.yml       # GitHub Actions workflow
+└── README.md
