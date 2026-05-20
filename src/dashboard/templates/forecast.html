@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cloud Cost Forecast Dashboard</title>
+</head>
+<body>
+    <h1>Cloud Cost Forecasts</h1>
+    <form action="/forecast" method="get">
+        Start Date: <input type="text" name="start_date"><br>
+        End Date: <input type="text" name="end_date"><br>
+        Sort By: <input type="text" name="sort_by"><br>
+        <input type="submit" value="Filter and Sort">
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Feature 1</th>
+                <th>Feature 2</th>
+                <th>Forecasted Cost</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data %}
+            <tr>
+                <td>{{ item.date }}</td>
+                <td>{{ item.feature1 }}</td>
+                <td>{{ item.feature2 }}</td>
+                <td>{{ forecasts[loop.index0] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
