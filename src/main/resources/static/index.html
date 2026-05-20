@@ -1,129 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AxentX Gaming Component Recommender</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 2rem;
-            line-height: 1.6;
-        }
-        .form-section {
-            margin-bottom: 1.5rem;
-        }
-        .recommendations {
-            margin-top: 2rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        .recommendation-card {
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 15px;
-            width: 300px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            background-color: #fafafa;
-        }
-        .recommendation-card h3 {
-            margin-top: 0;
-            color: #333;
-        }
-        .recommendation-card p {
-            margin: 5px 0;
-        }
-        .price {
-            font-weight: bold;
-            color: #2a6496;
-        }
-        .performance-score {
-            color: #585858;
-            font-size: 0.9em;
-        }
-        .error {
-            color: #c00;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Performance Comparison</title>
 </head>
 <body>
-    <h1>Best Gaming Component Mix for Your Favorite Game</h1>
+  <h1>Current Rig's Performance</h1>
+  <div id="current-rig-data"></div>
 
-    <div class="form-section">
-        <label for="game-select">Target Game:</label>
-        <select id="game-select">
-            <option value="rust">Rust</option>
-            <option value="cyberpunk">Cyberpunk 2077</option>
-            <option value="fortnite">Fortnite</option>
-            <!-- More games can be added here -->
-        </select>
+  <h1>Proposed Upgrade's Performance</h1>
+  <div id="proposed-upgrade-data"></div>
 
-        <label for="budget-slider">Budget ($):</label>
-        <input type="range" id="budget-slider" min="500" max="5000" value="1500">
-        <span id="budget-value">1500</span>
-
-        <button id="get-recommendations">Get Recommendations</button>
-    </div>
-
-    <div id="recommendations" class="recommendations">
-        <!-- Recommendations will be displayed here -->
-    </div>
-    <div id="error-message" class="error" style="display: none;"></div>
-
-    <script>
-        document.getElementById('budget-slider').addEventListener('input', function() {
-            document.getElementById('budget-value').textContent = this.value;
-        });
-
-        document.getElementById('get-recommendations').addEventListener('click', async function() {
-            const game = document.getElementById('game-select').value;
-            const budget = document.getElementById('budget-slider').value;
-
-            try {
-                const recommendations = await fetchRecommendations(game, budget);
-                displayRecommendations(recommendations);
-                document.getElementById('error-message').style.display = 'none';
-            } catch (err) {
-                document.getElementById('error-message').textContent = 'Failed to fetch recommendations. Please try again later.';
-                document.getElementById('error-message').style.display = 'block';
-            }
-        });
-
-        async function fetchRecommendations(game, budget) {
-            const params = new URLSearchParams({ game, budget });
-            const response = await fetch(`/api/recommendations?${params.toString()}`);
-
-            if (!response.ok) {
-                const err = await response.text();
-                throw new Error(err || 'Failed to fetch recommendations');
-            }
-
-            return response.json(); // Expected format: [{ component: "GPU", name: "...", price: 400, performanceScore: 92 }, ...]
-        }
-
-        function displayRecommendations(data) {
-            const container = document.getElementById('recommendations');
-            container.innerHTML = '';
-
-            if (!Array.isArray(data) || data.length === 0) {
-                container.innerHTML = '<p>No recommendations available for the given game and budget.</p>';
-                return;
-            }
-
-            data.forEach(component => {
-                const card = document.createElement('div');
-                card.className = 'recommendation-card';
-
-                card.innerHTML = `
-                    <h3>${component.name}</h3>
-                    <p class="price">$${component.price}</p>
-                    <p class="performance-score">Performance Score: ${component.performanceScore}</p>
-                `;
-
-                container.appendChild(card);
-            });
-        }
-    </script>
+  <script src="app.js"></script>
 </body>
 </html>
