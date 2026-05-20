@@ -1,0 +1,72 @@
+{
+  "categories": [
+    {
+      "id": "permits",
+      "name": "Permits",
+      "description": "Licenses and permits required for operation",
+      "subcategories": [
+        {
+          "id": "food-service-permit",
+          "name": "Food Service Permit"
+        },
+        {
+          "id": "liquor-licence",
+          "name": "Liquor Licence"
+        },
+        {
+          "id": "occupancy-permit",
+          "name": "Occupancy Permit"
+        }
+      ]
+    },
+    {
+      "id": "inspections",
+      "name": "Inspections",
+      "description": "Regular inspections by authorities",
+      "subcategories": [
+        {
+          "id": "health-inspection",
+          "name": "Health Inspection"
+        },
+        {
+          "id": "fire-inspection",
+          "name": "Fire Inspection"
+        },
+        {
+          "id": "building-inspection",
+          "name": "Building Inspection"
+        }
+      ]
+    },
+    {
+      "id": "licenses",
+      "name": "Licenses",
+      "description": "Business licenses",
+      "subcategories": [
+        {
+          "id": "business-license",
+          "name": "Business License"
+        },
+        {
+          "id": "zoning-approval",
+          "name": "Zoning Approval"
+        }
+      ]
+    },
+    {
+      "id": "environmental",
+      "name": "Environmental Compliance",
+      "description": "Compliance with environmental regulations",
+      "subcategories": [
+        {
+          "id": "waste-management",
+          "name": "Waste Management"
+        },
+        {
+          "id": "air-quality",
+          "name": "Air Quality"
+        }
+      ]
+    }
+  ]
+}
