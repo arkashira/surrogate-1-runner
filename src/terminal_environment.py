@@ -1,32 +1,22 @@
-import asyncio
-from typing import List
-from .websockets import WebSocketServer
+from .workflow_management import WorkflowManagement
 
 class TerminalEnvironment:
-    def __init__(self, websocket_host: str, websocket_port: int):
-        self.websocket_server = WebSocketServer(websocket_host, websocket_port)
-        self.users: List[str] = []
+    def __init__(self):
+        self.workflow_manager = WorkflowManagement()
 
-    async def add_user(self, user_id: str):
-        self.users.append(user_id)
-        await self.update_environment()
+    def create_and_manage_workflow(self, name, steps, action):
+        workflow = self.workflow_manager.create_workflow(name, steps)
+        managed_workflow = self.workflow_manager.manage_workflow(id(workflow), action)
+        return managed_workflow
 
-    async def remove_user(self, user_id: str):
-        self.users.remove(user_id)
-        await self.update_environment()
+    def execute_workflow_with_feedback(self, workflow_id):
+        executed_workflow = self.workflow_manager.execute_workflow(workflow_id)
+        feedback = self.workflow_manager.get_real_time_feedback(workflow_id)
+        return executed_workflow, feedback
 
-    async def update_environment(self):
-        message = f"Users in environment: {', '.join(self.users)}"
-        await self.websocket_server.broadcast(message)
-
-    def start(self):
-        self.websocket_server.start()
-
-def main():
-    env = TerminalEnvironment('localhost', 8765)
-    asyncio.run(env.add_user("user1"))
-    asyncio.run(env.add_user("user2"))
-    env.start()
-
+# Example usage
 if __name__ == "__main__":
-    main()
+    env = TerminalEnvironment()
+    workflow = env.create_and_manage_workflow("Test Workflow", ["Step 1", "Step 2"], "start")
+    executed_workflow, feedback = env.execute_workflow_with_feedback(id(workflow))
+    print(feedback)
