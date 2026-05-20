@@ -1,1 +1,9 @@
-# This file is intentionally left empty to mark the directory as a Python package.
+import click
+from .wizard import wizard_cmd
+
+@click.group()
+def main():
+    """Surrogate-1 CLI"""
+    pass
+
+main.add_command(wizard_cmd)
