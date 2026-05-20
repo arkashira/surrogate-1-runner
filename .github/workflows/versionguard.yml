@@ -1,0 +1,63 @@
+name: VersionGuard CI Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to validate'
+        required: false
+        type: string
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Install VersionGuard
+        run: |
+          dotnet tool install --global VersionGuard
+          echo "PATH=$PATH:/home/runner/.dotnet/tools" >> $GITHUB_ENV
+
+      - name: Get version from input or environment
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            # Default to reading from a version file or environment variable
+            VERSION=$(cat VERSION 2>/dev/null || echo "1.0.0")
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate version with VersionGuard
+        id: validate
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          echo "Validating version: $VERSION"
+          if ! versionguard validate "$VERSION"; then
+            echo "Version validation failed!"
+            exit 1
+          fi
+        continue-on-error: false
+
+      - name: Show success message
+        if: success()
+        run: |
+          echo " Version validation passed for version: ${{ steps.get_version.outputs.version }}"
+
+      - name: Show failure message
+        if: failure()
+        run: |
+          echo " Version validation failed for version: ${{ steps.get_version.outputs.version }}"
+          echo "Please ensure the version follows semantic versioning standards."
