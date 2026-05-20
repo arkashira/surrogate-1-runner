@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Provider Registration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        form { max-width: 600px; margin: auto; }
+        label { display: block; margin-top: 1rem; }
+        input, textarea { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+        button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Register as a Service Provider</h1>
+    <form id="registration-form" action="/register" method="post" enctype="multipart/form-data">
+        <label>
+            Full Name:
+            <input type="text" name="full_name" required>
+        </label>
+        <label>
+            Email Address:
+            <input type="email" name="email" required>
+        </label>
+        <label>
+            Password:
+            <input type="password" name="password" required>
+        </label>
+        <label>
+            Phone Number:
+            <input type="tel" name="phone" pattern="[0-9]{10}" placeholder="1234567890" required>
+        </label>
+        <label>
+            Company Name:
+            <input type="text" name="company" required>
+        </label>
+        <label>
+            Brief Description:
+            <textarea name="description" rows="4" required></textarea>
+        </label>
+        <label>
+            Upload Verification Documents:
+            <input type="file" name="documents" accept=".pdf, .jpg, .jpeg, .png" multiple required>
+        </label>
+        <button type="submit">Register</button>
+    </form>
+</body>
+<script>
+    // Add JavaScript code for form validation and submission here
+    document.getElementById('registration-form').addEventListener('submit', function(event) {
+        // Perform client-side validation if needed
+        // Example: Check if all fields are filled correctly
+        const fullName = document.querySelector('input[name="full_name"]').value;
+        const email = document.querySelector('input[name="email"]').value;
+        const password = document.querySelector('input[name="password"]').value;
+        const phone = document.querySelector('input[name="phone"]').value;
+        const company = document.querySelector('input[name="company"]').value;
+        const description = document.querySelector('textarea[name="description"]').value;
+        const documents = document.querySelector('input[name="documents"]').files;
+
+        if (!fullName || !email || !password || !phone || !company || !description || documents.length === 0) {
+            alert('Please fill out all fields and upload the required documents.');
+            event.preventDefault();
+            return;
+        }
+
+        // If validation passes, allow the form to be submitted
+    });
+</script>
+</html>
