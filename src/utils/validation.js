@@ -1,62 +1,57 @@
-/**
- * Validation utilities for build recommendation inputs
- */
-class InputValidator {
-  /**
-   * Validate budget input
-   * @param {number} budget - User's budget
-   * @returns {boolean} - Whether validation passes
-   */
-  static validateBudget(budget) {
-    if (typeof budget !== 'number' || isNaN(budget)) {
-      return false;
-    }
-    if (budget < 0) {
-      return false;
-    }
-    if (budget > 1000000) { // $1M max budget
-      return false;
-    }
-    return true;
+const PROFANITY_FILTER = new Set(['spam', 'fake', 'hate', 'violence']);
+const MIN_RATING = 1;
+const MAX_RATING = 5;
+const MIN_REVIEW_LENGTH = 10;
+
+export function validateReview(review) {
+  if (!review || typeof review !== 'object') return false;
+  
+  // Check required fields
+  if (!review.id || !review.userId || !review.componentId || !review.rating || !review.comment) {
+    return false;
   }
-
-  /**
-   * Validate build requirements
-   * @param {string} requirements - User's requirements text
-   * @returns {boolean} - Whether validation passes
-   */
-  static validateRequirements(requirements) {
-    if (!requirements || typeof requirements !== 'string') {
+  
+  // Validate rating range
+  if (review.rating < MIN_RATING || review.rating > MAX_RATING) {
+    return false;
+  }
+  
+  // Validate comment length
+  if (review.comment.length < MIN_REVIEW_LENGTH) {
+    return false;
+  }
+  
+  // Check for profanity
+  const lowerComment = review.comment.toLowerCase();
+  for (const word of PROFANITY_FILTER) {
+    if (lowerComment.includes(word)) {
       return false;
     }
-    if (requirements.trim().length < 10) {
-      return false;
-    }
-    return true;
   }
-
-  /**
-   * Validate all inputs
-   * @param {Object} inputs - User inputs
-   * @returns {Object} - Validation results
-   */
-  static validateAll(inputs) {
-    const results = {
-      budget: this.validateBudget(inputs.budget),
-      requirements: this.validateRequirements(inputs.requirements),
-      budgetError: '',
-      requirementsError: ''
-    };
-
-    if (!results.budget) {
-      results.budgetError = 'Budget must be a positive number';
-    }
-    if (!results.requirements) {
-      results.requirementsError = 'Please provide detailed build requirements';
-    }
-
-    return results;
-  }
+  
+  return true;
 }
 
-export default InputValidator;
+export function moderateReview(review) {
+  if (!validateReview(review)) {
+    return { status: 'rejected', reason: 'validation_failed' };
+  }
+  
+  // Check for suspicious patterns
+  if (review.rating === MAX_RATING && review.comment.length < 20) {
+    return { status: 'pending', reason: 'suspicious_high_rating' };
+  }
+  
+  if (review.comment.includes('best ever') || review.comment.includes('perfect')) {
+    return { status: 'pending', reason: 'generic_praise' };
+  }
+  
+  return { status: 'approved', reason: 'valid_review' };
+}
+
+export function filterReviews(reviews) {
+  return reviews.filter(review => {
+    const moderation = moderateReview(review);
+    return moderation.status === 'approved';
+  });
+}
