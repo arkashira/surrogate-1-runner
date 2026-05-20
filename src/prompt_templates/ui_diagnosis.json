@@ -1,0 +1,21 @@
+{
+  "template": "Analyze the following diagnostic data to determine the root cause of the UI issue:\n\nUI Interaction Steps:\n{{ui_steps}}\n\nBrowser Console Logs:\n{{console_logs}}\n\nNetwork Requests (filtered for errors):\n{{network_data}}\n\nBased on this information, provide:\n1. A 3-sentence root-cause hypothesis.\n2. Two actionable mitigations that an SRE can immediately implement.\n\nFormat the response as:\n### Root Cause\n<3-sentence hypothesis>\n\n### Mitigations\n- <action 1>\n- <action 2>",
+  "required_fields": [
+    "ui_steps",
+    "console_logs",
+    "network_data"
+  ],
+  "output_schema": {
+    "root_cause": "string[3 sentences]",
+    "mitigations": "array[string] (length: 2)"
+  },
+  "instructions": {
+    "response_format": "markdown",
+    "tone": "concise, technical, SRE-focused",
+    "constraints": [
+      "Do not include speculation not supported by the data.",
+      "Prioritize frontend performance, client errors, and API failure chains.",
+      "Mitigations must be immediately actionable by an SRE."
+    ]
+  }
+}
