@@ -1,20 +1,18 @@
-const http = require('http');
-const { app, projectEmitter } = require('./app');
-const socketIo = require('socket.io');
-
-const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: '*' } });
-
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
-  const onProjectCreated = (project) => socket.emit('projectCreated', project);
-  projectEmitter.on('projectCreated', onProjectCreated);
-
-  socket.on('disconnect', () => {
-    projectEmitter.off('projectCreated', onProjectCreated);
-  });
-});
+const mongoose = require('mongoose');
+const app = require('./app');
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/axentx';
+
+mongoose
+  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => {
+    console.log('MongoDB connected');
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  });

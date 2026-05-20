@@ -1,22 +1,39 @@
+require('dotenv').config();
+require('express-async-errors'); // must be required before routes
+
 const express = require('express');
-const bodyParser = require('body-parser');
-const EventEmitter = require('events');
-const validationRoutes = require('./routes/validation');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+
+const routes = require('./routes');
+const errorHandler = require('./middlewares/errorHandler');
+const notFound = require('./middlewares/notFound');
 
 const app = express();
-app.use(bodyParser.json());
 
-// Global event emitter for real‑time updates
-const projectEmitter = new EventEmitter();
-app.set('projectEmitter', projectEmitter);
+/* ---------- Middleware ---------- */
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Mount routes
-app.use('/api/v1/validation', validationRoutes);
+// Logging
+app.use(morgan('combined'));
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal Server Error' });
+// Rate limiting (adjust values for your traffic)
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,            // limit each IP to 200 requests per windowMs
 });
+app.use(limiter);
 
-module.exports = { app, projectEmitter };
+/* ---------- Routes ---------- */
+app.use('/api', routes);
+
+/* ---------- 404 & Error ---------- */
+app.use(notFound);
+app.use(errorHandler);
+
+module.exports = app;
