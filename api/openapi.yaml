@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: Surrogate‑1 Mesh API
+  version: 1.0.0
+  description: |
+    A REST endpoint that accepts a dataset file (up to 1 GB) and returns a
+    generated mesh packaged as a ZIP archive.
+
+servers:
+  # Base‑path is deliberately explicit – the service is expected to be
+  # reachable under “…/api”.  Using a relative URL keeps the spec portable.
+  - url: /api
+
+paths:
+  /mesh:
+    post:
+      summary: Upload a file and receive a mesh ZIP archive
+      operationId: uploadMesh
+      requestBody:
+        description: The dataset to be meshed.
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    Input file (e.g., CSV, OBJ, STL).  The service enforces a
+                    hard limit of **1 GB**; larger payloads are rejected with
+                    HTTP 400.
+      responses:
+        '200':
+          description: Successful mesh generation – a ZIP archive.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad request – missing file, unsupported type, or size > 1 GB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload Too Large – file exceeds the 1 GB limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human‑readable description of the problem.
