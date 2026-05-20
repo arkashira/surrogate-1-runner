@@ -1,96 +1,117 @@
 #!/usr/bin/env python3
-"""Credit management CLI for axentx surrogate-1.
-Provides commands to query and set credit balances with persistent storage.
 """
-import os
-import sys
+Credit management CLI for surrogate-1.
+
+Provides commands to query and set credit balances:
+  credit status          - Returns current monthly and bulk balances in JSON
+  credit set-bulk <amount> - Updates the bulk credit limit
+"""
+
+import argparse
 import json
-import click
-from typing import Dict, Any
+import sys
+from dataclasses import dataclass, asdict
+from typing import Optional
 
-# Configuration
-CREDIT_DATA_PATH = os.getenv("CREDIT_DATA_PATH", "/opt/axentx/surrogate-1/var/credit_balances.json")
 
-def _load_balances() -> Dict[str, int]:
-    """Load credit balances from persistent storage.
-    Returns a dict with at least 'monthly' and 'bulk' keys.
-    If storage is unavailable or malformed, returns default zero balances.
+@dataclass
+class CreditBalances:
+    """Credit balance data structure."""
+    monthly: int
+    bulk: int
+    
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+class CreditStore:
     """
-    if not os.path.exists(CREDIT_DATA_PATH):
-        return {"monthly": 0, "bulk": 0}
+    In-memory credit balance storage.
+    
+    Note: In production, this should be backed by persistent storage
+    (database, config file, or environment variables).
+    """
+    
+    def __init__(self, monthly: int = 1000, bulk: int = 5000):
+        self._monthly = monthly
+        self._bulk = bulk
+    
+    def get_balances(self) -> CreditBalances:
+        """Retrieve current credit balances."""
+        return CreditBalances(monthly=self._monthly, bulk=self._bulk)
+    
+    def set_bulk(self, amount: int) -> CreditBalances:
+        """Update bulk credit limit."""
+        if amount < 0:
+            raise ValueError("Bulk amount cannot be negative")
+        self._bulk = amount
+        return self.get_balances()
 
+
+# Global store instance
+_credit_store = CreditStore()
+
+
+def status_command(args) -> int:
+    """Execute the credit status command."""
     try:
-        with open(CREDIT_DATA_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            # Ensure required keys exist with default values
-            data.setdefault("monthly", 0)
-            data.setdefault("bulk", 0)
-            return data
-    except (json.JSONDecodeError, OSError):
-        # Corrupt file or permission issues - reset to defaults
-        return {"monthly": 0, "bulk": 0}
-
-def _save_balances(balances: Dict[str, int]) -> None:
-    """Persist credit balances to storage."""
-    os.makedirs(os.path.dirname(CREDIT_DATA_PATH), exist_ok=True)
-    with open(CREDIT_DATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(balances, f)
-
-def get_status() -> Dict[str, Any]:
-    """Get current credit status for both monthly and bulk balances."""
-    balances = _load_balances()
-    return {
-        "monthly": {"balance": balances["monthly"]},
-        "bulk": {"balance": balances["bulk"]}
-    }
-
-def set_bulk_credit(amount: int) -> Dict[str, Any]:
-    """Set the bulk credit limit.
-    Args:
-        amount: The new bulk credit amount (must be non-negative).
-    Returns:
-        Dict with success status and updated balance.
-    """
-    if amount < 0:
-        return {
-            "success": False,
-            "error": "Amount must be non-negative",
-            "bulk": {"balance": _load_balances()["bulk"]}
+        balances = _credit_store.get_balances()
+        output = {
+            "success": True,
+            "balances": balances.to_dict()
         }
+        print(json.dumps(output, indent=2))
+        return 0
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
 
-    balances = _load_balances()
-    old_balance = balances["bulk"]
-    balances["bulk"] = amount
-    _save_balances(balances)
 
-    return {
-        "success": True,
-        "message": f"Bulk credit limit updated from {old_balance} to {amount}",
-        "bulk": {"balance": amount}
-    }
+def set_bulk_command(args) -> int:
+    """Execute the credit set-bulk command."""
+    try:
+        amount = int(args.amount)
+        balances = _credit_store.set_bulk(amount)
+        output = {
+            "success": True,
+            "message": f"Bulk credit limit updated to {amount}",
+            "balances": balances.to_dict()
+        }
+        print(json.dumps(output, indent=2))
+        return 0
+    except ValueError as e:
+        print(json.dumps({"success": False, "error": f"Invalid amount: {e}"}, indent=2), file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
 
-@click.group()
-def credit() -> None:
-    """Credit management commands for axentx surrogate-1."""
-    pass
 
-@credit.command()
-def status() -> None:
-    """Return the current monthly and bulk credit balances as JSON."""
-    result = get_status()
-    click.echo(json.dumps(result, indent=2))
-    return 0
+def main(argv: Optional[list] = None) -> int:
+    """Main entry point for the credit CLI."""
+    parser = argparse.ArgumentParser(
+        prog="credit",
+        description="Manage credit balances"
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Status subcommand
+    subparsers.add_parser("status", help="Show current credit balances")
+    
+    # Set-bulk subcommand
+    set_bulk_parser = subparsers.add_parser("set-bulk", help="Set bulk credit limit")
+    set_bulk_parser.add_argument("amount", type=int, help="New bulk credit amount")
+    
+    args = parser.parse_args(argv)
+    
+    if args.command == "status":
+        return status_command(args)
+    elif args.command == "set-bulk":
+        return set_bulk_command(args)
+    else:
+        parser.print_help()
+        return 1
 
-@credit.command()
-@click.argument("amount", type=int)
-def set_bulk(amount: int) -> None:
-    """Set the bulk credit limit.
-    Example: credit set-bulk 5000
-    """
-    result = set_bulk_credit(amount)
-    click.echo(json.dumps(result, indent=2))
-    if not result.get("success", True):
-        sys.exit(1)
 
 if __name__ == "__main__":
-    credit()
+    sys.exit(main())
