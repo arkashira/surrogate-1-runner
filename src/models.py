@@ -1,55 +1,55 @@
-from datetime import datetime
-from enum import Enum
+from __future__ import annotations
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Enum as SQLEnum,
-    Integer,
-    String,
-)
-from sqlalchemy.orm import declarative_base
+import sqlalchemy as sa
+from sqlalchemy.orm import declarative_base, Mapped, mapped_column
 
 Base = declarative_base()
 
 
-class UserRole(Enum):
-    """Enumeration of user roles used for access control."""
-    USER = "user"
-    ADMIN = "admin"
+class AccountCredit(Base):
+    """
+    One row per account.  Two independent credit buckets:
+      * monthly – refreshed each calendar month
+      * bulk    – long‑lived “pay‑as‑you‑go” pool
+    """
+    __tablename__ = "account_credit"
 
+    account_id: Mapped[str] = mapped_column(sa.String, primary_key=True)
 
-class User(Base):
-    """User model with role‑based access control."""
-    __tablename__ = "users"
+    # Totals are immutable from the service’s point of view;
+    # they can be changed only by an admin operation (not shown here).
+    monthly_total: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    bulk_total: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(255), unique=True, nullable=False, index=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    # How much of each bucket has already been consumed.
+    monthly_used: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    bulk_used: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
 
-    # Store the role as a PostgreSQL ENUM.  The server_default guarantees
-    # that new rows default to USER even if the application layer omits it.
-    role = Column(
-        SQLEnum(UserRole, name="user_role_enum", native_enum=False),
-        nullable=False,
-        server_default="user",
-    )
-
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False,
-    )
-
-    # ------------------------------------------------------------------
+    # --------------------------------------------------------------------- #
     # Helper methods
-    # ------------------------------------------------------------------
-    def is_admin(self) -> bool:
-        """Return True if the user has the ADMIN role."""
-        return self.role == UserRole.ADMIN
+    # --------------------------------------------------------------------- #
+    def to_dict(self) -> dict:
+        """Serialise the row for API responses or tests."""
+        return {
+            "account_id": self.account_id,
+            "monthly_total": self.monthly_total,
+            "monthly_used": self.monthly_used,
+            "bulk_total": self.bulk_total,
+            "bulk_used": self.bulk_used,
+        }
 
-    def __repr__(self) -> str:
-        return f"<User {self.username!r} ({self.role.value})>"
+    @property
+    def monthly_remaining(self) -> int:
+        return max(self.monthly_total - self.monthly_used, 0)
+
+    @property
+    def bulk_remaining(self) -> int:
+        return max(self.bulk_total - self.bulk_used, 0)
+
+    @property
+    def monthly_usage_pct(self) -> float:
+        return (self.monthly_used / self.monthly_total * 100) if self.monthly_total else 0.0
+
+    @property
+    def bulk_usage_pct(self) -> float:
+        return (self.bulk_used / self.bulk_total * 100) if self.bulk_total else 0.0
