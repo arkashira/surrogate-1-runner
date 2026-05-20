@@ -1,16 +1,43 @@
-[tool.poetry]
-name = "surrogate-1"
-version = "0.1.0"
-description = "Parallel public-dataset ingest workers"
-authors = ["axentx-dev-bot <dev@axentx.com>"]
-
-[tool.poetry.dependencies]
-python = "^3.9"
-
-[tool.poetry.dev-dependencies]
-pytest = "^6.2"
-mypy = "^0.910"
-
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "surrogate1-llm-gateway"
+version = "0.1.0"
+description = "LLM gateway for surrogate-1, providing easy access to Claude and Minimax APIs."
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "AxentX Team", email = "dev@axentx.com"}
+]
+keywords = ["llm", "gateway", "surrogate-1", "claude", "minimax"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+
+# Package discovery - adjust based on Step 1 findings
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["surrogate1_llm_gateway*"]
+exclude = ["tests*", "docs*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.0.260"
+]
+
+[project.urls]
+Homepage = "https://github.com/axentx/surrogate-1"
+Repository = "https://github.com/axentx/surrogate-1.git"
+Documentation = "https://github.com/axentx/surrogate-1#readme"
