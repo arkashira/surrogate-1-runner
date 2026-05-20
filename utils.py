@@ -1,115 +1,64 @@
-"""
-Utility helpers for the surrogate‑1 API.
-"""
-
+import time
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from functools import wraps
+from typing import Callable, Iterable, Tuple, Type
 
+# Configure a module level logger
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(logging.INFO)
 
-# ----------------------------------------------------------------------
-# Public API
-# ----------------------------------------------------------------------
-def get_excerpt(content: Optional[str], length: int = 100) -> str:
+def retry(
+    max_attempts: int = 5,
+    backoff_factor: float = 1.0,
+    retry_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    on_failure: Callable[[Callable, Exception, int], None] | None = None,
+) -> Callable:
     """
-    Return the first `length` characters of `content`.
-
-    If `content` is None, empty, or not a string, an empty string is returned.
+    Decorator that retries a function call with exponential backoff.
 
     Parameters
     ----------
-    content: Optional[str]
-        The raw document text.
-    length: int
-        Maximum number of characters to return (default 100).
+    max_attempts : int
+        Maximum number of attempts (including the first try). Default is 5.
+    backoff_factor : float
+        Initial delay in seconds. Each subsequent retry doubles the delay.
+        Default is 1.0.
+    retry_exceptions : tuple[Type[BaseException], ...]
+        Exceptions that trigger a retry. Default is all Exceptions.
+    on_failure : Callable[[Callable, Exception, int], None] | None
+        Optional callback invoked after the final failure. It receives the
+        original function, the exception raised, and the attempt count.
+        If not provided, the failure is simply logged.
 
     Returns
     -------
-    str
-        The truncated excerpt.
+    Callable
+        Wrapped function with retry logic.
     """
-    if not isinstance(content, str) or not content:
-        return ""
-    return content[:length]
-
-
-def get_recent_documents(limit: int = 5) -> List[Dict[str, Any]]:
-    """
-    Return the most recently updated documents.
-
-    Each entry contains:
-
-    * ``title`` – document title
-    * ``updated_at`` – ISO‑8601 timestamp (UTC, ``Z`` suffix)
-    * ``excerpt`` – first ``length`` characters of the document body
-
-    The implementation currently uses a placeholder list.
-    In production this should be replaced with a real DB/ORM query that:
-
-    * filters to the desired set of documents,
-    * orders by ``updated_at`` descending,
-    * limits to ``limit`` rows.
-
-    Parameters
-    ----------
-    limit: int
-        Number of documents to return (default 5).
-
-    Returns
-    -------
-    List[Dict[str, Any]]
-        List of document dictionaries.
-    """
-    # ------------------------------------------------------------------
-    # TODO: replace the dummy data below with an actual DB query.
-    #   Example (pseudo‑SQL):
-    #
-    #   SELECT id, title, updated_at, content
-    #   FROM documents
-    #   ORDER BY updated_at DESC
-    #   LIMIT :limit;
-    # ------------------------------------------------------------------
-    _NOW = datetime.now(timezone.utc).replace(tzinfo=None)  # naive for dummy string
-    dummy_docs = [
-        {
-            "title": "SOP Overview",
-            "updated_at": _NOW.isoformat() + "Z",
-            "content": "This is a sample procedure document describing how to perform task X. It includes steps, safety notes, and references.",
-        },
-        {
-            "title": "Data Ingestion Guide",
-            "updated_at": _NOW.isoformat() + "Z",
-            "content": "The ingestion pipeline processes sharded JSONL files, normalizes schema, and stores results in the central dataset repository.",
-        },
-        {
-            "title": "Dedup Strategy",
-            "updated_at": _NOW.isoformat() + "Z",
-            "content": "Deduplication uses an MD5 hash of the document content to ensure uniqueness across shards and iterations.",
-        },
-        {
-            "title": "Runner Configuration",
-            "updated_at": _NOW.isoformat() + "Z",
-            "content": "Each runner operates on a deterministic slice of the dataset list, defined by the slug-hash bucket in `bin/dataset-enrich.sh`.",
-        },
-        {
-            "title": "Error Handling",
-            "updated_at": _NOW.isoformat() + "Z",
-            "content": "Workers catch exceptions, log stack traces, and retry transient failures to ensure reliable batch production.",
-        },
-    ]
-
-    # Slice to the requested limit (in a real query this is done by the DB)
-    docs = dummy_docs[:limit]
-
-    # Build the response payload
-    result: List[Dict[str, Any]] = []
-    for doc in docs:
-        result.append({
-            "title": doc["title"],
-            "updated_at": doc["updated_at"],
-            "excerpt": get_excerpt(doc.get("content"), length=100),
-        })
-
-    logger.debug("Fetched %d recent documents", len(result))
-    return result
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            delay = backoff_factor
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except retry_exceptions as exc:
+                    attempts += 1
+                    if attempts >= max_attempts:
+                        logger.error(
+                            f"Function {func.__name__!r} failed after {attempts} attempts: {exc}"
+                        )
+                        if on_failure:
+                            on_failure(func, exc, attempts)
+                        raise
+                    logger.warning(
+                        f"Attempt {attempts} failed for {func.__name__!r}: {exc}. "
+                        f"Retrying in {delay}s (attempt {attempts + 1}/{max_attempts})"
+                    )
+                    time.sleep(delay)
+                    delay *= 2
+        return wrapper
+    return decorator
