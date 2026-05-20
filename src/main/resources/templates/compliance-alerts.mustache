@@ -1,0 +1,43 @@
+# src/main/resources/templates/compliance-alerts.mustache
+{{! Compliance Alert Template for Expense Ratio Breach }}
+{{! Variables:
+    ownerName          - Name or title of the business owner
+    thresholdPercent   - Threshold percentage (e.g., 15)
+    currentRatioPercent- Current expense-to-revenue ratio in percent
+    revenue            - Current revenue figure
+    expenses           - Current expenses figure
+    timestamp          - ISO 8601 timestamp of the alert
+    dashboardLink      - URL to the dashboard page
+}}
+
+Subject: ⚠️ Compliance Alert: Expense Ratio Exceeded
+
+Hi {{ownerName}},
+
+This is an automated alert from the **Axentx Compliance Monitoring System**.
+
+**Alert Details**
+
+| Metric | Value |
+|--------|-------|
+| Revenue | ${{revenue}} |
+| Expenses | ${{expenses}} |
+| Expense / Revenue Ratio | {{currentRatioPercent}}% |
+| Threshold | {{thresholdPercent}}% |
+
+**Timestamp**: {{timestamp}}
+
+The expense-to-revenue ratio has exceeded the configured threshold of **{{thresholdPercent}}%**. Please review the recent financial activity and take corrective action to prevent potential cash flow issues.
+
+**Next Steps**
+
+1. Review the detailed transaction history in the dashboard: [{{dashboardLink}}]
+2. Verify expense entries for accuracy.
+3. Adjust budgeting or operational plans as needed.
+
+If you have any questions or need assistance, feel free to reach out to the compliance team.
+
+Thank you for your prompt attention to this matter.
+
+Best regards,  
+Axentx Compliance Monitoring Team
