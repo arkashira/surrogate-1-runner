@@ -1,39 +1,22 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Surrogate-1 Configuration Schema",
   "type": "object",
-  "required": ["dataset_path", "worker_count", "api_key", "shard_id", "output_dir", "log_level"],
   "properties": {
-    "dataset_path": {
-      "type": "string",
-      "description": "Path to the public dataset directory."
-    },
-    "worker_count": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 64,
-      "description": "Number of parallel workers to spawn."
-    },
-    "api_key": {
-      "type": "string",
-      "minLength": 1,
-      "description": "API key for authentication."
+    "dataset_name": {
+      "type": "string"
     },
     "shard_id": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 15,
-      "description": "Shard ID for this worker instance."
+      "maximum": 15
     },
-    "output_dir": {
-      "type": "string",
-      "description": "Directory where processed data will be stored."
+    "output_path": {
+      "type": "string"
     },
-    "log_level": {
-      "type": "string",
-      "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-      "description": "Logging verbosity level."
+    "interval": {
+      "type": "integer",
+      "minimum": 1
     }
   },
-  "additionalProperties": false
+  "required": ["dataset_name", "shard_id", "output_path"]
 }
