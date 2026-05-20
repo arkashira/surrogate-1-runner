@@ -1,24 +1,32 @@
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.express as px
 import pandas as pd
-from cost_optimization import CostOptimization
+from metrics import get_performance_metrics
 
-class Dashboard:
-    def __init__(self, data):
-        self.data = data
-        self.cost_optimization = CostOptimization(data)
+app = dash.Dash(__name__)
 
-    def display_recommendations(self):
-        recommendations = self.cost_optimization.update_recommendations()
-        for recommendation in recommendations:
-            print(f"Resource ID: {recommendation['resource_id']}")
-            print(f"Recommendation: {recommendation['recommendation']}")
-            print(f"Priority: {recommendation['priority']}")
-            print()
+app.layout = html.Div(children=[
+    html.H1(children='Surrogate-1 Performance Monitoring Dashboard'),
+    dcc.Graph(id='performance-metrics-graph'),
+    dcc.Interval(
+        id='interval-component',
+        interval=1000, # in milliseconds
+        n_intervals=0
+    )
+])
 
-# Example usage
+@app.callback(
+    Output('performance-metrics-graph', 'figure'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_graph(n):
+    metrics = get_performance_metrics()
+    df = pd.DataFrame(metrics)
+    fig = px.line(df, x='time', y='metric')
+    return fig
+
 if __name__ == '__main__':
-    data = pd.DataFrame({
-        'resource_id': [1, 2, 3],
-        'cost': [1500, 600, 300]
-    })
-    dashboard = Dashboard(data)
-    dashboard.display_recommendations()
+    app.run_server(debug=True)
