@@ -1,0 +1,24 @@
+{
+  "tasks": [
+    {
+      "id": "task-001",
+      "description": "Create initial dataset schema definitions.",
+      "due_date": "2026-05-15"
+    },
+    {
+      "id": "task-002",
+      "description": "Implement data normalization logic for each schema type.",
+      "due_date": "2026-05-20"
+    },
+    {
+      "id": "task-003",
+      "description": "Set up periodic ingestion workflow using GitHub Actions.",
+      "due_date": "2026-05-25"
+    },
+    {
+      "id": "task-004",
+      "description": "Test end-to-end data flow with sample datasets.",
+      "due_date": "2026-05-30"
+    }
+  ]
+}
