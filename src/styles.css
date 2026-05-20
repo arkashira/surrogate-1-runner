@@ -1,53 +1,39 @@
-/* Global Styles */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* Navigation Menu */
-.nav-menu {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1em;
-    background-color: #333;
-    color: #fff;
+.task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
 }
 
-.nav-menu a {
-    color: #fff;
-    text-decoration: none;
-    margin-right: 20px;
+.task-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* Responsive Design */
-@media only screen and (max-width: 768px) {
-    .nav-menu {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 0.5em;
-    }
-    
-    .nav-menu a {
-        margin-bottom: 0.5em;
-    }
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-@media only screen and (max-width: 480px) {
-    .nav-menu {
-        padding: 0.5em;
-    }
-    
-    body {
-        font-size: 14px;
-    }
+.status-indicator.running {
+  background-color: yellow;
 }
 
-/* Additional responsive improvements */
-@media (max-width: 768px) {
-    body {
-        font-size: 16px;
-    }
+.status-indicator.completed {
+  background-color: green;
+}
+
+.task-details {
+  display: flex;
+  gap: 10px;
 }
