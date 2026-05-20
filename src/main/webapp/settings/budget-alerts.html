@@ -1,0 +1,7 @@
+   @Controller
+   public class SettingsController {
+       @GetMapping("/settings/budget-alerts")
+       public String budgetAlerts() {
+           return "forward:/static/settings/budget-alerts.html";
+       }
+   }
