@@ -1,29 +1,28 @@
-import argparse
-from sop_creator import SOPCreator
+import time
+from routing.loader import RoutingLoader
 
 def main():
-    parser = argparse.ArgumentParser(description='Create and sync SOPs.')
-    parser.add_argument('--template', type=str, required=True, help='Template name')
-    parser.add_argument('--variables', type=str, required=True, help='Variables in JSON format')
-    parser.add_argument('--sync_to', type=str, choices=['slack', 'github', 'notion'], help='Sync to a specific tool')
-    parser.add_argument('--channel', type=str, help='Slack channel')
-    parser.add_argument('--repo', type=str, help='GitHub repository')
-    parser.add_argument('--branch', type=str, help='GitHub branch')
-    parser.add_argument('--page_id', type=str, help='Notion page ID')
+    config_path = '/opt/axentx/surrogate-1/config/routing.yaml'
+    routing_loader = RoutingLoader(config_path)
 
-    args = parser.parse_args()
+    try:
+        routing_loader.load()
+        print("Routing table loaded successfully")
 
-    sop_creator = SOPCreator('templates', 'output')
+        while True:
+            if routing_loader.reload_if_changed():
+                print("Routing table reloaded due to changes")
 
-    variables = eval(args.variables)
-    output_path = sop_creator.create_sop(args.template, variables)
+            try:
+                next_agent = routing_loader.get_next_agent('agent1', 'test_payload')
+                print(f"Next agent: {next_agent}")
+            except ValueError as e:
+                print(f"Routing error: {e}")
 
-    if args.sync_to == 'slack' and args.channel:
-        sop_creator.sync_to_slack(output_path, args.channel)
-    elif args.sync_to == 'github' and args.repo and args.branch:
-        sop_creator.sync_to_github(output_path, args.repo, args.branch)
-    elif args.sync_to == 'notion' and args.page_id:
-        sop_creator.sync_to_notion(output_path, args.page_id)
+            time.sleep(5)
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        raise
 
 if __name__ == '__main__':
     main()

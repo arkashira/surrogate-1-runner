@@ -1,0 +1,7 @@
+routes:
+  agent1:
+    agent: agent1
+    next_agent: ["agent2", "agent3"]
+  agent2:
+    agent: agent2
+    next_agent: ["agent3", "agent4"]
