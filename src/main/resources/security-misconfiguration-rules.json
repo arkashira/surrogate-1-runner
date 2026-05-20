@@ -1,0 +1,10 @@
+[
+    {
+        "condition": "some_security_condition",
+        "alertMessage": "Detected a potential security misconfiguration!"
+    },
+    {
+        "condition": "another_security_condition",
+        "alertMessage": "Another security issue detected!"
+    }
+]
