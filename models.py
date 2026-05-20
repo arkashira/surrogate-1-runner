@@ -1,45 +1,43 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
 from datetime import datetime
+from typing import Dict, List, Optional
+from dataclasses import dataclass, asdict
+from pydantic import BaseModel
 
-Base = declarative_base()
+# ---- Domain models ----
+@dataclass
+class CostMetric:
+    timestamp: datetime
+    resource_id: str
+    resource_name: str
+    resource_type: str
+    cost: float
+    currency: str = "USD"
+    tags: Optional[Dict[str, str]] = None
 
-class Request(Base):
-    __tablename__ = "requests"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    status = Column(String, default="pending")
-    # Other fields...
-    
-    # Relationship to status transitions
-    status_transitions = relationship("StatusTransition", back_populates="request")
-    timeline_events = relationship("TimelineEvent", back_populates="request")
+    def to_dict(self):
+        d = asdict(self)
+        d["timestamp"] = self.timestamp.isoformat()
+        return d
 
-class StatusTransition(Base):
-    __tablename__ = "status_transitions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    request_id = Column(Integer, ForeignKey("requests.id"))
-    from_status = Column(String)
-    to_status = Column(String)
-    actor = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationship back to request
-    request = relationship("Request", back_populates="status_transitions")
+class CostSummary(BaseModel):
+    period_start: datetime
+    period_end: datetime
+    total_cost: float
+    currency: str
+    by_resource_type: Dict[str, float]
+    by_service: Dict[str, float]
+    trend: float  # % change vs previous period
 
-class TimelineEvent(Base):
-    __tablename__ = "timeline_events"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    request_id = Column(Integer, ForeignKey("requests.id"))
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    description = Column(Text)
-    actor = Column(String)
-    # Link to status transition if applicable
-    status_transition_id = Column(Integer, ForeignKey("status_transitions.id"))
-    
-    # Relationships
-    request = relationship("Request", back_populates="timeline_events")
-    status_transition = relationship("StatusTransition")
+# ---- API schemas ----
+class RealtimeRequest(BaseModel):
+    hours: int = 24
+
+class SummaryRequest(BaseModel):
+    days: int = 30
+
+class AuditEntry(BaseModel):
+    timestamp: datetime
+    action: str
+    user: str
+    resource: str
+    details: Dict[str, str]
