@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Dashboard</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .high {
+            color: red;
+        }
+        .medium {
+            color: orange;
+        }
+        .low {
+            color: green;
+        }
+        .filter {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Security Dashboard</h1>
+    <div class="filter">
+        <label for="severity">Filter by Severity:</label>
+        <select id="severity" onchange="filterTable()">
+            <option value="">All</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+        </select>
+    </div>
+    <table id="scanTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Vulnerability</th>
+                <th>Severity</th>
+                <th>Remediation</th>
+                <th>Scan Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Scans}}
+            {{if or (eq .Severity $.FilterSeverity) (eq $.FilterSeverity "")}}
+            <tr>
+                <td>{{.ID}}</td>
+                <td>{{.Vulnerability}}</td>
+                <td class="{{.Severity | lower}}">{{.Severity}}</td>
+                <td>{{.Remediation}}</td>
+                <td>{{.ScanDate}}</td>
+            </tr>
+            {{end}}
+            {{end}}
+        </tbody>
+    </table>
+
+    <script>
+        function filterTable() {
+            const severity = document.getElementById('severity').value;
+            window.location.href = `?severity=${severity}`;
+        }
+    </script>
+</body>
+</html>
