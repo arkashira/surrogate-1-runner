@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Observability Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <h1>Unified Observability Dashboard</h1>
+    <div id="metrics-container">
+        <div id="latency-container">
+            <h2>Latency</h2>
+            <canvas id="latency-chart"></canvas>
+        </div>
+        <div id="cost-container">
+            <h2>Cost</h2>
+            <canvas id="cost-chart"></canvas>
+        </div>
+        <div id="error-container">
+            <h2>Error Rates</h2>
+            <canvas id="error-chart"></canvas>
+        </div>
+    </div>
+    <div id="filter-sort-container">
+        <label for="filter-input">Filter:</label>
+        <input type="text" id="filter-input" placeholder="Search...">
+        <label for="sort-select">Sort:</label>
+        <select id="sort-select">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+        </select>
+    </div>
+    <script src="dashboard.js"></script>
+</body>
+</html>
