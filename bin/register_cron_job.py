@@ -1,0 +1,1 @@
+/opt/axentx/surrogate-1/bin/register_cron_job.py

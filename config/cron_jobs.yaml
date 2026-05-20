@@ -1,0 +1,14 @@
+# ----------------------------------------------------------------------
+# Central source‑of‑truth for all surrogate‑1 scheduled jobs.
+# Each entry can be consumed by the registration script (Python) or by
+# external orchestration tools (Ansible, Terraform, etc.).
+# ----------------------------------------------------------------------
+jobs:
+  - name: recommendation_engine
+    schedule: "0 2 * * *"                     # 02:00 UTC daily
+    command: "/opt/axentx/surrogate-1/bin/run_recommendations.sh"
+    description: |
+      Generate cost‑reduction recommendations, filter by confidence
+      and critical‑worker whitelist, write JSON output and post a
+      summary to the configured Slack webhook.
+    enabled: true
