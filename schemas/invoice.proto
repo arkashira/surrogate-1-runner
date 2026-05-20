@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package axentx.surrogate_1;
+
+message Invoice {
+  string invoice_number = 1;
+  string vendor_name = 2;
+  string customer_name = 3;
+  string issue_date = 4;
+  string due_date = 5;
+  float amount_due = 6;
+  repeated LineItem line_items = 7;
+}
+
+message LineItem {
+  string description = 1;
+  int32 quantity = 2;
+  float unit_price = 3;
+  float total_price = 4;
+}
