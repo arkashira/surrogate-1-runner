@@ -1,21 +1,22 @@
-use crate::relay::relay::Relay;
-use crate::relay::config::RelayConfig;
-use crate::relay::types::Transaction;
-use anyhow::Result;
+use crate::relay::Relay;
+use crate::error::Error;
+use crate::types::Transaction;
+use serde::Serialize;
 
-pub struct PrivateTransactionRelayAPI {
-    relay: Relay,
+#[derive(Serialize)]
+pub struct RelayTransactionRequest {
+    pub transaction: Transaction,
+    pub destination_chain: String,
 }
 
-impl PrivateTransactionRelayAPI {
-    pub fn new(config: RelayConfig) -> Self {
-        let relay = Relay::new(config);
-        PrivateTransactionRelayAPI { relay }
-    }
+pub trait RelayApi {
+    fn send_transaction(&self, request: RelayTransactionRequest) -> Result<(), Error>;
+}
 
-    pub fn enable_private_transaction(&self, tx: &Transaction) -> Result<Transaction> {
-        let obfuscated_tx = self.relay.obfuscate_transaction(tx)?;
-        self.relay.relay_transaction(&obfuscated_tx)?;
-        Ok(obfuscated_tx)
+impl RelayApi for Relay {
+    fn send_transaction(&self, request: RelayTransactionRequest) -> Result<(), Error> {
+        // Logic to send transaction across chains using private relays
+        // ...
+        Ok(())
     }
 }
