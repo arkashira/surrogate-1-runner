@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locks Dashboard</title>
+</head>
+<body>
+    <h1>Locks Dashboard</h1>
+    <div id="locks-container">
+        <!-- Locks will be displayed here -->
+    </div>
+    <script>
+        // WebSocket connection will be established here
+        const socket = new WebSocket('ws://' + window.location.host + '/ws/locks');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            // Update the locks container with the received data
+            document.getElementById('locks-container').innerHTML = data.map(lock => `
+                <div class="lock">
+                    <p>Document: ${lock.document}</p>
+                    <p>Section: ${lock.section}</p>
+                    <p>Owner: ${lock.owner}</p>
+                    <p>TTL: ${lock.ttl}</p>
+                </div>
+            `).join('');
+        };
+    </script>
+</body>
+</html>
