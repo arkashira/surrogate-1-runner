@@ -1,0 +1,17 @@
+---
+customer_interview_questions:
+  - "What are the primary pain points you experience with our product?"
+  - "How do you currently use our product, and what features do you find most valuable?"
+  - "What are your expectations for our product, and how do you think we can improve it?"
+competitor_analysis_summaries:
+  - "Analyze the market share of our top competitors and identify areas for improvement."
+  - "Compare the features and pricing models of our competitors and provide recommendations for differentiation."
+  - "Assess the strengths and weaknesses of our competitors and provide a competitive landscape analysis."
+pricing_model_stress_tests:
+  - "Test the pricing model under various scenarios, including changes in demand and competition."
+  - "Analyze the sensitivity of our pricing model to changes in costs and revenue."
+  - "Evaluate the impact of different pricing strategies on customer acquisition and retention."
+llm_integration:
+  - "Integrate with the surrogate-1 API to generate customer interview questions and competitor analysis summaries."
+  - "Use the surrogate-1 API to generate pricing model stress tests and provide recommendations for improvement."
+  - "Develop a workflow to automate the generation of validation tasks using the surrogate-1 API."
