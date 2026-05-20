@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Alert Triage</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <header>
+        <h1>Alert Triage</h1>
+    </header>
+
+    <!-- -------------------------------------------------
+         1️⃣  Alert details – core information that already
+         existed in the original dashboard.
+         ------------------------------------------------- -->
+    <section id="alert-details">
+        <h2>Alert Details</h2>
+        <p><strong>ID:</strong> {{ alert.id }}</p>
+        <p><strong>Severity:</strong> {{ alert.severity }}</p>
+        <p><strong>Timestamp:</strong> {{ alert.timestamp }}</p>
+        <p><strong>Description:</strong> {{ alert.description }}</p>
+    </section>
+
+    <!-- -------------------------------------------------
+         2️⃣  Context Tags – new UI block that surfaces any
+         tags the enrichment pipeline attached to the alert.
+         ------------------------------------------------- -->
+    <section id="context-tags">
+        <h2>Context Tags</h2>
+        {% if context_tags %}
+            <ul class="tag-list">
+                {% for tag in context_tags %}
+                    <li class="tag">{{ tag }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty-state">No context tags available.</p>
+        {% endif %}
+    </section>
+
+    <!-- -------------------------------------------------
+         3️⃣  Decision Logs – new UI block that shows the
+         chronological audit trail of analyst actions.
+         ------------------------------------------------- -->
+    <section id="decision-logs">
+        <h2>Decision Logs</h2>
+        {% if decision_logs %}
+            <ul class="decision-log-list">
+                {% for log in decision_logs %}
+                    <li class="log-entry">
+                        <strong>{{ log.timestamp }} – {{ log.author }}:</strong>
+                        <p class="log-message">{{ log.message }}</p>
+
+                        {% if log.attachments %}
+                            <ul class="attachments">
+                                {% for att in log.attachments %}
+                                    <li>
+                                        <a href="{{ att.url }}" target="_blank"
+                                           rel="noopener">{{ att.name }}</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty-state">No decision logs recorded for this alert.</p>
+        {% endif %}
+    </section>
+
+    <!-- -------------------------------------------------
+         4️⃣  Action form – unchanged from the original UI,
+         but now lives after the new sections so analysts
+         see context before they act.
+         ------------------------------------------------- -->
+    <section id="triage-actions">
+        <h2>Actions</h2>
+        <form method="post" action="/triage/{{ alert.id }}/resolve">
+            <label for="resolution">Resolution:</label>
+            <select name="resolution" id="resolution" required>
+                <option value="acknowledged">Acknowledge</option>
+                <option value="investigating">Investigating</option>
+                <option value="resolved">Resolved</option>
+            </select>
+            <button type="submit">Submit</button>
+        </form>
+    </section>
+
+    <footer>
+        <p>Surrogate‑1 Dashboard – © {{ current_year }} Axentx</p>
+    </footer>
+</body>
+</html>
