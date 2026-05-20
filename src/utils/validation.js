@@ -1,18 +1,11 @@
-function validateHardwareInput(input) {
-  const requiredFields = ['cpu', 'gpu', 'ram', 'storage', 'motherboard'];
-  const errors = [];
 
-  requiredFields.forEach((field) => {
-    if (!input[field] || input[field].trim() === '') {
-      errors.push(`${field} is required`);
-    }
-  });
+function isValidContributionAmount(amount) {
+  const minContribution = 10;
+  const maxContribution = 10000;
 
-  if (errors.length > 0) {
-    throw new Error(errors.join('\n'));
+  if (amount < minContribution || amount > maxContribution) {
+    throw new Error('Invalid contribution amount. Please enter a value between $10 and $10,000.');
   }
-
-  return input;
 }
 
-module.exports = validateHardwareInput;
+export { isValidContribution };
