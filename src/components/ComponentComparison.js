@@ -1,47 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { fetchPriceComparison } from '../utils/priceComparison';
+import getBuildRecommendations from '../utils/buildRecommendations';
 
-const ComponentComparison = ({ componentId }) => {
-  const [comparisonData, setComparisonData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const ComponentComparison = () => {
+  const [userBudget, setUserBudget] = useState(1000);
+  const [userNeeds, setUserNeeds] = useState('gaming');
+  const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const loadComparisonData = async () => {
+    const fetchRecommendations = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        const data = await fetchPriceComparison(componentId);
-        setComparisonData(data);
-      } catch (err) {
-        setError(err.message);
+        const recs = getBuildRecommendations(userBudget, userNeeds);
+        setRecommendations(recs);
+      } catch (error) {
+        console.error('Error fetching recommendations:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (componentId) {
-      loadComparisonData();
-    }
-  }, [componentId]);
+    fetchRecommendations();
+  }, [userBudget, userNeeds]);
 
-  if (loading) return <div className="loading">Loading price comparison...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
-  if (!comparisonData) return <div>No comparison data available</div>;
+  const handleBudgetChange = (e) => {
+    setUserBudget(Number(e.target.value));
+  };
+
+  const handleNeedsChange = (e) => {
+    setUserNeeds(e.target.value);
+  };
 
   return (
     <div className="component-comparison">
-      <h2>Price Comparison for {comparisonData.componentName}</h2>
-      <div className="comparison-results">
-        {comparisonData.retailers.map((retailer) => (
-          <div key={retailer.name} className="retailer-card">
-            <h3>{retailer.name}</h3>
-            <p className="price">${retailer.price.toFixed(2)}</p>
-            <p className="availability">{retailer.availability}</p>
-            <a href={retailer.url} target="_blank" rel="noopener noreferrer">
-              View Product
-            </a>
+      <h1>PC Build Recommendations</h1>
+      
+      <div className="user-inputs">
+        <div className="input-group">
+          <label htmlFor="budget">Budget ($):</label>
+          <input
+            type="range"
+            id="budget"
+            min="500"
+            max="3000"
+            value={userBudget}
+            onChange={handleBudgetChange}
+          />
+          <span>{userBudget}</span>
+        </div>
+        
+        <div className="input-group">
+          <label htmlFor="needs">Primary Use:</label>
+          <select id="needs" value={userNeeds} onChange={handleNeedsChange}>
+            <option value="gaming">Gaming</option>
+            <option value="productivity">Productivity</option>
+            <option value="content-creation">Content Creation</option>
+            <option value="general">General Use</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="recommendations-section">
+        <h2>Recommended Builds</h2>
+        
+        {loading ? (
+          <div className="loading">Generating recommendations...</div>
+        ) : (
+          <div className="recommendations-grid">
+            {recommendations.length > 0 ? (
+              recommendations.map(build => (
+                <div key={build.id} className="build-card">
+                  <h3>{build.name}</h3>
+                  <div className="build-specs">
+                    <p><strong>CPU:</strong> {build.cpu}</p>
+                    <p><strong>GPU:</strong> {build.gpu}</p>
+                    <p><strong>Motherboard:</strong> {build.motherboard}</p>
+                    <p><strong>RAM:</strong> {build.ram}</p>
+                    <p><strong>PSU:</strong> {build.psu}</p>
+                    <p><strong>SSD:</strong> {build.ssd}</p>
+                  </div>
+                  <div className="build-footer">
+                    <span className="total-cost">${build.totalCost}</span>
+                    <span className="relevance">Relevance: {Math.round(build.relevance * 100)}%</span>
+                    <span className="value">Value Score: {build.valueScore}/10</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="no-recommendations">
+                No builds found within your budget. Try increasing your budget.
+              </div>
+            )}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
