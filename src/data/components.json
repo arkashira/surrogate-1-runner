@@ -1,48 +1,20 @@
-{
-  "components": [
+[
     {
-      "name": "dataset-streamer",
-      "category": "ingestion",
-      "description": "Parallel dataset slicing and streaming worker",
-      "performance": {
-        "benchmark1": "15000 records/sec",
-        "benchmark2": "2.5ms avg"
-      },
-      "tested_with": "reddit-0a3d688046dde7a4",
-      "last_benchmarked": "2026-05-04T00:49:17Z"
+        "id": "comp1",
+        "name": "Component 1",
+        "performance": 85,
+        "price": 150
     },
     {
-      "name": "schema-normalizer",
-      "category": "processing",
-      "description": "Per-schema normalization engine",
-      "performance": {
-        "benchmark1": "8000 records/sec",
-        "benchmark2": "5ms avg"
-      },
-      "tested_with": "reddit-0a3d688046dde7a4",
-      "last_benchmarked": "2026-05-04T00:49:17Z"
+        "id": "comp2",
+        "name": "Component 2",
+        "performance": 90,
+        "price": 200
     },
     {
-      "name": "md5-deduplicator",
-      "category": "processing",
-      "description": "Central md5 hash store deduplication",
-      "performance": {
-        "benchmark1": "12000 records/sec",
-        "benchmark2": "3ms avg"
-      },
-      "tested_with": "reddit-0a3d688046dde7a4",
-      "last_benchmarked": "2026-05-04T00:49:17Z"
-    },
-    {
-      "name": "huggingface-uploader",
-      "category": "output",
-      "description": "Dataset repo upload worker",
-      "performance": {
-        "benchmark1": "5000 records/sec",
-        "benchmark2": "15ms avg"
-      },
-      "tested_with": "reddit-0a3d688046dde7a4",
-      "last_benchmarked": "2026-05-04T00:49:17Z"
+        "id": "comp3",
+        "name": "Component 3",
+        "performance": 80,
+        "price": 100
     }
-  ]
-}
+]

@@ -1,9 +1,34 @@
-export const getRefinedBuildRecommendations = (components, preferences) => {
-  // This function should implement logic to refine build recommendations based on user preferences.
-  // For demonstration purposes, we'll just filter components based on a simple performance threshold.
-  const performanceThreshold = preferences.performance || 50; // Default to 50 if not specified
+function refineBuildRecommendation(preferences, componentsData) {
+    const refinedRecommendations = [];
 
-  const refinedRecommendations = components.filter((component) => component.performance >= performanceThreshold);
+    // Iterate through components data and apply user preferences
+    componentsData.forEach(component => {
+        let score = 0;
 
-  return refinedRecommendations;
+        // Example preference: prioritize components with higher performance ratings
+        if (preferences.performance && component.performance) {
+            score += component.performance * preferences.performance.weight;
+        }
+
+        // Example preference: prioritize components with lower prices
+        if (preferences.price && component.price) {
+            score -= component.price * preferences.price.weight;
+        }
+
+        // Add more conditions based on user preferences
+
+        refinedRecommendations.push({
+            ...component,
+            score
+        });
+    });
+
+    // Sort recommendations based on the calculated score
+    refinedRecommendations.sort((a, b) => b.score - a.score);
+
+    return refinedRecommendations;
+}
+
+module.exports = {
+    refineBuildRecommendation
 };
