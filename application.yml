@@ -1,0 +1,22 @@
+spring:
+  profiles:
+    active: dev
+
+llm:
+  provider: openai
+  providers:
+    openai: https://api.openai.com/v1
+    anthropic: https://api.anthropic.com/v1
+    huggingface: https://huggingface.co/api
+
+---
+spring:
+  profiles:
+    active: prod
+
+llm:
+  provider: anthropic
+  providers:
+    openai: https://api.openai.com/v1
+    anthropic: https://api.anthropic.com/v1
+    huggingface: https://huggingface.co/api
