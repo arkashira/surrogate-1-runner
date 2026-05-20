@@ -1,22 +1,11 @@
-# surrogate-1
+# surrogate-1-runner
 
-**surrogate-1** provides a lightweight functional‑programming toolkit for building data‑processing pipelines in Python.  
-It ships with generic `Functor` and `Monad` abstractions that can be combined with the library’s dataset‑ingestion utilities.
+Parallel public-dataset ingest workers for the [axentx/surrogate-1](https://github.com/axentx/surrogate-1) HuggingFace dataset.
 
----
+## What this does
 
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Functor Pattern](#functor-pattern)
-- [Monad Pattern](#monad-pattern)
-- [Tutorial – Common Use Cases](#tutorial---common-use-cases)
-- [Running the Examples](#running-the-examples)
-- [Contributing](#contributing)
-
----
+Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**. Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`) of the public dataset list defined in `bin/dataset-enrich.sh`, streams, normalizes per-schema, dedups via the central md5 hash store, and uploads its output to a unique path on the dataset repo:
 
 ## Installation
 
-The package is published on PyPI and can be installed with `pip`:
+To install the surrogate-1 library, run:
