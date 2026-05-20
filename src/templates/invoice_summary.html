@@ -2,28 +2,13 @@
 <html>
 <head>
     <title>Invoice Summary</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid black; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
 </head>
 <body>
-    <h2>Invoice Summary</h2>
-    <table>
-        <tr>
-            <th>Vendor Name</th>
-            <th>Date</th>
-            <th>Amount</th>
-            <th>Due Date</th>
-        </tr>
-        <tr>
-            <td>{{ vendor_name }}</td>
-            <td>{{ invoice_date }}</td>
-            <td>{{ amount }}</td>
-            <td>{{ due_date }}</td>
-        </tr>
-    </table>
+    <h1>Invoice Summary</h1>
+    <p><strong>Vendor:</strong> {{ vendor_name }}</p>
+    <p><strong>Date:</strong> {{ date }}</p>
+    <p><strong>Amount:</strong> ${{ "%.2f"|format(amount) }}</p>
+    <p><strong>Due Date:</strong> {{ due_date }}</p>
+    <a href="{{ url_for('invoice_summary.invoice_list') }}">Back to Invoices</a>
 </body>
 </html>
