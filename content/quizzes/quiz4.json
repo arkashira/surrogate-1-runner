@@ -1,0 +1,70 @@
+{
+  "article_id": "quiz4",
+  "title": "Introduction to Financial Statements",
+  "word_count": 700,
+  "topics": ["financial statements", "accounting basics", "business finance"],
+  "quizzes": [
+    {
+      "type": "multiple_choice",
+      "question": "Which financial statement shows a company's financial performance over a period of time?",
+      "options": [
+        "Balance Sheet",
+        "Income Statement",
+        "Cash Flow Statement",
+        "Statement of Equity"
+      ],
+      "correct_answer": 1,
+      "explanation": "The Income Statement (also known as the Profit and Loss Statement) reports a company's revenues, expenses, and profits or losses over a specific period."
+    },
+    {
+      "type": "multiple_choice",
+      "question": "What does the acronym 'ROI' stand for in business finance?",
+      "options": [
+        "Return on Investment",
+        "Revenue of Interest",
+        "Rate of Interest",
+        "Return on Income"
+      ],
+      "correct_answer": 0,
+      "explanation": "ROI stands for Return on Investment and is used to measure the efficiency or profitability of an investment."
+    },
+    {
+      "type": "true_false",
+      "question": "Assets are resources owned by a company that have economic value.",
+      "correct_answer": true,
+      "explanation": "Assets represent items of value that a company owns or controls, such as cash, inventory, property, and equipment."
+    }
+  ],
+  "exercises": [
+    {
+      "type": "match",
+      "instruction": "Match each financial term with its correct definition:",
+      "items": [
+        {
+          "term": "Assets",
+          "definition": "Resources owned by a company with economic value"
+        },
+        {
+          "term": "Liabilities",
+          "definition": "Obligations or debts owed by a company"
+        },
+        {
+          "term": "Equity",
+          "definition": "The residual interest in the assets of the entity after deducting liabilities"
+        }
+      ],
+      "exercise_text": "Match the terms with their definitions."
+    },
+    {
+      "type": "calculate",
+      "instruction": "Calculate the basic financial ratios for the given data:",
+      "data": {
+        "revenue": 500000,
+        "expenses": 300000,
+        "assets": 1000000,
+        "liabilities": 400000
+      },
+      "exercise_text": "Calculate Net Profit Margin and Current Ratio using the provided financial data."
+    }
+  ]
+}

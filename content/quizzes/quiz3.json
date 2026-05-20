@@ -1,0 +1,46 @@
+{
+  "article_id": "quiz3",
+  "title": "Understanding Business Communication",
+  "word_count": 650,
+  "topics": ["business communication", "professional writing", "email etiquette"],
+  "quizzes": [
+    {
+      "type": "multiple_choice",
+      "question": "Which of the following is the most appropriate email subject line for a professional setting?",
+      "options": [
+        "URGENT!!!",
+        "Meeting Notes - 3/15/2023",
+        "Re: Follow-up on Project Proposal",
+        "Quick Question"
+      ],
+      "correct_answer": 1,
+      "explanation": "A clear, descriptive subject line like 'Meeting Notes - 3/15/2023' provides recipients with immediate context about the email's content."
+    },
+    {
+      "type": "true_false",
+      "question": "In formal business communication, it's acceptable to use contractions like 'don't' and 'can't'.",
+      "correct_answer": false,
+      "explanation": "Formal business communication typically avoids contractions to maintain professionalism and clarity."
+    },
+    {
+      "type": "fill_blank",
+      "question": "When writing a business email, always begin with a _______ that clearly states the purpose of your message.",
+      "correct_answer": "clear subject line",
+      "explanation": "A clear subject line helps recipients understand the email's intent before opening it."
+    }
+  ],
+  "exercises": [
+    {
+      "type": "rewrite",
+      "instruction": "Rewrite the following informal email into a professional format:",
+      "original_text": "Hey there, just wanted to check if we're still on for the meeting tomorrow at 10am. Let me know if anything changes!",
+      "exercise_text": "Rewrite this email to be more professional while maintaining politeness."
+    },
+    {
+      "type": "identify",
+      "instruction": "Identify the tone of the following business message:",
+      "message": "We need to discuss the budget allocation for the upcoming quarter. Please prepare a summary of expenses from last quarter and bring it to our meeting.",
+      "exercise_text": "What is the tone of this message?"
+    }
+  ]
+}
