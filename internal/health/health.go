@@ -1,17 +1,13 @@
 package health
 
 import (
-	"encoding/json"
 	"net/http"
 )
 
-// Handler returns a health check handler
-func Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+// Register registers a simple /health endpoint that always returns 200.
+func Register(mux *http.ServeMux) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
-			"status": "ok",
-		})
-	}
+		w.Write([]byte("ok"))
+	})
 }
