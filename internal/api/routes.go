@@ -1,12 +1,13 @@
 package api
 
 import (
-	"log"
 	"net/http"
+
+	"github.com/axentx/surrogate-1/internal/api/handlers"
 )
 
-// InitRoutes registers all API routes for the surrogate-1 service.
-// It should be called from the main entry point of the application.
-func InitRoutes() {
-	http.HandleFunc("/tasks", taskHandler)
+func SetupRoutes(r *http.ServeMux) {
+	metricsHandler := handlers.NewMetricsHandler()
+	
+	r.HandleFunc("/metrics", metricsHandler.Handle).Methods("GET")
 }
