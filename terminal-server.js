@@ -1,31 +1,50 @@
-const express = require('express');
-const https = require('https');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
-const { validateToken } = require('./auth-service');
+const path = require('path');
 
-const app = express();
-const server = https.createServer({
-  key: fs.readFileSync('/opt/axentx/surrogate-1/config/tls/key.pem'),
-  cert: fs.readFileSync('/opt/axentx/surrogate-1/config/tls/cert.pem'),
-  ca: fs.readFileSync('/opt/axentx/surrogate-1/config/tls/ca.pem')
-}, app);
+const POLICIES_FILE = '/opt/axentx/surrogate-1/db/policies.json';
+const ACCESS_AUDIT_LOG = '/opt/axentx/surrogate-1/logs/access-audit.log';
 
-app.use(express.json());
-
-app.post('/terminal', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token || !(await validateToken(token))) {
-    return res.status(401).send('Invalid token');
+class TerminalServer {
+  constructor() {
+    this.policies = this.loadPolicies();
   }
 
-  const sessionId = uuidv4();
-  // Start a new terminal session here with the sessionId
-  // ...
+  loadPolicies() {
+    try {
+      const data = fs.readFileSync(POLICIES_FILE, 'utf8');
+      return JSON.parse(data);
+    } catch (err) {
+      console.error('Error loading policies:', err);
+      return {};
+    }
+  }
 
-  res.send({ sessionId });
-});
+  validateCommand(userRole, command) {
+    const policy = this.policies[userRole];
+    if (!policy) {
+      this.logAccessAttempt(userRole, command, false, 'No policy for role');
+      return false;
+    }
 
-server.listen(443, () => {
-  console.log('Terminal server listening on port 443');
-});
+    if (policy.allowedCommands.includes(command)) {
+      this.logAccessAttempt(userRole, command, true);
+      return true;
+    }
+
+    this.logAccessAttempt(userRole, command, false, 'Command not allowed');
+    return false;
+  }
+
+  logAccessAttempt(userRole, command, isAllowed, reason = '') {
+    const timestamp = new Date().toISOString();
+    const logEntry = `${timestamp} - UserRole: ${userRole}, Command: ${command}, Allowed: ${isAllowed}, Reason: ${reason}\n`;
+
+    fs.appendFile(ACCESS_AUDIT_LOG, logEntry, (err) => {
+      if (err) {
+        console.error('Error writing to access audit log:', err);
+      }
+    });
+  }
+}
+
+module.exports = TerminalServer;
