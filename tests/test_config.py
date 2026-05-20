@@ -1,121 +1,45 @@
 import unittest
-import yaml
-import json
-from surrogate_1.config import ConfigParser
+import os
+import tempfile
+from surrogate1.config import Config
 
-class TestConfigParser(unittest.TestCase):
+class TestConfig(unittest.TestCase):
     def setUp(self):
-        self.valid_yaml = """
-        python:
-          indent: 4
-          line_length: 120
-        javascript:
-          single_quote: true
-          tab_width: 2
-        go:
-          remove_extra_spaces: true
-        """
-        self.valid_json = """
-        {
-          "python": {
-            "indent": 4,
-            "line_length": 120
-          },
-          "javascript": {
-            "single_quote": true,
-            "tab_width": 2
-          },
-          "go": {
-            "remove_extra_spaces": true
-          }
-        }
-        """
-        self.invalid_yaml = """
-        python:
-          indent: 4
-          line_length: "120"
-        """
-        self.invalid_json = """
-        {
-          "python": {
-            "indent": 4,
-            "line_length": "120"
-          }
-        }
-        """
-        self.missing_key_yaml = """
-        python:
-          indent: 4
-        javascript:
-          single_quote: true
-        """
-        self.missing_key_json = """
-        {
-          "python": {
-            "indent": 4
-          },
-          "javascript": {
-            "single_quote": true
-          }
-        }
-        """
-        self.invalid_language_yaml = """
-        invalid_language:
-          option: value
-        """
-        self.invalid_language_json = """
-        {
-          "invalid_language": {
-            "option": "value"
-          }
-        }
-        """
+        self.temp_dir = tempfile.mkdtemp()
+        self.config_path = os.path.join(self.temp_dir, 'surrogate.yaml')
 
-    def test_valid_yaml_config(self):
-        config = ConfigParser()
-        result = config.parse(yaml.safe_load(self.valid_yaml))
-        self.assertEqual(result['python']['indent'], 4)
-        self.assertEqual(result['javascript']['tab_width'], 2)
-        self.assertEqual(result['go']['remove_extra_spaces'], True)
+    def tearDown(self):
+        if os.path.exists(self.config_path):
+            os.remove(self.config_path)
+        os.rmdir(self.temp_dir)
 
-    def test_valid_json_config(self):
-        config = ConfigParser()
-        result = config.parse(json.loads(self.valid_json))
-        self.assertEqual(result['python']['indent'], 4)
-        self.assertEqual(result['javascript']['tab_width'], 2)
-        self.assertEqual(result['go']['remove_extra_spaces'], True)
+    def test_config_creation(self):
+        config = Config(
+            project='test_project',
+            dataset='test_dataset',
+            output_dir='test_output_dir'
+        )
+        config.save(self.config_path)
 
-    def test_invalid_yaml_config(self):
-        config = ConfigParser()
-        with self.assertRaises(ValueError):
-            config.parse(yaml.safe_load(self.invalid_yaml))
+        self.assertTrue(os.path.exists(self.config_path))
+        with open(self.config_path, 'r') as f:
+            config_content = f.read()
+        self.assertIn('project: test_project', config_content)
+        self.assertIn('dataset: test_dataset', config_content)
+        self.assertIn('output_dir: test_output_dir', config_content)
 
-    def test_invalid_json_config(self):
-        config = ConfigParser()
-        with self.assertRaises(ValueError):
-            config.parse(json.loads(self.invalid_json))
+    def test_config_load(self):
+        with open(self.config_path, 'w') as f:
+            f.write('''
+project: test_project
+dataset: test_dataset
+output_dir: test_output_dir
+''')
 
-    def test_missing_language_key_yaml(self):
-        config = ConfigParser()
-        result = config.parse(yaml.safe_load(self.missing_key_yaml))
-        with self.assertRaises(KeyError):
-            result['go']
-
-    def test_missing_language_key_json(self):
-        config = ConfigParser()
-        result = config.parse(json.loads(self.missing_key_json))
-        with self.assertRaises(KeyError):
-            result['go']
-
-    def test_invalid_language_yaml(self):
-        config = ConfigParser()
-        with self.assertRaises(ValueError):
-            config.parse(yaml.safe_load(self.invalid_language_yaml))
-
-    def test_invalid_language_json(self):
-        config = ConfigParser()
-        with self.assertRaises(ValueError):
-            config.parse(json.loads(self.invalid_language_json))
+        config = Config.load(self.config_path)
+        self.assertEqual(config.project, 'test_project')
+        self.assertEqual(config.dataset, 'test_dataset')
+        self.assertEqual(config.output_dir, 'test_output_dir')
 
 if __name__ == '__main__':
     unittest.main()
