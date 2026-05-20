@@ -1,11 +1,15 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from database import Base
+from datetime import datetime
+from .extensions import db
 
-class Project(Base):
-    __tablename__ = "projects"
+class Component(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500))
+    prices = db.relationship('Price', backref='component', lazy=True)
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    bundle_id = Column(String(255), unique=True, nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
+class Price(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('component.id'), nullable=False)
+    vendor = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
