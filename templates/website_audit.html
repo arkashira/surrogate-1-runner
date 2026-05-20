@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Audit Results</title>
+</head>
+<body>
+  <h1>Website Audit Results</h1>
+  <ul id="audit-results"></ul>
+  <script>
+    const auditResults = JSON.parse('{{ audit_results|safe }}');
+    const resultsList = document.getElementById('audit-results');
+    auditResults.forEach((result) => {
+      const listItem = document.createElement('li');
+      listItem.innerHTML = `
+        <strong>${result.suggestion}</strong> - ${result.explanation} <a href="${result.help_article}" target="_blank">Learn more</a>
+      `;
+      resultsList.appendChild(listItem);
+    });
+  </script>
+</body>
+</html>
