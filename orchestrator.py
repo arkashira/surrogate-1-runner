@@ -1,26 +1,29 @@
-import time
-from typing import Callable, Any
+import hashlib
+from typing import List, Callable
 
-class RetryStrategy:
-    def __init__(self, max_retries: int = 3, backoff_factor: float = 1.0):
-        self.max_retries = max_retries
-        self.backoff_factor = backoff_factor
+class Orchestrator:
+    def __init__(self, llm_providers: List[Callable]):
+        self.llm_providers = sorted(llm_providers, key=lambda x: x.__name__)
 
-    def execute_with_retry(self, func: Callable, *args, **kwargs) -> Any:
-        retries = 0
-        while retries <= self.max_retries:
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                if retries == self.max_retries:
-                    raise e
-                wait_time = self.backoff_factor * (2 ** retries)
-                time.sleep(wait_time)
-                retries += 1
+    def execute_calls(self, requests: List[str]) -> List[str]:
+        responses = []
+        for request in requests:
+            for provider in self.llm_providers:
+                try:
+                    response = provider(request)
+                    responses.append(response)
+                    break
+                except Exception as e:
+                    print(f"Retry failed with {provider.__name__}: {str(e)}")
+        return responses
 
-def orchestrate_llm_calls(call_func: Callable, *args, **kwargs) -> Any:
-    retry_strategy = RetryStrategy()
-    return retry_strategy.execute_with_retry(call_func, *args, **kwargs)
+def deterministic_llm_call_provider(request: str) -> str:
+    # Simulate an LLM call provider
+    return hashlib.sha256(request.encode()).hexdigest()
 
-# Example usage:
-# result = orchestrate_llm_calls(make_llm_call, arg1, arg2, kwarg1=value1)
+if __name__ == "__main__":
+    providers = [deterministic_llm_call_provider]
+    orchestrator = Orchestrator(providers)
+    requests = ["request1", "request2"]
+    responses = orchestrator.execute_calls(requests)
+    print(responses)
