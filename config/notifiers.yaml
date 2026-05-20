@@ -1,0 +1,10 @@
+email:
+  enabled: true
+  from: "spend-alerts@axentx.io"
+  api_key: "SENDGRID_API_KEY"
+  smtp_host: "smtp.sendgrid.net"
+  port: 587
+
+slack:
+  enabled: true
+  webhook: "<slack-webhook>"
