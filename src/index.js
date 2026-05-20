@@ -1,10 +1,10 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import Dashboard from './components/Dashboard';
+const RBAC = require('./rbac-engine');
 
-ReactDOM.render(
-  <React.StrictMode>
-    <Dashboard />
-  </React.StrictMode>,
-  document.getElementById('root')
-);
+const rbac = new RBAC();
+
+// Example usage:
+const userRole = 'admin';
+const userPermissions = rbac.validateUser(userRole);
+console.log(userPermissions);
+
+rbac.auditAccessChange(userRole, 'execute_command');
