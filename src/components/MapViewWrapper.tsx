@@ -1,23 +1,65 @@
-import React, { useEffect, useRef } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useCallback,
+  useState,
+  PropsWithChildren,
+} from 'react';
 import {
   MapView,
   MapViewProps,
   Marker,
   MarkerProps,
+  Polyline,
+  PolylineProps,
+  Polygon,
+  PolygonProps,
+  Circle,
+  CircleProps,
+  Callout,
+  CalloutProps,
   PROVIDER_GOOGLE,
+  PROVIDER_DEFAULT,
 } from 'react-native-maps';
-import { ViewStyle } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ViewStyle,
+  Platform,
+  AppState,
+  AppStateStatus,
+} from 'react-native';
 
 /**
- * MapViewWrapper
+ * Props that extend the native `MapView` API with lifecycle helpers.
  *
- * A thin wrapper around `react-native-maps`'s `MapView` that safely handles
- * mounting and unmounting lifecycle events to avoid memory-leak crashes on
- * both Android and iOS. All props accepted by `MapView` are re-exposed so
- * the component can be used as a drop-in replacement.
+ * @property enableLifecycleManagement - When `true` (default) the wrapper will
+ *   automatically clean up the native view reference on unmount.
+ * @property onMapReady - Called when the underlying `MapView` fires its
+ *   `onMapReady` event.
+ * @property onMapDestroyed - Called just before the component unmounts.
+ * @property containerStyle - Style applied to the wrapper’s outer `View`.
+ * @property debugMode - When `true` the wrapper prefixes all console logs
+ *   with `[MapViewWrapper]`. Useful during development.
+ * @property children - Any `Marker`, `Polyline`, etc. that you want to render
+ *   inside the map.
+ */
+export interface MapViewWrapperProps
+  extends Omit<MapViewProps, 'provider'>,
+    PropsWithChildren {
+  enableLifecycleManagement?: boolean;
+  onMapReady?: () => void;
+  onMapDestroyed?: () => void;
+  containerStyle?: ViewStyle;
+  debugMode?: boolean;
+}
+
+/**
+ * A lifecycle‑aware wrapper around `react-native-maps`’ `MapView`.
  *
- * This wrapper ensures proper cleanup of native resources during component
- * unmount to prevent memory leaks and crashes.
+ * The component forwards **all** `MapView` props (except `provider`) and
+ * exposes a small set of helpers that make the map safe to use in a
+ * React‑Native application.
  *
- * Usage:
+ * @example
  *
