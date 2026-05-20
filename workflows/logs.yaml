@@ -1,0 +1,11 @@
+surrogate-1/
+├── src/
+│   └── audit_logger.py          # ← final implementation
+├── workflows/
+│   └── logs.yaml                # sample process definition
+├── tests/
+│   └── test_audit_logger.py
+├── bin/
+│   └── generate_logs.sh
+├── Makefile
+└── pyproject.toml               # (optional) for packaging
