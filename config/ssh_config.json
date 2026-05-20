@@ -1,0 +1,5 @@
+{
+  "private_key": "/opt/axentx/surrogate-1/config/ssh/id_ed25519",
+  "public_key": "/opt/axentx/surrogate-1/config/ssh/id_ed25519.pub",
+  "authorized_keys": "/opt/axentx/surrogate-1/config/ssh/authorized_keys"
+}
