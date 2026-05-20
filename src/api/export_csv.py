@@ -1,35 +1,30 @@
+
+from fastapi import FastAPI, Response, HTTP_200_OK
+from fastapi.responses import CSVResponse
+from typing import List
 import csv
-from io import StringIO
-from flask import make_response
-from .models import Difference  # Assuming a model named Difference exists
+import datetime
+from app.models.spend import Spend
 
-def generate_csv(differences):
-    """Generate CSV content from a list of differences."""
-    fieldnames = ['id', 'severity', 'script_name', 'database', 'details']
-    csv_buffer = StringIO()
-    writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
-    writer.writeheader()
-    for diff in differences:
-        writer.writerow({
-            'id': diff.id,
-            'severity': diff.severity,
-            'script_name': diff.script_name,
-            'database': diff.database,
-            'details': diff.details
-        })
-    return csv_buffer.getvalue()
+app = FastAPI()
 
-def export_differences_to_csv():
-    """Export all differences to a CSV file."""
-    differences = Difference.query.all()  # Adjust query based on actual data retrieval method
-    csv_content = generate_csv(differences)
-    
-    response = make_response(csv_content)
-    response.headers['Content-Disposition'] = 'attachment; filename=differences.csv'
-    response.headers['Content-type'] = 'text/csv'
-    return response
+@app.get("/cost-insights/export", response_model=List[Spend])
+async def export_spend():
+    # Fetch spend data from the database
+    # (Assuming you have a function `get_spend_data()` that returns a list of `Spend` objects)
+    spend_data = get_spend_data()
 
-# Example usage in a Flask route
-# @app.route('/api/export/csv')
-# def export_csv():
-#     return export_differences_to_csv()
+    # Prepare CSV response
+    csv_response = CSVResponse(
+        media_type="text/csv",
+        headers=[{"name": "date", "title": "Date"}, {"name": "account_id", "title": "Account ID"}, {"name": "spend", "title": "Spend"}],
+    )
+
+    # Write data to CSV response
+    writer = csv.writer(csv_response)
+    writer.writerow(["date", "account_id", "spend"])
+    for spend in spend_data:
+        writer.writerow([spend.date.strftime("%Y-%m-%d"), spend.account_id, spend.spend])
+
+    # Set response status to 200 OK and return the CSV response
+    return csv_response
