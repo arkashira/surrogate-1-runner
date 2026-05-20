@@ -1,87 +1,83 @@
 package synthetic
 
 import (
-	"math/rand"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-func init() {
-	// Seed the random number generator to ensure different results on each run
-	rand.Seed(time.Now().UnixNano())
+// Event mirrors the payload accepted by Datadog's /api/v2/events endpoint.
+type Event struct {
+	Title     string   `json:"title"`
+	Text      string   `json:"text"`
+	Priority  string   `json:"priority,omitempty"`
+	Host      string   `json:"host,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
+	Timestamp int64    `json:"timestamp,omitempty"`
 }
 
-// GenerateEvent creates a new synthetic event with random severity, message, and payload.
-func GenerateEvent() Event {
-	now := time.Now()
-	severity := pickSeverity()
-	message := pickMessage()
-	payload := generateRandomPayload()
+// ---------------------------------------------------------------------
+// ID generation
+// ---------------------------------------------------------------------
 
-	return Event{
-		Timestamp: now,
-		Severity:  severity,
-		Message:   message,
-		Payload:   payload,
+var deterministicCounter uint64 = 1 // starts at 1 for readability
+
+// NewDeterministicID returns a reproducible ID useful for unit‑tests.
+// Format: "synthetic-<counter>"
+func NewDeterministicID() string {
+	id := atomic.AddUint64(&deterministicCounter, 1)
+	return "synthetic-" + strconv.FormatUint(id, 10)
+}
+
+// NewUUID returns a random UUID string (v4) – the usual production‑style ID.
+func NewUUID() string {
+	return uuid.New().String()
+}
+
+// NewEventID chooses the appropriate generator.
+// When the binary is built with the `test` build tag we use the deterministic
+// counter; otherwise we fall back to a UUID.  This decision is made at compile
+// time, so there is zero runtime overhead.
+func NewEventID() string {
+	// The build tag logic lives in a separate file (see below).
+	return generateEventID()
+}
+
+// ---------------------------------------------------------------------
+// Payload helpers
+// ---------------------------------------------------------------------
+
+// ParseEvent reads the request body, decodes JSON into an Event struct and
+// fills missing fields with sensible defaults (e.g. timestamp = now).
+func ParseEvent(r *http.Request) (*Event, error) {
+	defer r.Body.Close()
+	var ev Event
+	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
+		return nil, err
 	}
-}
-
-// GenerateEvents generates a slice of n synthetic events.
-// This is useful for populating logs or testing batch processing.
-func GenerateEvents(n int) []Event {
-	events := make([]Event, n)
-	for i := 0; i < n; i++ {
-		events[i] = GenerateEvent()
+	if ev.Timestamp == 0 {
+		ev.Timestamp = time.Now().Unix()
 	}
-	return events
+	return &ev, nil
 }
 
-func pickSeverity() string {
-	levels := []string{"Error", "Warn", "Info"}
-	return levels[rand.Intn(len(levels))]
-}
-
-func pickMessage() string {
-	messages := []string{
-		"Connection timeout occurred",
-		"Database query took longer than expected",
-		"Memory usage spike detected",
-		"Failed to parse configuration",
-		"Service heartbeat missed",
-		"Invalid token provided",
-		"Rate limit exceeded",
-		"File system read error",
+// MarshalResponse builds the JSON payload that mimics Datadog's real response:
+//   { "event": { "id": "...", "title": "...", ... } }
+func MarshalResponse(eventID string, ev *Event) ([]byte, error) {
+	resp := map[string]any{
+		"event": map[string]any{
+			"id":        eventID,
+			"title":     ev.Title,
+			"text":      ev.Text,
+			"priority":  ev.Priority,
+			"host":      ev.Host,
+			"tags":      ev.Tags,
+			"timestamp": ev.Timestamp,
+		},
 	}
-	return messages[rand.Intn(len(messages))]
-}
-
-func generateRandomPayload() map[string]interface{} {
-	payload := make(map[string]interface{})
-	keys := []string{"request_id", "user_id", "latency_ms", "status_code", "region", "version"}
-
-	for _, key := range keys {
-		switch key {
-		case "request_id":
-			payload[key] = randString(16)
-		case "user_id":
-			payload[key] = rand.Intn(10000)
-		case "latency_ms":
-			payload[key] = rand.Intn(5000)
-		case "status_code":
-			payload[key] = rand.Intn(600)
-		case "region":
-			payload[key] = []string{"us-east-1", "eu-west-1", "ap-south-1"}[rand.Intn(3)]
-		case "version":
-			payload[key] = "v" + randString(3)
-		}
-	}
-	return payload
-}
-
-func randString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
+	return json.Marshal(resp)
 }
