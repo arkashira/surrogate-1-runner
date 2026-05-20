@@ -1,37 +1,37 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = 'https://api.surrogate-1.com';
 
-const api: AxiosInstance = axios.create({
+// Create axios instance
+const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// Request interceptor for auth
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('authToken');
-    if (token && config.headers) {
+// Interceptor to add Auth Token to every request
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken'); // Retrieve token
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error: AxiosError) => Promise.reject(error)
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+export const getRepositories = async (userId: number) => {
+  // Note: In a real app, the backend usually gets the user from the token, 
+  // so we might not need to pass userId in the URL, but keeping for context.
+  const response = await apiClient.get(`/users/${userId}/repositories`);
+  return response.data;
+};
 
-export default api;
+export const connectRepository = async (userId: number, repoUrl: string) => {
+  const response = await apiClient.post(`/users/${userId}/repositories`, { repoUrl });
+  return response.data;
+};
+
+export const deleteRepository = async (repoId: number) => {
+  const response = await apiClient.delete(`/repositories/${repoId}`);
+  return response.data;
+};
