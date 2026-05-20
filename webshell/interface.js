@@ -1,74 +1,45 @@
-const inputEl = document.getElementById('input');
-const outputEl = document.getElementById('output');
+/**
+ * Web‑shell UI entry point.
+ *
+ * 1. Serves static files from `public/`.
+ * 2. Applies the `isAuthorized` middleware before any request is handled.
+ * 3. Exposes a tiny API (`/api/status`) that can be used by the UI.
+ *
+ * The SAML middleware that populates `req.saml` must be mounted
+ * *before* this module in the main application.
+ */
 
-/* ---------- Utility ---------- */
-function append(text, { color = 'var(--success)', isPrompt = false } = {}) {
-  const el = document.createElement('div');
-  el.textContent = text;
-  el.style.color = color;
-  if (isPrompt) el.style.color = 'var(--prompt)';
-  outputEl.appendChild(el);
-  outputEl.scrollTop = outputEl.scrollHeight;
-}
+const express = require('express');
+const path = require('path');
+const { isAuthorized } = require('./auth');
 
-/* ---------- Client‑side simulator ---------- */
-async function simulate(cmd) {
-  const parts = cmd.trim().split(/\s+/);
-  const command = parts[0];
-  const args = parts.slice(1);
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-  switch (command) {
-    case 'ls':
-      return 'file1.txt\nfile2.txt\nfolder1\n';
-    case 'cd':
-      return `Changed directory to ${args[0] || '~'}\n`;
-    case 'mkdir':
-      return `Created directory ${args[0]}\n`;
-    case 'echo':
-      return args.join(' ') + '\n';
-    case '':
-      return '';
-    default:
-      return `bash: ${command}: command not found\n`;
+// ---------- 1. Static UI ----------
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------- 2. Authorization ----------
+app.use((req, res, next) => {
+  if (!isAuthorized(req)) {
+    return res
+      .status(403)
+      .send('Forbidden: You are not authorized to access the web shell.');
   }
-}
-
-/* ---------- Server‑side execution ---------- */
-async function runOnServer(cmd) {
-  const resp = await fetch('/shell', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ command: cmd })
-  });
-
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();          // Expected { output: string }
-  return data.output;
-}
-
-/* ---------- Main command handler ---------- */
-async function handleCommand(cmd) {
-  append(`$ ${cmd}`, { isPrompt: true });
-
-  try {
-    const output = await runOnServer(cmd);
-    append(output.trimEnd());
-  } catch (e) {
-    // If server fails, fall back to the simulator
-    console.warn('Server error, falling back to client simulation:', e);
-    const output = await simulate(cmd);
-    append(output.trimEnd(), { color: 'var(--error)' });
-  }
-}
-
-/* ---------- Event listener ---------- */
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    const cmd = inputEl.value.trim();
-    if (cmd) {
-      handleCommand(cmd);
-      inputEl.value = '';
-    }
-  }
+  next();
 });
+
+// ---------- 3. Sample API ----------
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'ok',
+    user: req.saml?.nameID ?? 'anonymous',
+  });
+});
+
+// ---------- 4. Start ----------
+app.listen(PORT, () => {
+  console.log(`Web shell listening on port ${PORT}`);
+});
+
+module.exports = app; // exported for testing
