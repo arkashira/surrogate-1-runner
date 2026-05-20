@@ -1,0 +1,52 @@
+[
+  {
+    "word": "API",
+    "definition": "Application Programming Interface – a set of functions and procedures that allow the creation of applications which access the features or data of an operating system, application, or other service.",
+    "example_sentence": "The developer used the API to integrate the payment gateway into the e-commerce platform."
+  },
+  {
+    "word": "Database",
+    "definition": "An organized collection of structured information, typically stored electronically in a computer system.",
+    "example_sentence": "The company uses a relational database to manage customer information and order history."
+  },
+  {
+    "word": "Server",
+    "definition": "A computer program or device that provides functionality for other programs or devices, called 'clients'.",
+    "example_sentence": "The web server hosts the website and responds to requests from users' browsers."
+  },
+  {
+    "word": "Encryption",
+    "definition": "The process of converting information or data into a code, especially to prevent unauthorized access.",
+    "example_sentence": "Sensitive data is encrypted before being transmitted over the internet to ensure its security."
+  },
+  {
+    "word": "Algorithm",
+    "definition": "A set of rules or instructions used to solve a problem or perform a calculation.",
+    "example_sentence": "The search engine uses a complex algorithm to rank websites based on relevance."
+  },
+  {
+    "word": "IT",
+    "definition": "Short for information technology, the industry dealing with computers and telecommunications.",
+    "example_sentence": "I work in the IT department."
+  },
+  {
+    "word": "Professional",
+    "definition": "A person who works in a particular profession or area of work.",
+    "example_sentence": "She is a professional software engineer."
+  },
+  {
+    "word": "Vocabulary",
+    "definition": "A list of words and their meanings.",
+    "example_sentence": "The vocabulary of a language includes both common and technical words."
+  },
+  {
+    "word": "Practice",
+    "definition": "The actual application or use of an idea, belief, or skill.",
+    "example_sentence": "Practice makes perfect."
+  },
+  {
+    "word": "Communicate",
+    "definition": "To exchange information or send and receive messages.",
+    "example_sentence": "Good communication is essential for a successful team."
+  }
+]
