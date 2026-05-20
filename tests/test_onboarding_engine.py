@@ -1,93 +1,32 @@
-import pytest
-from unittest.mock import Mock, patch
-from src.onboarding_engine import OnboardingEngine
+import unittest
+from unittest.mock import patch, MagicMock
+from services.onboarding_engine import send_onboarding_email
 
-@pytest.fixture
-def mock_db():
-    return Mock()
+class TestOnboardingEngine(unittest.TestCase):
 
-@pytest.fixture
-def engine(mock_db):
-    return OnboardingEngine(db=mock_db)
+    @patch('services.onboarding_engine.smtplib.SMTP')
+    @patch('services.onboarding_engine.Environment')
+    def test_send_onboarding_email(self, mock_env, mock_smtp):
+        user = MagicMock()
+        user.name = "Test User"
+        user.email = "test@example.com"
+        
+        step = MagicMock()
+        step.title = "Step 1"
+        step.description = "This is the first step."
 
-def test_load_sequence_and_progress(engine, mock_db):
-    # Setup
-    user_id = "user123"
-    sequence_id = "seq456"
-    
-    # Mock database calls
-    mock_db.get_user_progress.return_value = {"current_step": 1}
-    mock_db.get_sequence.return_value = [
-        {"step_id": 1, "action": "welcome"},
-        {"step_id": 2, "action": "setup_profile"},
-        {"step_id": 3, "action": "connect_social"}
-    ]
-    
-    # Test
-    result = engine.load_sequence_and_progress(user_id, sequence_id)
-    
-    # Assert
-    assert result == {
-        "sequence": [
-            {"step_id": 1, "action": "welcome"},
-            {"step_id": 2, "action": "setup_profile"},
-            {"step_id": 3, "action": "connect_social"}
-        ],
-        "progress": {"current_step": 1}
-    }
-    mock_db.get_user_progress.assert_called_once_with(user_id, sequence_id)
-    mock_db.get_sequence.assert_called_once_with(sequence_id)
+        # Mock the template rendering
+        mock_template = MagicMock()
+        mock_template.render.return_value = "<html>Mocked Email Content</html>"
+        mock_env.return_value.get_template.return_value = mock_template
 
-def test_get_next_step(engine, mock_db):
-    # Setup
-    user_id = "user123"
-    sequence_id = "seq456"
-    
-    # Mock data
-    mock_db.get_user_progress.return_value = {"current_step": 1}
-    mock_db.get_sequence.return_value = [
-        {"step_id": 1, "action": "welcome"},
-        {"step_id": 2, "action": "setup_profile"},
-        {"step_id": 3, "action": "connect_social"}
-    ]
-    
-    # Test
-    result = engine.get_next_step(user_id, sequence_id)
-    
-    # Assert
-    assert result == {"step_id": 2, "action": "setup_profile"}
-    mock_db.get_user_progress.assert_called_once_with(user_id, sequence_id)
-    mock_db.get_sequence.assert_called_once_with(sequence_id)
+        send_onboarding_email(user, step)
 
-def test_get_next_step_completed_sequence(engine, mock_db):
-    # Setup
-    user_id = "user123"
-    sequence_id = "seq456"
-    
-    # Mock data - user has completed all steps
-    mock_db.get_user_progress.return_value = {"current_step": 3}
-    mock_db.get_sequence.return_value = [
-        {"step_id": 1, "action": "welcome"},
-        {"step_id": 2, "action": "setup_profile"},
-        {"step_id": 3, "action": "connect_social"}
-    ]
-    
-    # Test
-    result = engine.get_next_step(user_id, sequence_id)
-    
-    # Assert
-    assert result is None
-    mock_db.get_user_progress.assert_called_once_with(user_id, sequence_id)
-    mock_db.get_sequence.assert_called_once_with(sequence_id)
+        # Assert that the email was sent
+        mock_smtp.return_value.__enter__.return_value.send_message.assert_called_once()
 
-def test_update_user_progress(engine, mock_db):
-    # Setup
-    user_id = "user123"
-    sequence_id = "seq456"
-    step_id = 2
-    
-    # Test
-    engine.update_user_progress(user_id, sequence_id, step_id)
-    
-    # Assert
-    mock_db.update_user_progress.assert_called_once_with(user_id, sequence_id, step_id)
+        # Assert that the template was rendered with the correct parameters
+        mock_template.render.assert_called_once_with(user=user, step=step)
+
+if __name__ == '__main__':
+    unittest.main()
