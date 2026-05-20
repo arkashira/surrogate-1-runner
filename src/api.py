@@ -1,23 +1,38 @@
-from fastapi import FastAPI
-from sqlalchemy import create_engine, text
-from datetime import datetime, timedelta
+
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Dict
+from dataclasses import dataclass
+import random
+import json
+from src.data import generate_synthetic_data
 
 app = FastAPI()
-engine = create_engine('sqlite:///cost_data.db')
 
-@app.get("/anomalies")
-def get_anomalies():
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)
+class SyntheticData(BaseModel):
+    data_format: str
+    data: str
 
-    query = text("""
-        SELECT date, total_spend, is_anomaly
-        FROM cost_anomalies
-        WHERE date BETWEEN :start_date AND :end_date
-    """)
+@dataclass
+class SyntheticDataResponse:
+    data_format: str
+    data: Dict
 
-    with engine.connect() as conn:
-        result = conn.execute(query, {'start_date': start_date, 'end_date': end_date})
-        anomalies = [dict(row) for row in result.fetchall()]
+@app.get("/synthetic-data", response_model=SyntheticDataResponse)
+def get_synthetic_data():
+    data_format = random.choice(["json", "csv", "xml"])
+    data = generate_synthetic_data(data_format)
+    return SyntheticDataResponse(data_format=data_format, data=data)
 
-    return {"anomalies": anomalies}
+@app.get("/synthetic-data/{data_format}", response_model=SyntheticData)
+def get_synthetic_data_by_format(data_format: str):
+    if data_format not in ["json", "csv", "xml"]:
+        raise HTTPException(status_code=400, detail="Unsupported data format")
+    data = generate_synthetic_data(data_format)
+    return SyntheticData(data_format=data_format, data=data)
+
+@app.post("/synthetic-data", response_model=SyntheticData)
+def get_synthetic_data_by_request(body: SyntheticData):
+    if body.data_format not in ["json", "csv", "xml"]:
+        raise HTTPException(status_code=400, detail="Unsupported data format")
+    return body
