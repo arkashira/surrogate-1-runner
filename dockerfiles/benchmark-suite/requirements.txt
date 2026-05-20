@@ -1,0 +1,6 @@
+torch
+transformers
+axentx-sdk
+numpy
+pandas
+scikit-learn
