@@ -1,21 +1,38 @@
-use std::process::Command;
-use std::env;
+use clap::{App, Arg};
+use std::process;
+
+mod cli;
+mod dataset;
 
 fn main() {
-    // Check if Java is installed
-    let java_check = Command::new("java")
-        .arg("-version")
-        .output();
+    let matches = App::new("surrogate-1")
+        .version("1.0")
+        .author("axentx-dev-bot")
+        .about("Parallel public-dataset ingest workers")
+        .arg(
+            Arg::with_name("shard-id")
+                .long("shard-id")
+                .value_name("SHARD_ID")
+                .help("Sets the shard ID for the worker")
+                .takes_value(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("output")
+                .long("output")
+                .value_name("OUTPUT_FILE")
+                .help("Sets the output file path")
+                .takes_value(true),
+        )
+        .get_matches();
 
-    if java_check.is_ok() {
-        eprintln!("Warning: Java is installed. This plugin should run without Java. Please remove Java to ensure optimal performance.");
+    let shard_id = matches.value_of("shard-id").unwrap().parse::<u32>().unwrap();
+    let output_file = matches.value_of("output").unwrap_or("output.json");
+
+    if shard_id >= 16 {
+        eprintln!("Invalid shard ID: {}", shard_id);
+        process::exit(1);
     }
 
-    // Your existing plugin logic here
-    println!("Running surrogate-1 plugin without Java dependency");
-
-    // Add a fallback mechanism to ensure plugin execution
-    if java_check.is_err() {
-        eprintln!("Error: Java is not installed. Please install Java to run this plugin.");
-    }
+    cli::run(shard_id, output_file);
 }
