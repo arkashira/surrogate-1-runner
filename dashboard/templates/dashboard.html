@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>LLM Cost Optimization Dashboard</h1>
+    
+    <section class="metrics">
+        <h2>Usage Metrics</h2>
+        <p>Total Tokens: {{ usage_stats.total_tokens|default:"N/A" }}</p>
+        <p>Avg Latency: {{ usage_stats.avg_latency|default:"N/A" }}s</p>
+    </section>
+
+    <section class="recommendations">
+        <h2>Cost Optimization Recommendations</h2>
+        {% if recommendations %}
+            <ul>
+            {% for rec in recommendations %}
+                <li class="recommendation">
+                    <h3>{{ rec.title }}</h3>
+                    <p>{{ rec.description }}</p>
+                    <ul class="actions">
+                    {% for action in rec.actions %}
+                        <li>✅ {{ action }}</li>
+                    {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            <p>No active recommendations. Your system is operating efficiently.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
