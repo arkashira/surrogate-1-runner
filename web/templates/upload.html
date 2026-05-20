@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDPA / SOC‑2 Compliance Report Generator</title>
+
+  <!-- Optional external stylesheet (you can delete if not needed) -->
+  <link rel="stylesheet" href="/static/css/main.css">
+
+  <!-- Core UI script – defer so the DOM is ready before it runs -->
+  <script src="/static/js/upload.js" defer></script>
+
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 2rem; line-height: 1.5; }
+    .field { margin-bottom: 1rem; }
+    label { display: block; margin-bottom: .3rem; font-weight: 600; }
+    #status { margin-top: 1rem; color: #c00; }
+    #download-section { margin-top: 1rem; }
+    #download-link { font-weight: bold; }
+    button[disabled] { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+
+<body>
+  <h1>Generate PDPA / SOC‑2 Compliance Report</h1>
+
+  <form id="upload-form" enctype="multipart/form-data" novalidate>
+    <div class="field">
+      <label for="config-file">
+        Terraform / Helm configuration file
+        (<code>.tf</code>, <code>.yaml</code>, <code>.yml</code>)
+      </label>
+      <input id="config-file"
+             name="config"
+             type="file"
+             accept=".tf,.yaml,.yml"
+             required>
+    </div>
+
+    <div class="field">
+      <label for="audit-file">
+        Audit log file (<code>.json</code> or <code>.log</code>)
+      </label>
+      <input id="audit-file"
+             name="audit"
+             type="file"
+             accept=".json,.log"
+             required>
+    </div>
+
+    <button id="generate-btn" type="submit" disabled>Generate Report</button>
+  </form>
+
+  <!-- Live status messages – ARIA makes them audible to assistive tech -->
+  <div id="status" role="alert" aria-live="polite"></div>
+
+  <!-- Shown only after a successful generation -->
+  <div id="download-section" style="display:none;">
+    <h2>Report Ready</h2>
+    <a id="download-link" href="#" download>Download PDF</a>
+  </div>
+</body>
+</html>
