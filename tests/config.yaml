@@ -1,0 +1,5 @@
+# Configuration for Surrogate‑1 test suite
+
+# Path to the KiCad 9 executable on the CI runner.
+# Adjust this path if KiCad is installed elsewhere.
+kicad_path: /usr/bin/kicad
