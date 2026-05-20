@@ -1,135 +1,96 @@
 """
-Metric utilities for the surrogate‑1 synthetic data generator.
+Prometheus metrics for the *axentx* surrogate service.
 
-Provides:
-* `Metric` – immutable representation of a single data point.
-* Low‑level generators (`generate_steady`, `generate_spike`, `generate_custom`).
-* Small helper `datetime_range` used by both metrics and events.
+* A dedicated CollectorRegistry isolates our metrics from any third‑party
+  collectors that might be loaded elsewhere in the process.
+* The port is read from the environment (default 8000) – this makes the
+  component container‑friendly.
+* Helper functions are tiny, pure and easy to mock in unit‑tests.
 """
 
 from __future__ import annotations
 
-import random
-import time
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Callable, Iterable, List, Tuple
+import os
+import logging
+from prometheus_client import Counter, start_http_server, CollectorRegistry, generate_latest
 
-# --------------------------------------------------------------------------- #
-#  Core data object
-# --------------------------------------------------------------------------- #
-@dataclass(frozen=True, slots=True)
-class Metric:
-    """A single metric data point, ready for JSON‑serialisation."""
-    service: str
-    name: str
-    timestamp: int          # epoch seconds
-    value: float
-    tags: Tuple[Tuple[str, str], ...] = ()
+# ----------------------------------------------------------------------
+# Registry & metric definition
+# ----------------------------------------------------------------------
+_registry = CollectorRegistry()
 
-    def to_dict(self) -> dict:
-        """Return a dict compatible with Datadog’s metric ingest API."""
-        return {
-            "service": self.service,
-            "metric": self.name,
-            "points": [[self.timestamp, self.value]],
-            "tags": [f"{k}:{v}" for k, v in self.tags],
-        }
+paste_cascade_failures_total = Counter(
+    "paste_cascade_failures_total",
+    "Total number of paste‑cascade failures",
+    registry=_registry,
+)
 
-# --------------------------------------------------------------------------- #
-#  Timestamp helpers
-# --------------------------------------------------------------------------- #
-def _now_ts() -> int:
-    """Current epoch seconds (int)."""
-    return int(time.time())
-
-
-def datetime_range(
-    start: datetime, end: datetime, step: timedelta
-) -> Iterable[datetime]:
+# ----------------------------------------------------------------------
+# Public API
+# ----------------------------------------------------------------------
+def inc_paste_cascade_failure() -> None:
     """
-    Yield ``datetime`` objects from *start* to *end* inclusive,
-    stepping by ``step``.  Works with both naive and timezone‑aware
-    ``datetime`` instances.
+    Increment the ``paste_cascade_failures_total`` counter.
+
+    The function is deliberately tiny – it only mutates the metric and
+    writes a debug log entry.  Because it never returns a value, callers
+    can treat it as fire‑and‑forget.
     """
-    cur = start
-    while cur <= end:
-        yield cur
-        cur += step
+    paste_cascade_failures_total.inc()
+    logging.getLogger(__name__).debug(
+        "Incremented paste_cascade_failures_total metric"
+    )
 
 
-# --------------------------------------------------------------------------- #
-#  Low‑level metric generators
-# --------------------------------------------------------------------------- #
-def generate_steady(
-    service: str,
-    name: str,
-    start: datetime,
-    end: datetime,
-    interval: timedelta,
-    base: float = 100.0,
-    jitter: float = 5.0,
-    tags: Tuple[Tuple[str, str], ...] = (),
-) -> List[Metric]:
+def start_metrics_server(port: int | None = None) -> None:
     """
-    Produce a “steady‑state” series: values hover around ``base`` with
-    optional random jitter.
+    Start a Prometheus HTTP endpoint that serves the metrics from the
+    dedicated registry.
+
+    Parameters
+    ----------
+    port:
+        TCP port to bind to.  If ``None`` the value of the environment
+        variable ``PROMETHEUS_METRICS_PORT`` is used, falling back to
+        ``8000``.
+
+    Raises
+    ------
+    OSError
+        If the socket cannot be bound (e.g. port already in use).
     """
-    metrics: List[Metric] = []
-    for ts in datetime_range(start, end, interval):
-        value = base + random.uniform(-jitter, jitter)
-        metrics.append(
-            Metric(service, name, int(ts.timestamp()), value, tags)
+    if port is None:
+        port = int(os.getenv("PROMETHEUS_METRICS_PORT", "8000"))
+
+    try:
+        start_http_server(port, registry=_registry)
+        logging.getLogger(__name__).info(
+            "Prometheus metrics server started on port %s", port
         )
-    return metrics
-
-
-def generate_spike(
-    service: str,
-    name: str,
-    start: datetime,
-    end: datetime,
-    interval: timedelta,
-    base: float = 100.0,
-    spike_value: float = 500.0,
-    spike_chance: float = 0.02,
-    jitter: float = 5.0,
-    tags: Tuple[Tuple[str, str], ...] = (),
-) -> List[Metric]:
-    """
-    Same as ``generate_steady`` but with occasional high‑value spikes.
-    ``spike_chance`` is the per‑point probability of a spike.
-    """
-    metrics: List[Metric] = []
-    for ts in datetime_range(start, end, interval):
-        if random.random() < spike_chance:
-            value = spike_value
-        else:
-            value = base + random.uniform(-jitter, jitter)
-        metrics.append(
-            Metric(service, name, int(ts.timestamp()), value, tags)
+    except Exception as exc:  # pragma: no cover – defensive
+        logging.getLogger(__name__).exception(
+            "Failed to start Prometheus metrics server"
         )
-    return metrics
+        raise OSError(f"Could not start metrics server on port {port}") from exc
 
 
-def generate_custom(
-    service: str,
-    name: str,
-    generator: Callable[[int], float],
-    start: datetime,
-    end: datetime,
-    interval: timedelta,
-    tags: Tuple[Tuple[str, str], ...] = (),
-) -> List[Metric]:
+def expose_metrics_as_text() -> bytes:
     """
-    User‑supplied ``generator`` receives the epoch timestamp (int) and
-    must return a float.  This makes it trivial to plug in sinusoidal,
-    exponential‑decay, or any domain‑specific pattern.
+    Return the current metrics payload in the Prometheus text format.
+    Useful for unit‑tests or ad‑hoc debugging.
     """
-    metrics: List[Metric] = []
-    for ts in datetime_range(start, end, interval):
-        value = generator(int(ts.timestamp()))
-        metrics.append(
-            Metric(service, name, int(ts.timestamp()), value, tags)
-        )
-    return metrics
+    return generate_latest(_registry)
+
+
+def init_metrics(start_server: bool = True, port: int | None = None) -> None:
+    """
+    Initialise the metrics subsystem.
+
+    * Registers the metric (already done at import time).
+    * Optionally starts the HTTP endpoint.
+
+    This helper mirrors the pattern used in many micro‑service
+    frameworks – call it once at program start‑up.
+    """
+    if start_server:
+        start_metrics_server(port)
