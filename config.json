@@ -1,4 +1,6 @@
 {
-  "secret_key": "replace-this-with-a-strong-random-string",
-  "token_expiry_seconds": 3600
+  "multi_user_access": true,
+  "realtime_collaboration": true,
+  "simultaneous_access": true,
+  "users": []
 }
