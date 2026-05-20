@@ -1,0 +1,9 @@
+---
+# Slack Integration Configuration
+slack:
+  webhook_url: "${SLACK_WEBHOOK_URL}"  # Supports env var interpolation
+  default_channel: "#cost-alerts"
+  alert_settings:
+    include_forecast: true
+    include_recommendations: true
+    max_recommendations: 3
