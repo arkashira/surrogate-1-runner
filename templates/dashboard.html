@@ -1,76 +1,79 @@
+{# /opt/axentx/surrogate-1/templates/dashboard.html #}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Surrogate‑1 Dashboard</title>
-    <!-- Use Flask's url_for so the static path works in any deployment -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Billing Dashboard | Surrogate‑1</title>
+
+    {# Flask/Jinja2 static URL – works for any WSGI framework that supports url_for #}
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
+
 <body>
-    <header>
-        <h1>Surrogate‑1 Dashboard</h1>
+    <header class="dashboard-header">
+        <h1>Cloud Billing Insights</h1>
+        <p class="subtitle">Track and optimise your cloud spending</p>
     </header>
 
-    <!-- -------------------------------------------------
-         Credit‑balance section – the new feature
-         ------------------------------------------------- -->
-    <section id="credits" class="card">
-        <h2>Credit Balances</h2>
-        <div class="credit-card">
-            <span class="credit-label">Bulk Credits:</span>
-            <span id="bulk-balance" class="credit-value">Loading…</span>
-        </div>
-        <div class="credit-card">
-            <span class="credit-label">Monthly Credits:</span>
-            <span id="monthly-balance" class="credit-value">Loading…</span>
-        </div>
-    </section>
+    <main class="dashboard-grid">
 
-    <!-- -------------------------------------------------
-         Existing dashboard content (if any)
-         ------------------------------------------------- -->
-    {{ dashboard_content|safe }}
+        <!-- ==================== CREDIT BALANCES ==================== -->
+        <section class="card credit-balances">
+            <h2>Current Credit Balances</h2>
 
-    <footer>
-        <p>&copy; 2026 Axentx</p>
-    </footer>
+            <div class="credit-grid">
+                {# Example loop – replace with your own variable name #}
+                {% for cred in credits %}
+                <div class="credit-item">
+                    <span class="credit-label">{{ cred.provider }}</span>
+                    <span class="credit-value">{{ cred.amount | currency }}</span>
+                    <span class="credit-status {{ 'active' if cred.active else '' }}">
+                        {{ 'Active' if cred.active else 'Expired' }}
+                    </span>
+                </div>
+                {% endfor %}
 
-    <!-- -------------------------------------------------
-         JavaScript – fetches credit data and updates UI
-         ------------------------------------------------- -->
-    <script>
-        /**
-         * Pull the latest credit balances from the back‑end.
-         * Uses `credentials: 'same-origin'` so Flask session cookies are sent.
-         */
-        async function refreshCredits() {
-            try {
-                const resp = await fetch('/api/credits', { credentials: 'same-origin' });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const data = await resp.json();
+                {# Total row – optional, can be calculated in the view #}
+                <div class="credit-item total">
+                    <span class="credit-label">Total Available</span>
+                    <span class="credit-value">{{ total_credits | currency }}</span>
+                    <span class="credit-status">Combined</span>
+                </div>
+            </div>
+        </section>
 
-                // Guard against malformed payloads
-                const bulk   = typeof data.bulk   === 'number' ? data.bulk   : null;
-                const monthly= typeof data.monthly=== 'number' ? data.monthly: null;
+        <!-- ==================== USAGE OVERVIEW ==================== -->
+        <section class="card usage-overview">
+            <h2>Current Usage</h2>
 
-                document.getElementById('bulk-balance')
-                        .textContent = bulk !== null ? bulk.toLocaleString() : '—';
-                document.getElementById('monthly-balance')
-                        .textContent = monthly !== null ? monthly.toLocaleString() : '—';
-            } catch (err) {
-                console.error('Failed to fetch credit balances:', err);
-                // Show a non‑intrusive error state
-                document.getElementById('bulk-balance').textContent   = 'Error';
-                document.getElementById('monthly-balance').textContent = 'Error';
-            }
-        }
+            <div class="usage-meter">
+                <div class="meter-fill"
+                     style="width: {{ usage.percent }}%;"></div>
+            </div>
 
-        // Initial load
-        refreshCredits();
+            <p class="usage-text">
+                {{ usage.percent }}% of monthly quota used
+                ({{ usage.used | currency }} / {{ usage.quota | currency }})
+            </p>
+        </section>
 
-        // Real‑time updates – poll every 15 seconds (fast enough for UI responsiveness,
-        // light on the server, and matches the more aggressive interval from Candidate 2)
-        setInterval(refreshCredits, 15000);
-    </script>
+        <!-- ==================== QUICK ACTIONS ==================== -->
+        <section class="card quick-actions">
+            <h2>Quick Actions</h2>
+
+            <a href="{{ url_for('billing_settings') }}" class="action-button">
+                Manage Credits
+            </a>
+            <a href="{{ url_for('billing_support') }}" class="action-button">
+                Billing Support
+            </a>
+            <a href="{{ url_for('billing_history') }}" class="action-button">
+                View History
+            </a>
+        </section>
+
+    </main>
 </body>
 </html>
