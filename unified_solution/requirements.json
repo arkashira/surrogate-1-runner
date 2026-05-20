@@ -1,0 +1,9 @@
+{
+  "needed_components": [
+    "Provider-specific error classes (OpenAIError, AnthropicError, etc.)",
+    "Error mapping strategy (dictionary/class-based mapping of provider errors to LLMError)",
+    "Provider module import paths for mocking in tests"
+  ],
+  "implementation_path": "Implement error_mappers.py with provider error -> LLMError conversion logic",
+  "test_readiness": "Tests will be fully actionable once provider error classes and mapping strategy are implemented"
+}
