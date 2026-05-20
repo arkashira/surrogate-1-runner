@@ -1,0 +1,28 @@
+{
+  "dashboard": {
+    "title": "Ingestion Metrics Dashboard",
+    "panels": [
+      {
+        "title": "Ingestion Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.9, sum(rate(ingestion_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "{{le}}",
+            "instant": false
+          }
+        ]
+      },
+      {
+        "title": "Ingestion Failures",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "increase(ingestion_failures_total[5m])",
+            "instant": true
+          }
+        ]
+      }
+    ]
+  }
+}
