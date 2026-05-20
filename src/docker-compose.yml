@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: ["python", "healthcheck.py"]   # runs the Flask health‑end‑point
+    ports:
+      - "5000:5000"
+    environment:
+      - HEALTHCHECK_INTERVAL=${HEALTHCHECK_INTERVAL:-30s}
+      - HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT:-5s}
+      - HEALTHCHECK_RETRIES=${HEALTHCHECK_RETRIES:-3}
+      - HEALTHCHECK_START_PERIOD=${HEALTHCHECK_START_PERIOD:-40s}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${HEALTHCHECK_START_PERIOD}
+
+  worker:
+    build: .
+    command: ["python", "worker.py"]
+    environment:
+      - SHARD_ID=${SHARD_ID:-0}
+      - HEALTHCHECK_INTERVAL=${HEALTHCHECK_INTERVAL:-30s}
+      - HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT:-5s}
+      - HEALTHCHECK_RETRIES=${HEALTHCHECK_RETRIES:-3}
+      - HEALTHCHECK_START_PERIOD=${HEALTHCHECK_START_PERIOD:-40s}
+    deploy:
+      mode: replicated
+      replicas: 16
+    healthcheck:
+      # Verify that the worker process is still running
+      test: ["CMD", "sh", "-c", "pgrep -f worker.py > /dev/null || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${HEALTHCHECK_START_PERIOD}
