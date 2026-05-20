@@ -1,0 +1,114 @@
+openapi: 3.0.3
+info:
+  title: Surrogate‑1 API
+  description: |
+    API for surrogate‑1 dataset operations and metrics.
+    The API is versioned and follows best practices for RESTful design.
+  version: 1.0.0
+servers:
+  - url: https://api.surrogate-1.axentx.com
+    description: Production server
+  - url: https://staging-api.surrogate-1.axentx.com
+    description: Staging server
+paths:
+  /api/v1/metrics/flash:
+    get:
+      summary: Get average flash duration per device
+      description: |
+        Returns the average flash duration (in milliseconds) and the number of
+        flash events recorded for a specific device. This endpoint is useful for
+        identifying hardware that consistently produces long flash durations.
+      operationId: getFlashMetrics
+      tags:
+        - Metrics
+      parameters:
+        - name: device_id
+          in: query
+          required: true
+          description: The unique identifier of the device
+          schema:
+            type: string
+            example: "device-001"
+      responses:
+        '200':
+          description: Successful response with flash duration metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: string
+                    description: The device identifier
+                    example: "device-001"
+                  avg_duration_ms:
+                    type: number
+                    format: float
+                    description: Average flash duration in milliseconds
+                    example: 125.5
+                  count:
+                    type: integer
+                    description: Number of flash events recorded
+                    example: 1500
+              example:
+                device_id: "device-001"
+                avg_duration_ms: 125.5
+                count: 1500
+        '400':
+          description: Bad request – missing or invalid device_id parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/datasets:
+    get:
+      summary: List available datasets
+      description: Returns a list of all available datasets in the system.
+      operationId: listDatasets
+      tags:
+        - Datasets
+      responses:
+        '200':
+          description: List of datasets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dataset'
+components:
+  schemas:
+    Dataset:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique dataset identifier
+        name:
+          type: string
+          description: Human‑readable name of the dataset
+        size:
+          type: integer
+          description: Size of the dataset in bytes
+        created_at:
+          type: string
+          format: date-time
+          description: ISO‑8601 timestamp of when the dataset was created
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Short error code
+        message:
+          type: string
+          description: Human‑readable error message
+        code:
+          type: integer
+          description: HTTP status code
