@@ -1,0 +1,27 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    padding: 0;
+}
+
+h1 {
+    color: #333;
+}
+
+h2 {
+    color: #555;
+    margin-top: 20px;
+}
+
+p {
+    line-height: 1.6;
+}
+
+ol, ul {
+    padding-left: 20px;
+    margin-bottom: 10px;
+}
+
+#examples-section, #case-studies-section {
+    margin-top: 20px;
+}
