@@ -1,146 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Documentation Search</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Drift Monitor</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>Documentation Search</h1>
-  </header>
+    <h1>Signature Drift Monitor</h1>
 
-  <main>
-    <input type="search"
-           id="search-input"
-           placeholder="Search docs…"
-           aria-label="Search documentation"
-           autocomplete="off">
+    <div class="controls">
+        <label for="severityFilter">Severity:</label>
+        <select id="severityFilter">
+            <option value="all">All</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+        </select>
 
-    <div id="results" role="region" aria-live="polite"></div>
+        <label for="sortOrder">Sort by:</label>
+        <select id="sortOrder">
+            <option value="timestamp_desc">Timestamp (newest)</option>
+            <option value="timestamp_asc">Timestamp (oldest)</option>
+            <option value="severity_desc">Severity (high → low)</option>
+            <option value="severity_asc">Severity (low → high)</option>
+        </select>
+    </div>
 
-    <nav id="pagination" aria-label="Search results pagination"></nav>
-  </main>
+    <table id="driftTable">
+        <thead>
+            <tr>
+                <th>Signature ID</th>
+                <th>Severity</th>
+                <th>Timestamp</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Rows populated by JavaScript -->
+        </tbody>
+    </table>
 
-  <script>
-    /* ---------- Configuration ---------- */
-    const PAGE_SIZE = 10;          // results per page
-    const DOCS_URL = 'docs.json';  // or '/api/docs'
+    <div id="error" class="error"></div>
 
-    /* ---------- State ---------- */
-    let docs = [];                 // full data set
-    let filtered = [];             // current search hits
-    let currentPage = 1;
-
-    /* ---------- Utilities ---------- */
-    const debounce = (fn, ms) => {
-      let timer;
-      return (...args) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), ms);
-      };
-    };
-
-    const fuzzyMatch = (text, query) => {
-      // Simple Levenshtein distance (O(n*m)). For large data, use a library.
-      const lev = (a, b) => {
-        const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
-        for (let j = 1; j <= b.length; j++) d[0][j] = j;
-        for (let i = 1; i <= a.length; i++)
-          for (let j = 1; j <= b.length; j++)
-            d[i][j] = Math.min(
-              d[i-1][j] + 1,
-              d[i][j-1] + 1,
-              d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)
-            );
-        return d[a.length][b.length];
-      };
-      return lev(text.toLowerCase(), query.toLowerCase()) <= 2;
-    };
-
-    /* ---------- Rendering ---------- */
-    const renderResults = () => {
-      const container = document.getElementById('results');
-      container.innerHTML = '';
-
-      if (!filtered.length) {
-        container.textContent = 'No results found.';
-        document.getElementById('pagination').innerHTML = '';
-        return;
-      }
-
-      const start = (currentPage - 1) * PAGE_SIZE;
-      const pageItems = filtered.slice(start, start + PAGE_SIZE);
-
-      pageItems.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'result';
-        div.innerHTML = `<strong>${item.title}</strong><p>${item.content}</p>`;
-        container.appendChild(div);
-      });
-
-      renderPagination();
-    };
-
-    const renderPagination = () => {
-      const nav = document.getElementById('pagination');
-      nav.innerHTML = '';
-
-      const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-      if (totalPages <= 1) return;
-
-      const createBtn = (label, page) => {
-        const btn = document.createElement('button');
-        btn.textContent = label;
-        btn.disabled = page === currentPage;
-        btn.addEventListener('click', () => {
-          currentPage = page;
-          renderResults();
-        });
-        return btn;
-      };
-
-      nav.appendChild(createBtn('« Prev', Math.max(1, currentPage - 1)));
-      nav.appendChild(document.createTextNode(` Page ${currentPage} of ${totalPages} `));
-      nav.appendChild(createBtn('Next »', Math.min(totalPages, currentPage + 1)));
-    };
-
-    /* ---------- Search Logic ---------- */
-    const performSearch = query => {
-      if (!query) {
-        filtered = docs;
-      } else {
-        filtered = docs.filter(doc =>
-          fuzzyMatch(doc.title, query) ||
-          fuzzyMatch(doc.content, query)
-        );
-      }
-      currentPage = 1;
-      renderResults();
-    };
-
-    /* ---------- Event Handlers ---------- */
-    const onInput = debounce(e => {
-      const q = e.target.value.trim();
-      performSearch(q);
-    }, 200);
-
-    /* ---------- Data Loading ---------- */
-    const loadDocs = async () => {
-      try {
-        const res = await fetch(DOCS_URL);
-        docs = await res.json();
-        performSearch(''); // initial load
-      } catch (err) {
-        console.error('Failed to load docs:', err);
-        document.getElementById('results').textContent = 'Error loading documentation.';
-      }
-    };
-
-    /* ---------- Init ---------- */
-    document.getElementById('search-input').addEventListener('input', onInput);
-    loadDocs();
-  </script>
+    <script src="app.js"></script>
 </body>
 </html>
