@@ -1,0 +1,19 @@
+.dashboard-container {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chart-wrapper {
+  width: 100%;
+  max-width: 800px;
+  height: 300px;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .chart-wrapper {
+    height: 250px;
+  }
+}
