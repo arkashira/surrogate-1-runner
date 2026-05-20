@@ -1,0 +1,13 @@
+filter_settings:
+  enabled: true
+  threshold: 0.05  # 5% false positive rate
+  max_duration_seconds: 2
+  component_mapping:
+    infrastructure:
+      - "src/infrastructure/**"
+      - "config/**"
+    application:
+      - "src/application/**"
+      - "src/domain/**"
+    tests:
+      - "tests/**"
