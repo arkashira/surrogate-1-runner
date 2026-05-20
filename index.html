@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Axentx Web Terminal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="terminal-container" role="application">
+    <!-- Header -->
+    <header class="terminal-header">
+      <h1 class="logo">Axentx Terminal</h1>
+      <div class="auth-status" id="authStatus">Authenticating…</div>
+    </header>
+
+    <!-- Body -->
+    <main class="terminal-body">
+      <div class="output-container" id="outputContainer" aria-live="polite">
+        <div class="welcome-message">
+          Welcome to the Web Terminal.<br>
+          You are authenticated as <span id="username">unknown</span>.
+        </div>
+      </div>
+
+      <div class="input-area">
+        <input
+          type="text"
+          id="commandInput"
+          placeholder="Enter command…"
+          autocomplete="off"
+          aria-label="Command input"
+        >
+        <button id="sendButton" aria-label="Send command">Send</button>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="terminal-footer">
+      <div class="session-info">
+        Session ID: <span id="sessionId">loading…</span>
+      </div>
+      <div class="status-indicator" id="statusIndicator">Connected</div>
+    </footer>
+  </div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
