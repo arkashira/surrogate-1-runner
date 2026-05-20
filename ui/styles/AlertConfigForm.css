@@ -1,0 +1,33 @@
+.alert-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.alert-config-form label {
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-config-form input {
+  margin-top: 5px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.alert-config-form button {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.alert-config-form button:hover {
+  background-color: #0056b3;
+}
