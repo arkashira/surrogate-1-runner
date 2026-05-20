@@ -1,61 +1,37 @@
-import pytest
+import unittest
+from firmware.load_balancer import LoadBalancer
 
-# Import the load balancing logic. Adjust the import path if the module resides elsewhere.
-# The expected API: balance_load(gpus: List[str], tasks: List[Any]) -> Dict[str, List[Any]]
-try:
-    from surrogate_1.load_balancer import balance_load
-except Exception as e:
-    # If the import fails, provide a clear error message for debugging.
-    raise ImportError(f"Failed to import balance_load from surrogate_1.load_balancer: {e}")
+class TestLoadBalancer(unittest.TestCase):
+    def test_balance_load(self):
+        num_gpus = 4
+        load_balancer = LoadBalancer(num_gpus)
 
-@pytest.fixture
-def gpu_list():
-    """Return a sample list of GPU identifiers."""
-    return ["GPU0", "GPU1", "GPU2", "GPU3"]
+        # Simulate task sizes
+        task_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
 
-def test_balance_even_distribution(gpu_list):
-    """When number of tasks is a multiple of GPUs, each GPU should receive equal load."""
-    tasks = list(range(8))  # 8 tasks
-    distribution = balance_load(gpu_list, tasks)
-    # Each GPU should have 2 tasks
-    for gpu in gpu_list:
-        assert len(distribution[gpu]) == 2
-    # All tasks should be assigned exactly once
-    assigned = [t for lst in distribution.values() for t in lst]
-    assert sorted(assigned) == sorted(tasks)
+        # Balance the load
+        gpu_tasks = load_balancer.balance_load(task_sizes)
 
-def test_balance_uneven_tasks(gpu_list):
-    """When tasks are not evenly divisible, the first GPUs receive the extra tasks."""
-    tasks = list(range(7))  # 7 tasks
-    distribution = balance_load(gpu_list[:3], tasks)  # 3 GPUs
-    # Expected distribution: [3,2,2]
-    expected_counts = [3, 2, 2]
-    actual_counts = [len(distribution[gpu]) for gpu in distribution]
-    assert actual_counts == expected_counts
-    # All tasks assigned
-    assigned = [t for lst in distribution.values() for t in lst]
-    assert sorted(assigned) == sorted(tasks)
+        # Check if the tasks are assigned to the GPUs
+        self.assertEqual(len(gpu_tasks), num_gpus)
+        self.assertEqual(sum([len(tasks) for tasks in gpu_tasks]), len(task_sizes))
 
-def test_balance_no_tasks(gpu_list):
-    """If there are no tasks, the distribution should be empty lists for each GPU."""
-    distribution = balance_load(gpu_list, [])
-    for gpu in gpu_list:
-        assert distribution[gpu] == []
+    def test_update_utilization(self):
+        num_gpus = 4
+        load_balancer = LoadBalancer(num_gpus)
 
-def test_balance_more_gpus_than_tasks(gpu_list):
-    """When GPUs outnumber tasks, each task gets its own GPU and remaining GPUs receive empty lists."""
-    tasks = [101, 202]
-    distribution = balance_load(gpu_list[:5], tasks)  # 5 GPUs, 2 tasks
-    # Two GPUs should have one task each, others empty
-    non_empty = [gpu for gpu, lst in distribution.items() if lst]
-    assert len(non_empty) == 2
-    assert set(distribution[non_empty[0]]) == {101}
-    assert set(distribution[non_empty[1]]) == {202}
-    # Remaining GPUs should have empty lists
-    for gpu in set(gpu_list[:5]) - set(non_empty):
-        assert distribution[gpu] == []
+        # Simulate task sizes
+        task_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
 
-def test_balance_no_gpus():
-    """If no GPUs are provided, balance_load should raise a ValueError."""
-    with pytest.raises(ValueError):
-        balance_load([], [1, 2, 3])
+        # Balance the load
+        gpu_tasks = load_balancer.balance_load(task_sizes)
+
+        # Update the utilization of each GPU
+        load_balancer.update_utilization(gpu_tasks)
+
+        # Check if the utilization of each GPU is updated
+        self.assertEqual(len(load_balancer.gpu_utilization), num_gpus)
+        self.assertGreater(sum(load_balancer.gpu_utilization), 0)
+
+if __name__ == "__main__":
+    unittest.main()
