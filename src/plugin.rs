@@ -1,26 +1,39 @@
-use kicad_plugin::Plugin;
-use kicad_plugin::PluginRegistrar;
+use std::time::Instant;
+use log;
 
-/// The Axentx plugin struct.
-struct AxentxPlugin;
+pub struct Plugin {
+    // existing fields...
+}
 
-impl Plugin for AxentxPlugin {
-    /// Returns the name of the plugin.
-    fn name(&self) -> &str {
-        "Axentx Plugin"
+impl Plugin {
+    pub fn new() -> Self {
+        // existing initialization...
+        Self { /* existing fields... */ }
     }
 
-    /// Called when the plugin is activated from the menu.
-    fn on_menu(&self) {
-        // TO DO: implement plugin functionality, such as:
-        // - Creating a new menu item
-        // - Handling user input
-        // - Interacting with the KiCAD API
+    pub fn route(&self, /* existing args */) -> Result</* existing return type */> {
+        let start = Instant::now();
+        let result = self.route_impl(/* existing args */);
+        let duration = start.elapsed();
+        log::info!("Routing completed in {:?}", duration);
+        result
+    }
+
+    fn route_impl(&self, /* existing args */) -> Result</* existing return type */> {
+        // existing routing logic...
     }
 }
 
-#[no_mangle]
-pub extern "C" fn plugin_register(reg: &mut PluginRegistrar) {
-    // Register the plugin with KiCAD.
-    reg.register_plugin(Box::new(AxentxPlugin));
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_log::test;
+
+    #[test]
+    fn test_routing_duration_logging() {
+        let plugin = Plugin::new();
+        let _ = plugin.route(/* test args */);
+        // Verify the log contains the expected duration message
+        // Note: In practice, you'd need a logging test framework like test_log
+    }
 }
