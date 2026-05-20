@@ -1,46 +1,57 @@
 """
-Centralised configuration for the Finance Ingest service.
+Centralised configuration for the surrogate‑1 application.
+
+* Loads a JSON configuration file (`config.json`) that contains
+  broker URLs, result backends, and optional overrides.
+* Loads a JSON *schema* (`finance_schema.json`) that tells the
+  job which columns in the raw CSVs represent revenue and expense.
+* Exposes absolute paths for raw data and metrics output.
 """
 
-import os
-from pathlib import Path
-from datetime import date
-from typing import Set
+from __future__ import annotations
 
-# ------------------------------------------------------------------
-# 1️⃣  Directories
-# ------------------------------------------------------------------
-BASE_RAW_DIR: Path = Path(os.getenv("BASE_RAW_DIR", "/data/finance/raw"))
-BASE_RAW_DIR.mkdir(parents=True, exist_ok=True)
+import json
+import pathlib
+from typing import Dict, Any
 
-# ------------------------------------------------------------------
-# 2️⃣  Celery
-# ------------------------------------------------------------------
-CELERY_BROKER_URL: str = os.getenv(
-    "CELERY_BROKER_URL", "redis://localhost:6379/0"
-)
-CELERY_RESULT_BACKEND: str = os.getenv(
-    "CELERY_RESULT_BACKEND", "redis://localhost:6379/0"
-)
+# --------------------------------------------------------------------------- #
+# Base directories
+# --------------------------------------------------------------------------- #
+BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data" / "finance"
+RAW_DIR = DATA_DIR / "raw"
+METRICS_DIR = DATA_DIR / "metrics"
 
-# ------------------------------------------------------------------
-# 3️⃣  Upload limits
-# ------------------------------------------------------------------
-MAX_UPLOAD_SIZE_BYTES: int = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", 10 * 1024 * 1024))
-ALLOWED_MIME_TYPES: Set[str] = {
-    "text/csv",
-    "application/vnd.ms-excel",
-    "text/plain",  # some clients send plain text for CSV
-}
+# Ensure the metrics directory exists – Celery will write to it.
+METRICS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ------------------------------------------------------------------
-# 4️⃣  Logging
-# ------------------------------------------------------------------
-LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+# --------------------------------------------------------------------------- #
+# Configuration files
+# --------------------------------------------------------------------------- #
+CONFIG_PATH = BASE_DIR / "config.json"
+SCHEMA_PATH = BASE_DIR / "config" / "finance_schema.json"
 
-# ------------------------------------------------------------------
-# 5️⃣  Helpers
-# ------------------------------------------------------------------
-def today_str() -> str:
-    """Return YYYY‑MM‑DD for the current day."""
-    return date.today().isoformat()
+# --------------------------------------------------------------------------- #
+# Helper functions
+# --------------------------------------------------------------------------- #
+def _load_json(path: pathlib.Path) -> Dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"Required configuration file not found: {path}")
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+# --------------------------------------------------------------------------- #
+# Public API
+# --------------------------------------------------------------------------- #
+# Load the main config – this is the only place that raises if the file is missing.
+CONFIG: Dict[str, Any] = _load_json(CONFIG_PATH)
+
+# Load the finance schema – this is optional; if missing we default to common names.
+try:
+    SCHEMA: Dict[str, str] = _load_json(SCHEMA_PATH)
+except FileNotFoundError:
+    SCHEMA = {"revenue": "revenue", "expense": "expense"}
+
+# Convenience aliases used throughout the codebase
+BROKER_URL = CONFIG["celery"]["broker_url"]
+RESULT_BACKEND = CONFIG["celery"]["result_backend"]
