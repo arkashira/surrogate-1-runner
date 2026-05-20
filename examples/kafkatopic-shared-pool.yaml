@@ -1,0 +1,13 @@
+apiVersion: kafka.axentx.io/v1
+kind: KafkaTopic
+metadata:
+  name: example-shared-topic
+spec:
+  partitions: 10
+  replicationFactor: 3
+  brokerPool:
+    shared:
+      poolName: default-pool
+  config:
+    retention.ms: 86400000
+    message.format.version: "2.8"
