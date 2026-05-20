@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cloud Spend Dashboard</title>
+</head>
+<body>
+<h1>Cloud Spend Dashboard</h1>
+<form action="/dashboard" method="get">
+    <label for="account">Account:</label>
+    <input type="text" id="account" name="account" value="{{account}}"><br>
+    <label for="sortBy">Sort By:</label>
+    <select id="sortBy" name="sortBy">
+        <option value="date" {{sortBy eq 'date' ? 'selected' : ''}}>Date</option>
+        <option value="amount" {{sortBy eq 'amount' ? 'selected' : ''}}>Amount</option>
+    </select><br>
+    <button type="submit">Filter</button>
+</form>
+<ul>
+    <li th:each="spend : ${spends}">
+        <span th:text="${spend.date}">Date</span> -
+        <span th:text="${spend.amount}">Amount</span> -
+        <span th:text="${spend.account}">Account</span>
+    </li>
+</ul>
+</body>
+</html>
