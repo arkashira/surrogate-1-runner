@@ -1,0 +1,10 @@
+udp_mappings:
+  - public_port: 1935
+    internal_endpoint: "127.0.0.1:1935"
+    description: "Game server UDP traffic"
+  - public_port: 3478
+    internal_endpoint: "127.0.0.1:3478"
+    description: "STUN server UDP traffic"
+  - public_port: 4500
+    internal_endpoint: "127.0.0.1:4500"
+    description: "NAT traversal UDP traffic"
