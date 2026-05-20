@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tool Management Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1 { margin-bottom: 0.5rem; }
+    .container { max-width: 800px; margin: auto; }
+    .tool-list { margin-top: 1rem; border-collapse: collapse; width: 100%; }
+    .tool-list th, .tool-list td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .tool-list th { background-color: #f2f2f2; }
+    .stats { margin-top: 1.5rem; }
+    .add-form input { padding: 5px; margin-right: 5px; }
+    .add-form button { padding: 5px 10px; }
+    .remove-btn { color: #c00; cursor: pointer; }
+    .usage-btn { color: #06c; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tool Management Dashboard</h1>
+
+    <section class="add-form">
+      <h2>Add New Tool</h2>
+      <input type="text" id="tool-name-input" placeholder="Tool name" />
+      <button id="add-tool-btn">Add Tool</button>
+    </section>
+
+    <section class="list-section">
+      <h2>Managed Tools</h2>
+      <table class="tool-list" id="tool-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Usage Count</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tool-tbody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </section>
+
+    <section class="stats">
+      <h2>Statistics</h2>
+      <p>Total Tools: <span id="total-tools">0</span></p>
+      <p>Total Usage Events: <span id="total-usage">0</span></p>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'axentx_tools';
+
+    function loadTools() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return [];
+      }
+    }
+
+    function saveTools(tools) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tools));
+    }
+
+    function renderTools() {
+      const tools = loadTools();
+      const tbody = document.getElementById('tool-tbody');
+      tbody.innerHTML = '';
+      tools.forEach((tool, idx) => {
+        const tr = document.createElement('tr');
+
+        const nameTd = document.createElement('td');
+        nameTd.textContent = tool.name;
+        tr.appendChild(nameTd);
+
+        const usageTd = document.createElement('td');
+        usageTd.textContent = tool.usage;
+        tr.appendChild(usageTd);
+
+        const actionsTd = document.createElement('td');
+
+        const incBtn = document.createElement('span');
+        incBtn.textContent = 'Increment Usage';
+        incBtn.className = 'usage-btn';
+        incBtn.style.marginRight = '10px';
+        incBtn.onclick = () => {
+          tool.usage += 1;
+          saveTools(tools);
+          renderTools();
+        };
+        actionsTd.appendChild(incBtn);
+
+        const delBtn = document.createElement('span');
+        delBtn.textContent = 'Remove';
+        delBtn.className = 'remove-btn';
+        delBtn.onclick = () => {
+          tools.splice(idx, 1);
+          saveTools(tools);
+          renderTools();
+        };
+        actionsTd.appendChild(delBtn);
+
+        tr.appendChild(actionsTd);
+        tbody.appendChild(tr);
+      });
+
+      // Update stats
+      document.getElementById('total-tools').textContent = tools.length;
+      const totalUsage = tools.reduce((sum, t) => sum + t.usage, 0);
+      document.getElementById('total-usage').textContent = totalUsage;
+    }
+
+    document.getElementById('add-tool-btn').addEventListener('click', () => {
+      const input = document.getElementById('tool-name-input');
+      const name = input.value.trim();
+      if (!name) {
+        alert('Tool name cannot be empty.');
+        return;
+      }
+      const tools = loadTools();
+      if (tools.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+        alert('A tool with this name already exists.');
+        return;
+      }
+      tools.push({ name, usage: 0, id: Date.now() });
+      saveTools(tools);
+      input.value = '';
+      renderTools();
+    });
+
+    // Initial render
+    renderTools();
+  </script>
+</body>
+</html>
