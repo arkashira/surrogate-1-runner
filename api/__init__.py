@@ -1,15 +1,7 @@
 """
-FastAPI application exposing the knowledge‑search API.
+Expose the finance router for the main app.
 """
 
-from fastapi import FastAPI
-from .search import router as search_router
+from .finance_metrics import router as finance_router
 
-app = FastAPI(
-    title="Surrogate‑1 Knowledge API",
-    description="Search knowledge articles by comma‑separated tags.",
-    version="1.0.0",
-)
-
-# Mount the search router under /api
-app.include_router(search_router, prefix="/api")
+__all__ = ["finance_router"]
