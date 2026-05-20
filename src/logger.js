@@ -1,47 +1,22 @@
-class Logger {
-  static info(message, data = {}) {
-    const logEntry = {
-      level: 'INFO',
-      message: message,
-      data: data,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.log(JSON.stringify(logEntry));
-  }
+const { createLogger, format, transports } = require('winston');
 
-  static warn(message, data = {}) {
-    const logEntry = {
-      level: 'WARN',
-      message: message,
-      data: data,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.warn(JSON.stringify(logEntry));
-  }
+const logger = createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: format.combine(
+    format.timestamp(),
+    format.errors({ stack: true }),          // keep stack traces
+    format.splat(),
+    format.json()
+  ),
+  transports: [
+    // Console is always enabled – useful in dev & CI
+    new transports.Console(),
 
-  static error(message, data = {}) {
-    const logEntry = {
-      level: 'ERROR',
-      message: message,
-      data: data,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.error(JSON.stringify(logEntry));
-  }
+    // In production you can add a file or external service (e.g. Loggly)
+    ...(process.env.NODE_ENV === 'production'
+      ? [new transports.File({ filename: '/var/log/axentx/axentx.log' })]
+      : [])
+  ],
+});
 
-  static debug(message, data = {}) {
-    const logEntry = {
-      level: 'DEBUG',
-      message: message,
-      data: data,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.debug(JSON.stringify(logEntry));
-  }
-}
-
-module.exports = Logger;
+module.exports = logger;
