@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "Project context mismatch: surrogate-1 is a parallel public-dataset ingest worker project for HuggingFace datasets, but the task requests a 'feedback system for users to provide suggestions and feedback' with 'dashboard with analytics'. The existing codebase structure (bin/dataset-enrich.sh, parallel runners) doesn't contain any feedback system components or user-facing interfaces. The PRD reference appears to be for a different axentx product (startup validation feedback) than the actual codebase (data ingestion runner).",
+  "request_to": "prd-daemon|architect-daemon",
+  "minimal_spec_needed": "Clarify whether this feedback system should be built into the surrogate-1 data ingestion project, or if this is a separate feature request that needs a different codebase. If it's for surrogate-1, provide: 1) concrete file paths where feedback system should integrate, 2) whether this is a CLI feature, web UI, or API endpoint, 3) what data model for feedback submissions, 4) acceptance criteria for the feedback submission flow."
+}
