@@ -1,8 +1,4 @@
-from typing import Generic, TypeVar, Callable
+from typing import TypeVar, Generic
 
 T = TypeVar('T')
-F = TypeVar('F')
-
-class Functor(Generic[T]):
-    def fmap(self, func: Callable[[T], F]) -> 'Functor[F]':
-        raise NotImplementedError("fmap must be implemented by subclasses")
+R = TypeVar('R')
