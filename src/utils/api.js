@@ -1,28 +1,10 @@
-/**
- * API utility for fetching build recommendations.
- *
- * The backend expects a POST request to `/api/recommendations` with a JSON
- * payload containing `requirements` (string) and `budget` (number).
- *
- * The function returns a promise that resolves to the parsed JSON response.
- * It throws an error if the HTTP status is not in the 200–299 range.
- */
-
-export async function getBuildRecommendations({ requirements, budget }) {
-  const response = await fetch('/api/recommendations', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ requirements, budget }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to fetch recommendations: ${response.status} ${errorText}`
-    );
+export const fetchComponentBenchmarks = async (componentId) => {
+  try {
+    const response = await fetch(`/api/components/${componentId}/benchmarks`);
+    if (!response.ok) throw new Error('Benchmark data fetch failed');
+    return await response.json();
+  } catch (error) {
+    console.error('Benchmark API error:', error);
+    throw error;
   }
-
-  return response.json();
-}
+};
