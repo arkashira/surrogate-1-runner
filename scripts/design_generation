@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "Task specifies 'design file generation scripts' but lacks concrete details: (1) What format/type of design files are being generated? (2) What inputs trigger generation? (3) What output format/structure expected? (4) Current directory structure at /opt/axentx/surrogate-1/scripts/?",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "Concrete spec defining: input data source, output file format (e.g., YAML/JSON/schematic), trigger mechanism, and example output structure for design generation scripts"
+}
