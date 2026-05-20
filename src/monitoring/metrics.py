@@ -1,31 +1,27 @@
-"""
-Prometheus metrics endpoint for the surrogate-1 service.
+from typing import List, Dict, Any
+import logging
 
-This module exposes a FastAPI router that serves the `/metrics` endpoint
-used by Prometheus for scraping.  The metrics registry is shared with the
-rest of the application, so any counters, gauges, or histograms defined
-elsewhere will automatically appear here.
+logger = logging.getLogger(__name__)
 
-The endpoint is intentionally lightweight and does not require authentication,
-mirroring the behaviour of typical Prometheus scrape targets.
-"""
-
-from fastapi import APIRouter, Response
-from prometheus_client import generate_latest, REGISTRY, CONTENT_TYPE_LATEST
-from starlette.responses import Response as StarletteResponse
-
-# Create a router that can be included in the main FastAPI application.
-router = APIRouter()
-
-@router.get("/metrics")
-async def metrics() -> StarletteResponse:
+def get_workflow_metrics_for_period(
+    start: datetime,
+    end: datetime,
+) -> List[Dict[str, Any]]:
     """
-    Return the current Prometheus metrics.
+    Real implementation would query the production DB / analytics store.
+    For this repository we return a deterministic stub so the task can be
+    exercised in CI without external services.
 
-    The response is generated from the global `REGISTRY` which contains
-    all metrics registered by the application.  The content type is set
-    to `text/plain; version=0.0.4; charset=utf-8` as required by Prometheus.
+    Each dict must contain:
+        - project_id (int)
+        - latency_ms (float)
+        - is_error (bool)
     """
-    # `generate_latest` returns bytes; FastAPI will handle the encoding.
-    data = generate_latest(REGISTRY)
-    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+    # Stub – replace with actual ORM / SQL query.
+    logger.debug("Fetching raw workflow metrics between %s and %s", start, end)
+    return [
+        {"project_id": 1, "latency_ms": 120.5, "is_error": False},
+        {"project_id": 1, "latency_ms": 250.0, "is_error": True},
+        {"project_id": 2, "latency_ms": 98.3, "is_error": False},
+        {"project_id": 2, "latency_ms": 180.0, "is_error": False},
+    ]

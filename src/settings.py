@@ -1,28 +1,22 @@
-from src.services.sync_service import SyncService
 import os
+from dataclasses import dataclass
+from typing import Optional
 
+@dataclass(frozen=True)
 class Settings:
-    def __init__(self):
-        self.sync_enabled = False
-        self.s3_bucket = os.getenv('S3_BUCKET')
-        self.s3_key = os.getenv('S3_KEY')
-        self.encryption_key = os.getenv('ENCRYPTION_KEY')
-        self.sync_service = SyncService(self.s3_bucket, self.s3_key, self.encryption_key)
+    # Celery
+    broker_url: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    result_backend: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
-    def toggle_sync(self):
-        self.sync_enabled = not self.sync_enabled
+    # AWS / S3
+    aws_access_key_id: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
+    aws_region: str = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+    reports_s3_bucket: str = os.getenv("REPORTS_S3_BUCKET", "surrogate-reports")
+    reports_s3_prefix: str = os.getenv("REPORTS_S3_PREFIX", "daily/")
 
-    def get_sync_status(self):
-        if self.sync_enabled:
-            return self.sync_service.get_sync_status()
-        return None
+    # Misc
+    report_retry_max: int = int(os.getenv("REPORT_RETRY_MAX", "3"))
+    report_retry_delay: int = int(os.getenv("REPORT_RETRY_DELAY", "60"))  # seconds
 
-    def sync_data(self, data):
-        if self.sync_enabled:
-            return self.sync_service.upload_to_s3(data)
-        return False
-
-    def restore_data(self):
-        if self.sync_enabled:
-            return self.sync_service.download_from_s3()
-        return None
+settings = Settings()
