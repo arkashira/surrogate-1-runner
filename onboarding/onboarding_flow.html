@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Onboarding Flow</title>
+  <link rel="stylesheet" href="onboarding_flow.css">
+</head>
+<body>
+  <div id="onboarding-container"></div>
+
+  <script src="onboarding_flow.js"></script>
+  <script>
+    // Simple renderer that loads each step's component into the container.
+    const container = document.getElementById('onboarding-container');
+    const steps = require('./onboarding_flow.js');
+
+    function loadStep(step) {
+      fetch(step.component)
+        .then(res => res.text())
+        .then(html => {
+          container.innerHTML = html;
+        })
+        .catch(err => {
+          container.innerHTML = `<p>Error loading step: ${err}</p>`;
+        });
+    }
+
+    // Start with the first step
+    loadStep(steps[0]);
+
+    // For demonstration, expose a global to navigate steps
+    window.onboarding = {
+      steps,
+      current: 0,
+      next() {
+        if (this.current < this.steps.length - 1) {
+          this.current += 1;
+          loadStep(this.steps[this.current]);
+        }
+      },
+      prev() {
+        if (this.current > 0) {
+          this.current -= 1;
+          loadStep(this.steps[this.current]);
+        }
+      }
+    };
+  </script>
+</body>
+</html>
