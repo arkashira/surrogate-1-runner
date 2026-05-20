@@ -1,0 +1,32 @@
+/* Basic reset */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; line-height: 1.6; background: #f9f9f9; }
+
+header { background: #004a99; color: #fff; padding: 1rem; text-align: center; }
+
+#filters, #export { padding: 1rem; background: #fff; margin: 0.5rem; border-radius: 4px; }
+
+.form-group { margin-bottom: 0.75rem; display: flex; flex-direction: column; }
+
+label { margin-bottom: 0.25rem; font-weight: 600; }
+
+select, input[type="date"] { padding: 0.5rem; font-size: 1rem; }
+
+button { padding: 0.6rem 1.2rem; margin-right: 0.5rem; border: none; border-radius: 4px; cursor: pointer; }
+
+#apply-filters { background: #004a99; color: #fff; }
+
+#export-csv { background: #28a745; color: #fff; }
+
+#export-pdf { background: #dc3545; color: #fff; }
+
+#dashboard table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+
+#dashboard th, #dashboard td { border: 1px solid #ddd; padding: 0.75rem; text-align: left; }
+
+#dashboard th { background: #e9ecef; }
+
+@media (max-width: 600px) {
+  .form-group { flex-direction: column; }
+  button { width: 100%; margin-bottom: 0.5rem; }
+}

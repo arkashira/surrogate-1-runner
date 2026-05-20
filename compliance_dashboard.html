@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Compliance Dashboard</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <script src="/static/js/dashboard.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Compliance Dashboard</h1>
+  </header>
+
+  <section id="filters" aria-labelledby="filter-heading">
+    <h2 id="filter-heading">Filters</h2>
+    <form id="filter-form" novalidate>
+      <div class="form-group">
+        <label for="account-select">Cloud Account:</label>
+        <select id="account-select" name="account" required>
+          <option value="">All Accounts</option>
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="policy-select">Policy:</label>
+        <select id="policy-select" name="policy" required>
+          <option value="">All Policies</option>
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="start-date">Start Date:</label>
+        <input type="date" id="start-date" name="start" required>
+      </div>
+
+      <div class="form-group">
+        <label for="end-date">End Date:</label>
+        <input type="date" id="end-date" name="end" required>
+      </div>
+
+      <button type="submit" id="apply-filters">Apply Filters</button>
+    </form>
+  </section>
+
+  <section id="dashboard" aria-live="polite">
+    <!-- Data table will be injected here -->
+  </section>
+
+  <section id="export">
+    <button id="export-csv">Export CSV</button>
+    <button id="export-pdf">Export PDF</button>
+  </section>
+</body>
+</html>
