@@ -1,5 +1,10 @@
-# Configuration for Surrogate‑1 test suite
-
-# Path to the KiCad 9 executable on the CI runner.
-# Adjust this path if KiCad is installed elsewhere.
-kicad_path: /usr/bin/kicad
+workflows:
+  surrogate1-tests:
+    jobs:
+      - name: KiCAD9CompatibilityTest
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v2
+          - name: Run KiCAD9CompatibilityTest
+            run: mvn test -Dtest=KiCAD9CompatibilityTest
