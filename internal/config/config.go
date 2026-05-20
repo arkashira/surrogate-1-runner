@@ -1,38 +1,19 @@
 package config
 
 import (
-	"io/ioutil"
-	"gopkg.in/yaml.v2"
+	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+
+	"github.com/axentx/surrogate-1/internal/report"
 )
 
-type SurrogateConfig struct {
-	Languages map[string]LanguageConfig `yaml:"languages"`
-}
+func GetReportConfig() (*report.ReportConfig, error) {
+	reportConfig := &report.ReportConfig{}
 
-type LanguageConfig struct {
-	Formatter string `yaml:"formatter"`
-	Rules     string `yaml:"rules"`
-}
+	// Assuming reportConfig is defined in the report package
+	// and has fields for report output path, log path, etc.
 
-func LoadConfig(configPath string) (*SurrogateConfig, error) {
-	config := &SurrogateConfig{}
-
-	configBytes, err := ioutil.ReadFile(filepath.Clean(configPath))
-	if err != nil {
-		return nil, err
-	}
-
-	err = yaml.Unmarshal(configBytes, config)
-	if err != nil {
-		return nil, err
-	}
-
-	return config, nil
-}
-
-func (c *SurrogateConfig) Validate() error {
-	// Add validation logic here
-	return nil
+	return reportConfig, nil
 }
