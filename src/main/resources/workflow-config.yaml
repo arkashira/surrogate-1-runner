@@ -1,0 +1,21 @@
+workflow:
+  maxRetries: 3
+  retryDelayMs: 5000
+  timeoutMinutes: 30
+  performance:
+    samplingIntervalMs: 10000
+    metricsEnabled: true
+    logThresholdMs: 1000
+  kicad9:
+    parallelProcesses: ${MAX_PARALLEL_TASKS:4}
+    memoryLimitMB: 4096
+    tempDir: /tmp/kicad9-workflows
+    cleanupOnSuccess: true
+  errorHandling:
+    notifyOnFailure: true
+    maxErrorMessages: 10
+    errorLogRetentionDays: 7
+  monitoring:
+    enablePrometheus: false
+    prometheusPort: 9091
+    jmxEnabled: true
