@@ -1,0 +1,70 @@
+
+/* ---- Trigger (wrapper) ---- */
+.tooltip-trigger {
+  position: relative;          /* anchor for absolute tooltip */
+  display: inline-block;
+}
+
+/* ---- Tooltip container ---- */
+.tooltip-content {
+  position: absolute;
+  background: #333;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  max-width: 260px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  pointer-events: none;        /* prevents tooltip from stealing hover */
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1000;
+}
+
+/* Visible state */
+.tooltip-content[data-show='true'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ---- Arrow ---- */
+.tooltip-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+
+/* Arrow placement per side */
+.tooltip-top .tooltip-arrow {
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: #333;
+}
+.tooltip-bottom .tooltip-arrow {
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: #333;
+}
+.tooltip-left .tooltip-arrow {
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: #333;
+}
+.tooltip-right .tooltip-arrow {
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: #333;
+}
+
+/* Text handling */
+.tooltip-text {
+  word-wrap: break-word;
+  text-align: center;
+}
