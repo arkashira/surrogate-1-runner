@@ -1,0 +1,50 @@
+[
+  {
+    "word": "firewall",
+    "definition": "A network security system that monitors and controls incoming/outgoing traffic based on security rules",
+    "example": "We configured the firewall to block unauthorized SSH access",
+    "category": "IT Security"
+  },
+  {
+    "word": "cloud migration",
+    "definition": "Process of transferring data/applications from on-premise infrastructure to cloud platforms",
+    "example": "The company scheduled cloud migration during weekend maintenance window",
+    "category": "Cloud Computing"
+  },
+  {
+    "word": "API endpoint",
+    "definition": "URL where API services can be accessed by applications",
+    "example": "Developers need to authenticate before accessing the payment API endpoint",
+    "category": "Software Development"
+  },
+  {
+    "word": "latency",
+    "definition": "Delay before data transfer begins after request is initiated",
+    "example": "High network latency caused video conferencing disruptions",
+    "category": "Networking"
+  },
+  {
+    "word": "patch management",
+    "definition": "Process of distributing and applying software updates",
+    "example": "IT teams use automated tools for efficient patch management",
+    "category": "System Administration"
+  },
+  {
+    "word": "load balancer",
+    "definition": "Device distributing network traffic across servers",
+    "example": "We deployed a load balancer to handle increased user traffic",
+    "category": "Infrastructure"
+  },
+  {
+    "word": "encryption",
+    "definition": "Process of converting data to unreadable format for security",
+    "example": "All sensitive data must be encryption at rest and in transit",
+    "category": "Security"
+  },
+  {
+    "word": "virtual machine",
+    "definition": "Emulated computer system running on physical hardware",
+    "example": "Developers use virtual machines for environment testing",
+    "category": "Cloud Computing"
+  }
+]
