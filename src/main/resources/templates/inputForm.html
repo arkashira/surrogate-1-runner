@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Business Marketing Strategy Input</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; }
+        form { display: grid; gap: 15px; }
+        label { font-weight: bold; }
+        textarea { height: 100px; }
+        button { padding: 10px 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Enter Your Business Details</h1>
+    <form action="/generate-strategy" method="POST">
+        <label for="businessName">Business Name:</label>
+        <input type="text" id="businessName" name="businessName" required>
+        
+        <label for="industry">Industry/Vertical:</label>
+        <input type="text" id="industry" name="industry" required>
+        
+        <label for="targetAudience">Target Audience:</label>
+        <textarea id="targetAudience" name="targetAudience" required></textarea>
+        
+        <label for="currentChallenges">Current Challenges:</label>
+        <textarea id="currentChallenges" name="currentChallenges"></textarea>
+        
+        <label for="goals">Marketing Goals (e.g. "Increase leads by 30%"):</label>
+        <textarea id="goals" name="goals" required></textarea>
+        
+        <label for="budgetRange">Monthly Marketing Budget ($):</label>
+        <input type="number" id="budgetRange" name="budgetRange">
+        
+        <button type="submit">Generate Strategy</button>
+    </form>
+</body>
+</html>
