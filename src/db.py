@@ -1,29 +1,34 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+import sqlite3
+from datetime import datetime
 
-SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/pricing_db"
+class Database:
+    def __init__(self, db_file):
+        self.connection = sqlite3.connect(db_file)
+        self.create_logs_table()
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,
-    future=True,               # use 2.0 style API
-)
+    def create_logs_table(self):
+        with self.connection:
+            self.connection.execute('''
+                CREATE TABLE IF NOT EXISTS user_usage_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    model_name TEXT NOT NULL,
+                    usage_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    action TEXT NOT NULL
+                )
+            ''')
 
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    class_=Session,
-    future=True,
-)
+    def log_usage(self, user_id, model_name, action):
+        with self.connection:
+            self.connection.execute('''
+                INSERT INTO user_usage_logs (user_id, model_name, action)
+                VALUES (?, ?, ?)
+            ''', (user_id, model_name, action))
 
+    def get_logs(self):
+        cursor = self.connection.cursor()
+        cursor.execute('SELECT * FROM user_usage_logs')
+        return cursor.fetchall()
 
-def get_db() -> Session:
-    """
-    FastAPI dependency that yields a DB session and guarantees it is closed.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    def close(self):
+        self.connection.close()
