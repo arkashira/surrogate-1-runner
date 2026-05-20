@@ -1,62 +1,70 @@
-import datetime
-import statistics
-from typing import Dict, List
+import os
+import requests
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
 
-class BaselineCalculator:
-    def __init__(self, data_service):
-        self.data_service = data_service
+from ..config import COSTINEL_API_KEY, COSTINEL_BASE_URL
+from ..utils import logger
 
-    def calculate_baseline(self, resource_type: str, account_id: str) -> float:
-        """
-        Calculate the 7-day baseline for a given resource type and account.
+def get_costinel_resource_breakdown(
+    alert_id: str,
+    time_range: str = "last_hour"
+) -> List[Dict]:
+    """
+    Fetch resource breakdown from Costinel API for a specific alert
+    Returns top 5 resources with cost, percentage, and links
+    """
+    try:
+        # Calculate time range parameters
+        end_time = datetime.utcnow().isoformat() + "Z"
+        if time_range == "last_hour":
+            start_time = (datetime.utcnow() - timedelta(hours=1)).isoformat() + "Z"
+        else:  # default to last day
+            start_time = (datetime.utcnow() - timedelta(days=1)).isoformat() + "Z"
 
-        Args:
-            resource_type: Type of resource (e.g., 'compute', 'storage')
-            account_id: ID of the account
-
-        Returns:
-            The baseline value as a float
-        """
-        end_date = datetime.datetime.now()
-        start_date = end_date - datetime.timedelta(days=7)
-
-        data_points = self._get_data_points(resource_type, account_id, start_date, end_date)
-        return statistics.mean(data_points)
-
-    def _get_data_points(self, resource_type: str, account_id: str,
-                         start_date: datetime.datetime, end_date: datetime.datetime) -> List[float]:
-        """
-        Retrieve data points for the given resource type, account, and date range.
-
-        Args:
-            resource_type: Type of resource
-            account_id: ID of the account
-            start_date: Start date for the range
-            end_date: End date for the range
-
-        Returns:
-            List of data points as floats
-        """
-        query = {
-            "resource_type": resource_type,
-            "account_id": account_id,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat()
+        # Build API request
+        headers = {
+            "Authorization": f"Bearer {COSTINEL_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        params = {
+            "alert_id": alert_id,
+            "start_time": start_time,
+            "end_time": end_time,
+            "limit": 5
         }
 
-        return self.data_service.query_data_points(query)
+        response = requests.get(
+            f"{COSTINEL_BASE_URL}/api/v1/anomalies/resources",
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"Costinel API error: {response.status_code} - {response.text}")
+            raise CostinelAPIError(f"API request failed: {response.status_code}")
 
-class DataService:
-    def query_data_points(self, query: Dict) -> List[float]:
-        """
-        Query data points from the data service.
+        data = response.json()
+        total_cost = sum(item["cost"] for item in data)
+        
+        # Format results with percentages and links
+        return [
+            {
+                "resource_id": item["resource_id"],
+                "resource_type": item["resource_type"],
+                "cost": round(item["cost"], 2),
+                "percentage": round((item["cost"] / total_cost) * 100, 1) if total_cost > 0 else 0,
+                "link": f"{COSTINEL_BASE_URL}/resources/{item['resource_id']}/details"
+            }
+            for item in sorted(data, key=lambda x: x["cost"], reverse=True)[:5]
+        ]
+        
+    except requests.exceptions.RequestException as e:
+        logger.exception("Costinel API request failed")
+        raise CostinelAPIError(f"Network error: {str(e)}") from e
 
-        Args:
-            query: Dictionary containing query parameters
-
-        Returns:
-            List of data points as floats
-        """
-        # Implementation would connect to actual data source
-        # This is a mock implementation for demonstration
-        return [100.0, 105.0, 110.0, 108.0, 112.0, 107.0, 115.0]
+class CostinelAPIError(Exception):
+    """Custom exception for Costinel API errors"""
+    pass
