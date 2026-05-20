@@ -1,29 +1,52 @@
-const { error: logError } = require('./logger');
-
 /**
- * Centralised error handling.
+ * Centralised error handling for all surrogate‑1 integrations.
  *
- * @param {Error|string} errOrMsg – Either an Error object or a short message.
- * @param {Object} [context={}] – Arbitrary key/value pairs that describe where/why the error happened.
- * @throws {Error} – The original (or a wrapped) error, enriched with `context`.
+ * Why?
+ *  • Guarantees a uniform log format (easy to grep, ship to telemetry, etc.).
+ *  • Gives callers a single error type (`IntegrationError`) they can `instanceof`
+ *    check to decide whether to show a user‑friendly “integration failed” UI
+ *    or to treat the error as a bug.
+ *  • Preserves the original stack trace for debugging while still providing a
+ *    clear, high‑level message.
  */
-function handleError(errOrMsg, context = {}) {
-  const err = errOrMsg instanceof Error ? errOrMsg : new Error(String(errOrMsg));
 
-  // Attach the context for upstream consumers.
-  err.context = context;
+class IntegrationError extends Error {
+  /**
+   * @param {string} component   – Human‑readable name of the failing component
+   *                               (e.g. "Resolver").
+   * @param {Error}  original    – The raw error that was caught.
+   */
+  constructor(component, original) {
+    super(`Integration failure in ${component}: ${original.message}`);
+    this.name = 'IntegrationError';
+    this.component = component;
+    this.originalError = original;
 
-  // Build a readable log line.
-  const ctxString = Object.entries(context)
-    .map(([k, v]) => `${k}=${v}`)
-    .join(' ');
-  const logMsg = `Resolver Error: ${err.message}${ctxString ? ' | ' + ctxString : ''}`;
-
-  // Persist the error.
-  logError(logMsg);
-
-  // Re‑throw so callers can decide (retry, abort, etc.).
-  throw err;
+    // Keep the original stack trace – it is invaluable when debugging.
+    if (original.stack) {
+      this.stack = `${this.stack}\nCaused by: ${original.stack}`;
+    }
+  }
 }
 
-module.exports = { handleError };
+/**
+ * Log the error (console for now – replace with Winston/Pino/etc. in prod) and
+ * re‑throw a wrapped `IntegrationError`.
+ *
+ * @param {Error}  err        – The caught error.
+ * @param {string} component  – Component name for context.
+ * @throws {IntegrationError}
+ */
+function handleIntegrationError(err, component = 'UnknownComponent') {
+  // Structured logging placeholder – keep it simple but consistent.
+  console.error(`[IntegrationError] ${component}: ${err.message}`);
+  // Future‑proof: add telemetry here (e.g. Sentry, Datadog, etc.)
+
+  // Throw the wrapped error so callers can `instanceof IntegrationError`.
+  throw new IntegrationError(component, err);
+}
+
+module.exports = {
+  IntegrationError,
+  handleIntegrationError,
+};
