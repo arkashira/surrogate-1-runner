@@ -1,6 +1,3 @@
 {
-  "multi_user_access": true,
-  "realtime_collaboration": true,
-  "simultaneous_access": true,
-  "users": []
+  "costBasedRouting": true
 }

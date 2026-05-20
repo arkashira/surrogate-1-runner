@@ -1,10 +1,18 @@
-const RBAC = require('./rbac-engine');
 
-const rbac = new RBAC();
+const { setRequestType, dispatchRequest } = require('./router');
 
-// Example usage:
-const userRole = 'admin';
-const userPermissions = rbac.validateUser(userRole);
-console.log(userPermissions);
+async function handleRequest(request) {
+  await setRequestType(request);
+  await dispatchRequest(request);
+}
 
-rbac.auditAccessChange(userRole, 'execute_command');
+// Assuming an Express.js app
+const express = require('express');
+const app = express();
+
+app.post('/request', (req, res) => {
+  const request = req.body;
+  handleRequest(request).then(() => {
+    res.sendStatus(200);
+  });
+});
