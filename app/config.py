@@ -1,12 +1,14 @@
-from pathlib import Path
+import os
 from pydantic import BaseSettings, Field
 
 class Settings(BaseSettings):
-    policy_dir: Path = Field(default=Path("/opt/axentx/surrogate-1/policy"))
-    api_key: str = Field(..., env="POLICY_API_KEY")  # required
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    DATABASE_URL: str = Field(
+        default="sqlite:///./cost_data.db",
+        env="DATABASE_URL",
+        description="SQLAlchemy database URL",
+    )
+    FORECAST_DAYS_AHEAD: int = Field(default=30, env="FORECAST_DAYS_AHEAD")
+    MAPE_THRESHOLD: float = Field(default=5.0, env="MAPE_THRESHOLD")
+    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
 
 settings = Settings()
