@@ -1,10 +1,19 @@
-from pydantic import BaseSettings
+# Alert thresholds in USD
+ALERT_THRESHOLDS = {
+    'warning': 10000,
+    'critical': 20000
+}
 
-class Settings(BaseSettings):
-    RABBITMQ_HOST: str = "localhost"
-    ALERT_LOG_FILE: str = "/var/log/axentx/alerts.log"
+# Notification endpoints
+NOTIFICATION_ENDPOINTS = {
+    'email': 'cloud-alerts@axentx.com',
+    'in_app': 'https://api.axentx.com/notifications'
+}
 
-    class Config:
-        env_file = ".env"
-
-settings = Settings()
+# Email configuration
+EMAIL_CONFIG = {
+    'sender': 'alerts@axentx.com',
+    'password': 'secure_password_here',
+    'smtp_server': 'smtp.axentx.com',
+    'port': 465
+}
