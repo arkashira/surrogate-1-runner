@@ -1,0 +1,42 @@
+{
+  "id": "AWS_S3_PUBLIC_001",
+  "name": "Detect Publicly Accessible S3 Buckets",
+  "description": "Ensures no S3 buckets have public read or write access enabled",
+  "severity": "critical",
+  "category": "security",
+  "provider": "aws",
+  "resource": "aws_s3_bucket",
+  "condition": {
+    "operator": "or",
+    "conditions": [
+      {
+        "operator": "contains",
+        "field": "acl",
+        "value": "public-read"
+      },
+      {
+        "operator": "contains",
+        "field": "acl",
+        "value": "public-read-write"
+      },
+      {
+        "operator": "equals",
+        "field": "policy.Statement[?Effect==`Allow`].Principal",
+        "value": "*"
+      }
+    ]
+  },
+  "remediation": {
+    "steps": [
+      "1. Remove public access from bucket ACL",
+      "2. Review bucket policy for wildcard principals",
+      "3. Enable S3 Block Public Access at account level",
+      "4. Implement least-privilege access policies"
+    ],
+    "cli_command": "aws s3api put-public-access-block --bucket <bucket-name> --public-access-block-configuration '{\"BlockPublicAcls\":true,\"BlockPublicPolicy\":true,\"IgnorePublicAcls\":true,\"RestrictPublicBuckets\":true}'"
+  },
+  "metadata": {
+    "created_date": "2024-01-15T00:00:00Z",
+    "cis_benchmark_ref": "CIS AWS 2.1.1"
+  }
+}

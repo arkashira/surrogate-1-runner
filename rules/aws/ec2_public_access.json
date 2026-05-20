@@ -1,0 +1,27 @@
+{
+  "id": "AWS_EC2_PUBLIC_001",
+  "name": "Detect Publicly Accessible EC2 Instances",
+  "description": "Identifies EC2 instances with public IP addresses that may be exposed to the internet",
+  "severity": "high",
+  "category": "security",
+  "provider": "aws",
+  "resource": "aws_ec2_instance",
+  "condition": {
+    "operator": "exists",
+    "field": "PublicIpAddress"
+  },
+  "remediation": {
+    "steps": [
+      "1. Review if public IP is required for the instance",
+      "2. If not required, disassociate the public IP",
+      "3. Consider using a NAT gateway for outbound traffic",
+      "4. Ensure security groups restrict inbound access"
+    ],
+    "cli_command": "aws ec2 disassociate-address --association-id <association-id>",
+    "terraform_snippet": "resource \"aws_instance\" \"example\" { associate_public_ip_address = false }"
+  },
+  "metadata": {
+    "created_date": "2024-01-15T00:00:00Z",
+    "cis_benchmark_ref": "CIS AWS 1.20"
+  }
+}

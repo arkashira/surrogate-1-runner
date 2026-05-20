@@ -1,0 +1,30 @@
+{
+  "id": "AWS_SG_OPEN_001",
+  "name": "Detect Open Security Groups",
+  "description": "Identifies security groups allowing unrestricted inbound traffic from 0.0.0.0/0",
+  "severity": "critical",
+  "category": "security",
+  "provider": "aws",
+  "resource": "aws_security_group",
+  "condition": {
+    "operator": "contains",
+    "field": "IpPermissions",
+    "value": {
+      "IpProtocol": "-1",
+      "IpRanges": [{"CidrIp": "0.0.0.0/0"}]
+    }
+  },
+  "remediation": {
+    "steps": [
+      "1. Identify the source of the open rule",
+      "2. Restrict to specific IP ranges or security groups",
+      "3. Document business justification if required",
+      "4. Implement just-in-time access for administrative ports"
+    ],
+    "cli_command": "aws ec2 revoke-security-group-ingress --group-id <sg-id> --protocol all --cidr 0.0.0.0/0"
+  },
+  "metadata": {
+    "created_date": "2024-01-15T00:00:00Z",
+    "cis_benchmark_ref": "CIS AWS 4.1"
+  }
+}
