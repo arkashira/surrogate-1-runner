@@ -1,121 +1,97 @@
-from __future__ import annotations
+"""
+Credit model for tracking user monthly and bulk credits.
+"""
+from datetime import datetime
+from typing import Optional, TYPE_CHECKING
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship, declarative_base
 
-from dataclasses import dataclass, field
-from threading import RLock
-from typing import Dict, Optional
+Base = declarative_base()
 
 
-@dataclass(frozen=True)
-class CreditBalance:
+class Credit(Base):
     """
-    Immutable representation of a user’s credit balances.
-
-    Validation is performed in ``__post_init__`` so that no instance can ever
-    contain a negative value – this guarantees data integrity throughout the
-    stack.
+    Stores monthly and bulk credit balances per user.
     """
-    bulk_balance: float = field(metadata={"description": "Total bulk credits"})
-    monthly_balance: float = field(metadata={"description": "Credits available this month"})
-
-    def __post_init__(self) -> None:
-        if self.bulk_balance < 0:
-            raise ValueError("Bulk balance cannot be negative")
-        if self.monthly_balance < 0:
-            raise ValueError("Monthly balance cannot be negative")
-
-
-class CreditService:
-    """
-    Simple in‑memory credit store with thread‑safety.
-
-    In production you would replace the ``_store`` implementation with a real
-    persistence layer (SQL, NoSQL, Redis, …) while keeping the public API
-    unchanged.
-    """
-
-    def __init__(self) -> None:
-        # ``_store`` maps ``user_id`` → ``CreditBalance``.
-        self._store: Dict[str, CreditBalance] = {}
-        self._lock = RLock()               # protects concurrent reads/writes
-
-    # --------------------------------------------------------------------- #
-    # Public API
-    # --------------------------------------------------------------------- #
-    def get_balance(self, user_id: str) -> CreditBalance:
+    __tablename__ = 'credits'
+    __table_args__ = (
+        UniqueConstraint('user_id', name='uq_credits_user_id'),
+    )
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    monthly_credits = Column(Integer, nullable=False, default=0)
+    bulk_credits = Column(Integer, nullable=False, default=0)
+    last_monthly_reset = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship to user
+    user = relationship("User", back_populates="credits")
+    
+    @property
+    def total_credits(self) -> int:
+        """Total available credits (monthly + bulk)."""
+        return self.monthly_credits + self.bulk_credits
+    
+    def can_deduct(self, amount: int = 1) -> bool:
+        """Check if user has enough credits."""
+        return self.total_credits >= amount
+    
+    def deduct(self, amount: int = 1) -> bool:
         """
-        Return the current balance for *user_id*.
-        If the user does not exist, a zero‑balance object is returned
-        (this mirrors the “default balance” behaviour from the drafts).
+        Deduct from monthly credits first, then bulk credits.
+        
+        Args:
+            amount: Number of credits to deduct
+            
+        Returns:
+            True if deduction successful, False if insufficient credits
         """
-        with self._lock:
-            return self._store.get(user_id, CreditBalance(0.0, 0.0))
-
-    def set_balance(
-        self,
-        user_id: str,
-        *,
-        bulk_balance: Optional[float] = None,
-        monthly_balance: Optional[float] = None,
-    ) -> CreditBalance:
-        """
-        Create or replace a user’s balance.
-
-        Parameters
-        ----------
-        user_id: str
-            Identifier of the user.
-        bulk_balance: float | None
-            New bulk balance. If ``None`` the existing bulk balance is kept.
-        monthly_balance: float | None
-            New monthly balance. If ``None`` the existing monthly balance is kept.
-
-        Returns
-        -------
-        CreditBalance
-            The freshly stored balance (useful for the API response).
-        """
-        with self._lock:
-            current = self._store.get(user_id, CreditBalance(0.0, 0.0))
-
-            new_bulk = bulk_balance if bulk_balance is not None else current.bulk_balance
-            new_monthly = monthly_balance if monthly_balance is not None else current.monthly_balance
-
-            # Validation happens inside CreditBalance
-            new_balance = CreditBalance(bulk_balance=new_bulk, monthly_balance=new_monthly)
-            self._store[user_id] = new_balance
-            return new_balance
-
-    def adjust_balance(
-        self,
-        user_id: str,
-        *,
-        bulk_delta: float = 0.0,
-        monthly_delta: float = 0.0,
-    ) -> CreditBalance:
-        """
-        Atomically add/subtract amounts from a user’s balance.
-
-        Raises
-        ------
-        ValueError
-            If the resulting balance would be negative.
-        """
-        with self._lock:
-            current = self.get_balance(user_id)
-            return self.set_balance(
-                user_id,
-                bulk_balance=current.bulk_balance + bulk_delta,
-                monthly_balance=current.monthly_balance + monthly_delta,
-            )
-
-    # --------------------------------------------------------------------- #
-    # Helper for testing / migrations
-    # --------------------------------------------------------------------- #
-    def _reset(self) -> None:
-        """Clear the in‑memory store – useful for unit tests."""
-        with self._lock:
-            self._store.clear()
+        if not self.can_deduct(amount):
+            return False
+        
+        remaining = amount
+        
+        # Deduct from monthly first
+        if self.monthly_credits >= remaining:
+            self.monthly_credits -= remaining
+        else:
+            remaining -= self.monthly_credits
+            self.monthly_credits = 0
+            # Deduct remaining from bulk
+            self.bulk_credits -= remaining
+        
+        self.updated_at = datetime.utcnow()
+        return True
+    
+    def reset_monthly(self, default_amount: int) -> None:
+        """Reset monthly credits to default amount."""
+        self.monthly_credits = default_amount
+        self.last_monthly_reset = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+    
+    def add_bulk(self, amount: int) -> None:
+        """Add bulk credits to user account."""
+        if amount <= 0:
+            raise ValueError("Bulk credit amount must be positive")
+        self.bulk_credits += amount
+        self.updated_at = datetime.utcnow()
+    
+    def to_dict(self) -> dict:
+        """Return dictionary representation."""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'monthly_credits': self.monthly_credits,
+            'bulk_credits': self.bulk_credits,
+            'total_credits': self.total_credits,
+            'last_monthly_reset': self.last_monthly_reset.isoformat() if self.last_monthly_reset else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
 
 
-# A module‑level singleton that the API layer can import.
-credit_service = CreditService()
+# Import User type for type hints only (avoids circular import)
+if TYPE_CHECKING:
+    from models.user import User

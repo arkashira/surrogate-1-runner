@@ -1,0 +1,26 @@
+# Credit configuration for user balances
+
+default_monthly_credits: 100
+
+bulk_credit_packages:
+  small:
+    credits: 500
+    description: "Starter pack"
+  medium:
+    credits: 2000
+    description: "Standard pack"
+  large:
+    credits: 5000
+    description: "Professional pack"
+  enterprise:
+    credits: 20000
+    description: "Enterprise pack"
+
+monthly_reset:
+  day: 1
+  carry_over: false
+
+rates:
+  api_call: 1
+  batch_process: 10
+  export: 5
