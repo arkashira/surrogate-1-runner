@@ -6,26 +6,19 @@ HuggingFace dataset.
 
 ## What this does
 
-Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**.
-Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`)
-of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
-normalizes per-schema, dedups via the central md5 hash store, and uploads
-its output to a unique path on the dataset repo:
+Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**. Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`) of the public dataset list defined in `bin/dataset-enrich.sh`, streams, normalizes per-schema, dedups via the central md5 hash store, and uploads its output to a unique path on the dataset repo.
 
-## Setup Process
+## Troubleshooting and Remediation
 
-To set up Surrogate-1, follow these steps:
+### Connectivity Issues
+1. Verify network connectivity to the public dataset source (e.g., HuggingFace API) using `curl` or `httping`.
+2. Check firewall rules and VPC security groups to ensure the runner has access to the dataset endpoints.
+3. Validate the `dataset-enrich.sh` script's configuration for correct API URLs and authentication tokens.
 
-1. Clone the repository: `git clone https://github.com/axentx/surrogate-1.git`
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure environment variables: `cp .env.example .env` and edit `.env` to set your credentials
-4. Run the setup script: `bin/setup.sh`
-5. Verify the setup: `bin/verify-setup.sh`
+### IAM Permissions Issues
+1. Confirm the GitHub Actions runner service account has the necessary permissions (e.g., `read` on the dataset repo, `write` to the output path).
+2. Review the IAM policy attached to the runner role, ensuring it includes the required actions (e.g., `repo:contents`, `actions:workflow`).
+3. Test IAM permissions using the AWS IAM console or `aws sts get-caller-identity` within the runner environment.
 
-## Guided Setup
-
-The guided setup process is designed to be intuitive and easy to follow. It should take less than 15 minutes to complete on average, and users should be able to complete it without assistance.
-
-## Troubleshooting
-
-If you encounter any issues during the setup process, refer to the troubleshooting guide: [Troubleshooting](https://github.com/axentx/surrogate-1/blob/main/docs/TROUBLESHOOTING.md)
+### Validation Scripts
+The project includes validation scripts (`bin/validate-connectivity.sh`, `bin/validate-iam.sh`) that can be run to automatically check for common issues. Run them with:
