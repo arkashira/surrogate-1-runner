@@ -1,58 +1,24 @@
 import requests
-import logging
-import time
-from typing import Optional
-from requests.exceptions import RequestException
-
-logger = logging.getLogger(__name__)
+import json
 
 class SlackNotifier:
-    def __init__(self, webhook_url: str):
+    def __init__(self, webhook_url):
         self.webhook_url = webhook_url
-        self.max_retries = 2
-        self.retry_delay = 5  # seconds
 
-    def send_high_severity_alert(
-        self,
-        account_id: str,
-        control_id: str,
-        report_url: str
-    ) -> bool:
-        payload = {
-            "text": (
-                f":rotating_light: HIGH-SEVERITY VIOLATION DETECTED\n"
-                f"Account ID: {account_id}\n"
-                f"Control ID: {control_id}\n"
-                f"Report: {report_url}"
-            )
-        }
-        
-        retry_count = 0
-        while retry_count <= self.max_retries:
-            try:
-                response = requests.post(
-                    self.webhook_url,
-                    json=payload,
-                    headers={'Content-Type': 'application/json'},
-                    timeout=10
-                )
-                response.raise_for_status()
-                return True
-            except RequestException as e:
-                retry_count += 1
-                if retry_count > self.max_retries:
-                    logger.error(
-                        f"Slack alert failed after {self.max_retries+1} attempts: {str(e)}",
-                        extra={
-                            'account_id': account_id,
-                            'control_id': control_id,
-                            'error': str(e)
-                        }
-                    )
-                    return False
-                logger.warning(
-                    f"Slack alert attempt {retry_count} failed: {str(e)}",
-                    extra={'retry_in_seconds': self.retry_delay}
-                )
-                time.sleep(self.retry_delay)
-        return False
+    def send_report(self, report):
+        if self.webhook_url:
+            headers = {'Content-Type': 'application/json'}
+            data = {'text': report}
+            response = requests.post(self.webhook_url, headers=headers, data=json.dumps(data))
+            if response.status_code != 200:
+                print(f"Failed to send report to Slack: {response.text}")
+        else:
+            print("Slack webhook URL is not configured")
+
+def get_slack_webhook_url(config):
+    return config.get('slack', {}).get('webhook_url')
+
+def send_report_to_slack(config, report):
+    webhook_url = get_slack_webhook_url(config)
+    notifier = SlackNotifier(webhook_url)
+    notifier.send_report(report)

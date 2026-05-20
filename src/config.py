@@ -1,24 +1,13 @@
-"""Central configuration for the idle‑resource detector."""
+import os
 
-from dataclasses import dataclass
-from typing import Mapping
+def load_config():
+    config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    with open(config_file, 'r') as f:
+        import yaml
+        return yaml.safe_load(f)
 
-# ----------------------------------------------------------------------
-# Thresholds – can be overridden by environment variables or a config file
-# ----------------------------------------------------------------------
-DEFAULT_IDLE_CPU_PCT = 10.0          # % CPU below which we call a resource idle
-DEFAULT_IDLE_HOURS_PCT = 5.0         # % CPU below which we count an hour as idle
-DEFAULT_DAYS_BACK = 30              # How many days of history we analyse
+def get_slack_enabled(config):
+    return config.get('slack', {}).get('enabled', False)
 
-# ----------------------------------------------------------------------
-# Simplified cost mapping (USD per hour). In a real deployment you would
-# pull this from the AWS Pricing API or a maintained CSV.
-# ----------------------------------------------------------------------
-COST_PER_HOUR: Mapping[str, float] = {
-    "t3.micro": 0.0104,
-    "t3.small": 0.0208,
-    "t3.medium": 0.0416,
-    "t3.large": 0.0832,
-    # fallback for any type we do not explicitly know
-    "default": 0.10,
-}
+def get_github_token():
+    return os.environ.get('GITHUB_TOKEN')
