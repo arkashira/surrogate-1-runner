@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Profit & Loss Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    .period { margin-bottom: 40px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+    th { background-color: #f2f2f2; }
+    .label { text-align: left; }
+    .positive { color: green; }
+    .negative { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Profit & Loss Dashboard</h1>
+
+  <div class="period" id="daily">
+    <h2>Daily</h2>
+    <table>
+      <tr><th class="label">Revenue</th><td id="daily-revenue">$0.00</td></tr>
+      <tr><th class="label">Expenses</th><td id="daily-expenses">$0.00</td></tr>
+      <tr><th class="label">Profit</th><td id="daily-profit" class="positive">$0.00</td></tr>
+    </table>
+  </div>
+
+  <div class="period" id="weekly">
+    <h2>Weekly</h2>
+    <table>
+      <tr><th class="label">Revenue</th><td id="weekly-revenue">$0.00</td></tr>
+      <tr><th class="label">Expenses</th><td id="weekly-expenses">$0.00</td></tr>
+      <tr><th class="label">Profit</th><td id="weekly-profit" class="positive">$0.00</td></tr>
+    </table>
+  </div>
+
+  <div class="period" id="monthly">
+    <h2>Monthly</h2>
+    <table>
+      <tr><th class="label">Revenue</th><td id="monthly-revenue">$0.00</td></tr>
+      <tr><th class="label">Expenses</th><td id="monthly-expenses">$0.00</td></tr>
+      <tr><th class="label">Profit</th><td id="monthly-profit" class="positive">$0.00</td></tr>
+    </table>
+  </div>
+
+  <script>
+    // Mock real-time data fetch – replace with real API calls
+    function fetchProfitLoss() {
+      // Simulated data
+      return {
+        daily:   { revenue: 1200.50, expenses: 800.25 },
+        weekly:  { revenue: 8400.75, expenses: 5600.60 },
+        monthly: { revenue: 36000.00, expenses: 24000.00 }
+      };
+    }
+
+    function formatCurrency(val) {
+      return `$${val.toFixed(2)}`;
+    }
+
+    function updateDashboard() {
+      const data = fetchProfitLoss();
+
+      const periods = ['daily', 'weekly', 'monthly'];
+      periods.forEach(p => {
+        const rev = data[p].revenue;
+        const exp = data[p].expenses;
+        const prof = rev - exp;
+        document.getElementById(`${p}-revenue`).textContent = formatCurrency(rev);
+        document.getElementById(`${p}-expenses`).textContent = formatCurrency(exp);
+        const profitEl = document.getElementById(`${p}-profit`);
+        profitEl.textContent = formatCurrency(prof);
+        profitEl.className = prof >= 0 ? 'positive' : 'negative';
+      });
+    }
+
+    // Initial load
+    updateDashboard();
+    // Update every 30 seconds to simulate real-time
+    setInterval(updateDashboard, 30000);
+  </script>
+</body>
+</html>
