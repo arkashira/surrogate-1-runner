@@ -1,0 +1,7 @@
+jobs:
+  - name: cloud-cost-collection
+    schedule: "0 * * * *"  # runs at the top of every hour
+    command: "/opt/axentx/surrogate-1/bin/collect-cloud-costs.sh"
+    enabled: true
+    description: "Collects hourly cloud cost data from AWS, GCP and Azure"
+    # Additional configuration can be added here for throttling and retries
