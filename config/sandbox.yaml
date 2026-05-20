@@ -1,0 +1,46 @@
+# ----------------------------------------------------------------------
+# Global defaults that apply to any service without an explicit override.
+data_volume:
+  default:
+    # Base rate (points/min) used when a service does not belong to a traffic profile.
+    rate_per_minute: 120
+
+    # Spike configuration – can be overridden per‑service.
+    spike:
+      enabled: true          # generate spikes?
+      factor: 4              # multiply base rate during a spike
+      duration_minutes: 3    # how long a spike lasts
+      interval_minutes: 30   # minimum minutes between spikes
+      chance: 0.05           # probability a spike starts in any minute
+
+  # Optional high/low traffic profiles – useful when you only care about “high”
+  # or “low” services and do not want to repeat the same numbers.
+  profiles:
+    high:
+      rate_per_minute: 5000
+    low:
+      rate_per_minute: 500
+
+  # Per‑service overrides.  Any key present here replaces the corresponding
+  # entry from the default block (including the nested ``spike`` dict).
+  services:
+    web:
+      rate_per_minute: 250
+      spike:
+        enabled: true
+        factor: 6
+        duration_minutes: 5
+        interval_minutes: 20
+        chance: 0.10
+    db:
+      rate_per_minute: 80
+      spike:
+        enabled: false
+    cache:
+      rate_per_minute: 150
+      spike:
+        enabled: true
+        factor: 3
+        duration_minutes: 2
+        interval_minutes: 25
+        chance: 0.07
