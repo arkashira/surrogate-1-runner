@@ -1,19 +1,19 @@
 const express = require('express');
-const integrationRouter = require('./api/integration-api');
+const path = require('path');
+const cloudCostsRouter = require('./api/cloudCosts');
 
 const app = express();
+const port = process.env.PORT || 3000;
 
-// Mount integration API under /api/integration
-app.use('/api/integration', integrationRouter);
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../ui')));
 
-// Export for serverless or direct start
-module.exports = app;
+app.use('/api/cloud-costs', cloudCostsRouter);
 
-// If executed directly, start an HTTP server (useful for local testing)
-if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
-    console.log(`Surrogate‑1 API listening on port ${PORT}`);
-  });
-}
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../ui/index.html'));
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
