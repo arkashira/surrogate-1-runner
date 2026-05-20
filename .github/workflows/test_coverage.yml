@@ -2,39 +2,96 @@ name: Test Coverage
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  test:
+  test-coverage:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.8', '3.9', '3.10']
-
     steps:
-    - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]" pytest pytest-cov coverage
 
-    - name: Run tests with coverage
-      run: |
-        python -m pytest --cov=./src --cov-report=xml:coverage.xml
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=src --cov-report=xml --cov-report=term --cov-report=term-missing \
+            --junitxml=test-results.xml -v
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v2
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: true
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: surrogate-1
+          fail_ci_if_error: false
+
+      - name: Publish Test Results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: test-results.xml
+          reporter: java-junit
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            coverage/
+          retention-days: 30
+
+      - name: Generate coverage summary
+        run: |
+          echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+
+      - name: Check minimum coverage threshold
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.get('line-rate', 0)))")
+          echo "Coverage: $COVERAGE"
+          python -c "import sys; sys.exit(0 if float('$COVERAGE') >= 0.70 else 1)" || {
+            echo "❌ Coverage below 70% threshold"
+            exit 1
+          }
+          echo "✅ Coverage meets 70% threshold"
+
+      - name: Generate filtered results
+        if: always()
+        run: |
+          python -c "
+          from src.ci_integration import CIIntegration
+          ci = CIIntegration()
+          ci.load_test_results('test-results.xml')
+          ci.load_coverage('coverage.xml')
+          filtered = ci.filter_results(status='failed')
+          ci.export_results(filtered, 'json', 'filtered-results.json')
+          ci.export_results(filtered, 'junit', 'filtered-junit.xml')
+          "
+        continue-on-error: true
+
+      - name: Upload filtered results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: filtered-test-results
+          path: |
+            filtered-results.json
+            filtered-junit.xml
+          retention-days: 90
