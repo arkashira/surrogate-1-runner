@@ -1,47 +1,22 @@
-"""
-Database models for surrogate-1.
-"""
 from datetime import datetime
-from typing import Optional
+from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import create_access_token
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric
-from sqlalchemy.orm import relationship, declarative_base
+db = SQLAlchemy()
 
-Base = declarative_base()
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    learned_terms = db.relationship('Term', secondary='user_learned_terms', backref='learners')
 
-class Organization(Base):
-    """Organization that owns resources and budgets."""
-    __tablename__ = 'organizations'
+class Term(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    word = db.Column(db.String(100), nullable=False)
+    definition = db.Column(db.Text, nullable=False)
+    example = db.Column(db.Text)
+    category = db.Column(db.String(50), nullable=False)
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    budgets = relationship("Budget", back_populates="organization", cascade="all, delete-orphan")
-
-class Budget(Base):
-    """Monthly budget limit for an organization."""
-    __tablename__ = 'budgets'
-
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey('organizations.id'), nullable=False)
-    month = Column(String(7), nullable=False, index=True)  # Format: YYYY-MM
-    limit = Column(Numeric(12, 2), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    organization = relationship("Organization", back_populates="budgets")
-
-    def to_dict(self):
-        """Serialize Budget instance to dictionary."""
-        return {
-            "id": self.id,
-            "organization_id": self.organization_id,
-            "month": self.month,
-            "limit": float(self.limit),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-        }
+user_learned_terms = db.Table('user_learned_terms',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('term_id', db.Integer, db.ForeignKey('term.id'), primary_key=True)
+)
