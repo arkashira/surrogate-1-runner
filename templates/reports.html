@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Post‑Mortem Reports</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Global dashboard styling -->
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <!-- Page‑specific styling -->
+    <link rel="stylesheet" href="/static/css/reports.css">
+</head>
+<body>
+    <div class="dashboard-container">
+
+        <!-- Header -->
+        <header class="dashboard-header">
+            <h1>Post‑Mortem Reports</h1>
+            <p>Document and learn from incidents</p>
+        </header>
+
+        <!-- Controls -->
+        <section class="dashboard-content">
+            <div class="reports-controls">
+                <button id="generate-report-btn" class="btn primary">
+                    Generate New Report
+                </button>
+
+                <input type="search"
+                       id="report-search"
+                       placeholder="Search reports…"
+                       aria-label="Search reports">
+            </div>
+
+            <!-- Report list (filled by JS) -->
+            <div id="reports-list" class="reports-list" role="list"></div>
+
+            <!-- Pagination (filled by JS) -->
+            <nav id="pagination" class="pagination" aria-label="Report pagination"></nav>
+        </section>
+    </div>
+
+    <!-- Modal – hidden by default -->
+    <div id="report-detail-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2 id="modal-title"></h2>
+                <button class="close" aria-label="Close dialog">&times;</button>
+            </header>
+
+            <section class="modal-body">
+                <dl class="report-info">
+                    <div><dt>Incident Date:</dt> <dd id="modal-date"></dd></div>
+                    <div><dt>Resolution:</dt>   <dd id="modal-resolution"></dd></div>
+                    <div><dt>Impact:</dt>       <dd id="modal-impact"></dd></div>
+                </dl>
+
+                <section class="decision-artifacts">
+                    <h3>Decision Artifacts</h3>
+                    <ul id="artifacts-list"></ul>
+                </section>
+
+                <section class="incident-data">
+                    <h3>Incident Data</h3>
+                    <ul id="data-list"></ul>
+                </section>
+            </section>
+        </div>
+    </div>
+
+    <!-- JavaScript – load after DOM -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/reports.js"></script>
+</body>
+</html>
