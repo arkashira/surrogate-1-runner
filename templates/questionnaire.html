@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Questionnaire</title>
+    <style>
+        .progress-bar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            padding: 5px;
+        }
+        .progress {
+            height: 20px;
+            background-color: #4caf50;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Product Questionnaire</h1>
+    <p>This questionnaire is optional but recommended for full personalization.</p>
+    <div class="progress-bar">
+        <div id="progress" class="progress" style="width: 0%;">0%</div>
+    </div>
+    <form id="questionnaireForm">
+        <label for="productType">Product Type:</label>
+        <input type="text" id="productType" name="productType" required><br>
+
+        <label for="targetMarket">Target Market:</label>
+        <input type="text" id="targetMarket" name="targetMarket" required><br>
+
+        <label for="currentTraffic">Current Traffic:</label>
+        <input type="number" id="currentTraffic" name="currentTraffic" required><br>
+
+        <label for="growthGoals">Growth Goals:</label>
+        <input type="text" id="growthGoals" name="growthGoals" required><br>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        document.getElementById('questionnaireForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData.entries());
+            console.log(data);
+
+            // Simulate storing responses in the user profile table
+            localStorage.setItem('userProfile', JSON.stringify(data));
+
+            // Update progress bar
+            const progress = document.getElementById('progress');
+            progress.style.width = '100%';
+            progress.textContent = '100%';
+
+            alert('Questionnaire submitted successfully!');
+        });
+    </script>
+</body>
+</html>
