@@ -1,0 +1,38 @@
+# Baseline request signatures for monitored API endpoints.
+# Each entry maps an endpoint URL to a dictionary of expected request fields
+# and their example values. The monitoring system will compare the current
+# signature against these baselines and trigger alerts on mismatches.
+#
+# Example structure:
+#   /api/v1/users:
+#     method: GET
+#     headers:
+#       Authorization: "Bearer <token>"
+#     query_params:
+#       limit: "10"
+#       offset: "0"
+#
+# Add or update entries as new endpoints are introduced or signatures evolve.
+
+api_endpoints:
+  /api/v1/users:
+    method: GET
+    headers:
+      Authorization: "Bearer <token>"
+    query_params:
+      limit: "10"
+      offset: "0"
+  /api/v1/orders:
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_schema:
+      order_id: "<uuid>"
+      amount: "<number>"
+  /api/v1/products:
+    method: GET
+    headers:
+      Accept: "application/json"
+    query_params:
+      category: "<string>"
+      sort: "asc"
