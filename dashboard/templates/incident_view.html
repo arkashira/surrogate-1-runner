@@ -1,0 +1,100 @@
+{# /opt/axentx/surrogate-1/dashboard/templates/incident_view.html #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Incident {{ incident.id }} – Surrogate‑1 Dashboard</title>
+
+    {# --------------------------------------------------------------
+       1️⃣  Styling – keep the page self‑contained for quick iteration,
+          but fall back to the global stylesheet if it exists.
+       -------------------------------------------------------------- #}
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <style>
+        /* Minimal fallback styling – will be overridden by dashboard.css */
+        body {font-family: Arial, Helvetica, sans-serif; margin: 20px; background:#fafafa;}
+        header, footer {text-align:center; margin-bottom:20px;}
+        h1 {margin:0;}
+        section {background:#fff; padding:15px; margin-bottom:25px; border-radius:5px;
+                 box-shadow:0 1px 3px rgba(0,0,0,.1);}
+        h2 {border-bottom:1px solid #ddd; padding-bottom:5px; margin-top:0;}
+        .list {list-style:none; padding:0; margin:0;}
+        .list li {padding:8px 0; border-bottom:1px solid #eee;}
+        .list li:last-child {border-bottom:none;}
+        .timestamp {color:#666; font-size:.9em; margin-right:8px;}
+        .tags {color:#336; background:#eef; padding:2px 6px; border-radius:3px;
+               font-size:.85em; margin-left:5px;}
+        .artifact-content {margin-top:5px;}
+        a {color:#0066cc; text-decoration:none;}
+        a:hover {text-decoration:underline;}
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Incident {{ incident.id }} – Dashboard</h1>
+    </header>
+
+    {# --------------------------------------------------------------
+       2️⃣  Monitoring Alerts
+       -------------------------------------------------------------- #}
+    <section id="alerts">
+        <h2>Monitoring Alerts</h2>
+        {% if alerts %}
+            <ul class="list alert-list">
+                {% for alert in alerts %}
+                    <li class="alert-item">
+                        <span class="timestamp">{{ alert.timestamp }}</span>
+                        <span class="message">{{ alert.message }}</span>
+                        {% if alert.tags %}
+                            <span class="tags">
+                                [{{ alert.tags | join(', ') }}]
+                            </span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No alerts found for this incident.</p>
+        {% endif %}
+    </section>
+
+    {# --------------------------------------------------------------
+       3️⃣  Decision Artifacts (correlated with the alerts)
+       -------------------------------------------------------------- #}
+    <section id="artifacts">
+        <h2>Decision Artifacts</h2>
+        {% if decision_artifacts %}
+            <ul class="list artifact-list">
+                {% for art in decision_artifacts %}
+                    <li class="artifact-item">
+                        <span class="timestamp">{{ art.timestamp }}</span>
+                        <strong>{{ art.title }}</strong>
+                        {% if art.tags %}
+                            <span class="tags">
+                                [{{ art.tags | join(', ') }}]
+                            </span>
+                        {% endif %}
+                        {% if art.url %}
+                            <a href="{{ art.url }}" target="_blank" rel="noopener">
+                                View Artifact
+                            </a>
+                        {% endif %}
+                        {% if art.content %}
+                            <div class="artifact-content">
+                                {{ art.content | safe }}
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No decision artifacts correlated with these alerts.</p>
+        {% endif %}
+    </section>
+
+    <footer>
+        <p>Surrogate‑1 Dashboard – generated {{ generation_time }}</p>
+    </footer>
+</body>
+</html>
