@@ -1,0 +1,14 @@
+# Only a subset – add more as needed
+t3.micro:
+  vcpus: 2
+  memory_gb: 1.0
+  hourly_cost: 0.0104
+  storage_gb: 0
+  network_performance: Moderate
+t3.small:
+  vcpus: 2
+  memory_gb: 2.0
+  hourly_cost: 0.0208
+  storage_gb: 0
+  network_performance: Moderate
+# … (add all types you care about)

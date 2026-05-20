@@ -1,1 +1,7 @@
-slack_webhook_url: "https://hooks.slack.com/services/XXXXXXX/XXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+region: us-east-1
+profile: default
+metrics_window_days: 14
+low_utilization: 20.0
+high_utilization: 80.0
+output_bucket: my-rightsizing-reports
+output_prefix: ec2-recommendations
