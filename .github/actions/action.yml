@@ -1,0 +1,34 @@
+name: 'Surrogate API Drift Detection'
+description: 'Detects API schema drift by comparing database state against expected definitions'
+author: 'axentx'
+branding:
+  icon: 'alert-triangle'
+  color: 'red'
+inputs:
+  service:
+    description: 'Service name to check for drift (used as table prefix)'
+    required: true
+  version:
+    description: 'Service version to check (used for schema lookup)'
+    required: true
+  db-connection-string:
+    description: 'PostgreSQL connection string (postgresql://user:pass@host:port/dbname)'
+    required: true
+    default: ''
+  expected-schema-url:
+    description: 'URL to expected schema definition (optional, overrides file-based lookup)'
+    required: false
+    default: ''
+  fail-on-drift:
+    description: 'Exit with failure if drift is detected'
+    required: false
+    default: 'true'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.service }}
+    - ${{ inputs.version }}
+    - ${{ inputs.db-connection-string }}
+    - ${{ inputs.expected-schema-url }}
+    - ${{ inputs.fail-on-drift }}
