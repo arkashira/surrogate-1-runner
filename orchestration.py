@@ -1,20 +1,25 @@
-from deployment import DeploymentManager
+from llm_agent import LLM_Agent
+from typing import List, Dict
+import threading
 
-class OrchestrationController:
-    def __init__(self):
-        self.deployment_manager = DeploymentManager()
+class Orchestration:
+    def __init__(self, agents_config: List[Dict[str, Any]]):
+        self.agents = [LLM_Agent(config) for config in agents_config]
 
-    def orchestrate_deployments(self, workflow_ids):
-        results = []
-        for workflow_id in workflow_ids:
-            result = self.deployment_manager.deploy_workflow(workflow_id)
-            results.append(result)
-        return results
+    def deploy_workflow(self, tasks: List[str]) -> None:
+        threads = []
+        for i, task in enumerate(tasks):
+            thread = threading.Thread(target=self._execute_task, args=(self.agents[i % len(self.agents)], task))
+            threads.append(thread)
+            thread.start()
 
-# Example usage
-if __name__ == "__main__":
-    controller = OrchestrationController()
-    workflow_ids = ["AIWorkflow1", "AIWorkflow2", "AIWorkflow3"]
-    results = controller.orchestrate_deployments(workflow_ids)
-    for result in results:
+        for thread in threads:
+            thread.join()
+
+    def _execute_task(self, agent: LLM_Agent, task: str) -> None:
+        result = agent.execute(task)
         print(result)
+
+    def observe_workflow(self) -> None:
+        # Placeholder for workflow observation logic
+        print("Workflow is fully observable")
