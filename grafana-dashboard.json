@@ -3,48 +3,29 @@
     "title": "Ingestion Metrics",
     "panels": [
       {
-        "title": "Ingestion Throughput",
+        "title": "Ingestion Duration",
         "type": "graph",
         "targets": [
           {
-            "expr": "rate(ingestion_throughput_total[1m])",
-            "legendFormat": "Throughput"
+            "expr": "histogram_quantile(0.95, sum(rate(ingestion_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(ingestion_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50"
           }
-        ],
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 0,
-          "y": 0
-        }
+        ]
       },
       {
-        "title": "Ingestion Latency",
-        "type": "graph",
+        "title": "Ingestion Failures",
+        "type": "singlestat",
         "targets": [
           {
-            "expr": "ingestion_latency_seconds",
-            "legendFormat": "Latency"
+            "expr": "sum(rate(ingestion_failures_total[5m]))",
+            "format": "short"
           }
-        ],
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 12,
-          "y": 0
-        }
+        ]
       }
-    ],
-    "templating": {
-      "list": [
-        {
-          "name": "Datasource",
-          "type": "datasource",
-          "query": "prometheus",
-          "refresh": 1
-        }
-      ]
-    }
-  },
-  "overwrite": true
+    ]
+  }
 }

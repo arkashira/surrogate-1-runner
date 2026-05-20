@@ -1,31 +1,24 @@
 import unittest
-from services.metrics import MetricsAggregator
+from unittest.mock import patch
+from prometheus_client import REGISTRY
+from src.metrics import INGESTION_DURATION, INGESTION_FAILURES
 
-class TestMetricsAggregator(unittest.TestCase):
-    def setUp(self):
-        self.aggregator = MetricsAggregator()
+class TestMetrics(unittest.TestCase):
+    def test_ingestion_duration_metric_exists(self):
+        self.assertIn('ingestion_duration_seconds', REGISTRY._names_to_collectors)
 
-    def test_initial_metrics(self):
-        metrics = self.aggregator.get_metrics()
-        self.assertEqual(metrics['total_alerts'], 0)
-        self.assertEqual(metrics['consolidated_alerts'], 0)
-        self.assertEqual(metrics['noise_alerts'], 0)
-        self.assertEqual(metrics['reduction_percentage'], 0.0)
+    def test_ingestion_failures_metric_exists(self):
+        self.assertIn('ingestion_failures_total', REGISTRY._names_to_collectors)
 
-    def test_process_alert(self):
-        self.aggregator.process_alert({'is_noise': False})
-        metrics = self.aggregator.get_metrics()
-        self.assertEqual(metrics['total_alerts'], 1)
-        self.assertEqual(metrics['consolidated_alerts'], 1)
-        self.assertEqual(metrics['noise_alerts'], 0)
-        self.assertEqual(metrics['reduction_percentage'], 0.0)
+    @patch('src.metrics.INGESTION_DURATION.time')
+    def test_ingestion_duration_observation(self, mock_time):
+        INGESTION_DURATION.observe(1.5)
+        mock_time.assert_called_once_with(1.5)
 
-        self.aggregator.process_alert({'is_noise': True})
-        metrics = self.aggregator.get_metrics()
-        self.assertEqual(metrics['total_alerts'], 2)
-        self.assertEqual(metrics['consolidated_alerts'], 1)
-        self.assertEqual(metrics['noise_alerts'], 1)
-        self.assertEqual(metrics['reduction_percentage'], 50.0)
+    def test_ingestion_failures_increment(self):
+        initial_value = INGESTION_FAILURES._value.get()
+        INGESTION_FAILURES.inc()
+        self.assertEqual(INGESTION_FAILURES._value.get(), initial_value + 1)
 
 if __name__ == '__main__':
     unittest.main()
