@@ -1,79 +1,54 @@
-{# /opt/axentx/surrogate-1/templates/dashboard.html #}
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Billing Dashboard | Surrogate‑1</title>
-
-    {# Flask/Jinja2 static URL – works for any WSGI framework that supports url_for #}
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <title>GCP Cost Dashboard</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
 </head>
-
 <body>
-    <header class="dashboard-header">
-        <h1>Cloud Billing Insights</h1>
-        <p class="subtitle">Track and optimise your cloud spending</p>
-    </header>
-
-    <main class="dashboard-grid">
-
-        <!-- ==================== CREDIT BALANCES ==================== -->
-        <section class="card credit-balances">
-            <h2>Current Credit Balances</h2>
-
-            <div class="credit-grid">
-                {# Example loop – replace with your own variable name #}
-                {% for cred in credits %}
-                <div class="credit-item">
-                    <span class="credit-label">{{ cred.provider }}</span>
-                    <span class="credit-value">{{ cred.amount | currency }}</span>
-                    <span class="credit-status {{ 'active' if cred.active else '' }}">
-                        {{ 'Active' if cred.active else 'Expired' }}
-                    </span>
-                </div>
-                {% endfor %}
-
-                {# Total row – optional, can be calculated in the view #}
-                <div class="credit-item total">
-                    <span class="credit-label">Total Available</span>
-                    <span class="credit-value">{{ total_credits | currency }}</span>
-                    <span class="credit-status">Combined</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- ==================== USAGE OVERVIEW ==================== -->
-        <section class="card usage-overview">
-            <h2>Current Usage</h2>
-
-            <div class="usage-meter">
-                <div class="meter-fill"
-                     style="width: {{ usage.percent }}%;"></div>
-            </div>
-
-            <p class="usage-text">
-                {{ usage.percent }}% of monthly quota used
-                ({{ usage.used | currency }} / {{ usage.quota | currency }})
-            </p>
-        </section>
-
-        <!-- ==================== QUICK ACTIONS ==================== -->
-        <section class="card quick-actions">
-            <h2>Quick Actions</h2>
-
-            <a href="{{ url_for('billing_settings') }}" class="action-button">
-                Manage Credits
-            </a>
-            <a href="{{ url_for('billing_support') }}" class="action-button">
-                Billing Support
-            </a>
-            <a href="{{ url_for('billing_history') }}" class="action-button">
-                View History
-            </a>
-        </section>
-
-    </main>
+    <h1>GCP Cost Dashboard</h1>
+    <form method="get">
+        <label for="project_id">Project ID:</label>
+        <input type="text" id="project_id" name="project_id">
+        <label for="resource_type">Resource Type:</label>
+        <input type="text" id="resource_type" name="resource_type">
+        <button type="submit">Filter</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Project ID</th>
+                <th>Resource Type</th>
+                <th>Cost</th>
+                <th>Currency</th>
+                <th>Usage Start Time</th>
+                <th>Usage End Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for data in cost_data %}
+            <tr>
+                <td>{{ data.project_id }}</td>
+                <td>{{ data.resource_type }}</td>
+                <td>{{ data.cost }}</td>
+                <td>{{ data.currency }}</td>
+                <td>{{ data.usage_start_time }}</td>
+                <td>{{ data.usage_end_time }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>

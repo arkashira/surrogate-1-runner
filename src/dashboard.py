@@ -1,31 +1,21 @@
-from session_manager import SessionManager
-from flask import Flask, jsonify, request
+import os
+import time
+from flask import Flask, render_template, request
+from gcp_billing_client import GCPBillingClient
 
 app = Flask(__name__)
-session_manager = SessionManager(timeout_minutes=30)
+billing_client = GCPBillingClient()
 
-@app.route('/sessions', methods=['GET'])
-def get_sessions():
-    active_sessions = session_manager.get_active_sessions()
-    return jsonify(active_sessions)
+@app.route('/')
+def dashboard():
+    project_id = request.args.get('project_id')
+    resource_type = request.args.get('resource_type')
+    cost_data = billing_client.fetch_cost_data(project_id, resource_type)
+    return render_template('dashboard.html', cost_data=cost_data)
 
-@app.route('/sessions/<session_id>', methods=['GET'])
-def get_session(session_id):
-    session = session_manager.get_session(session_id)
-    if session:
-        return jsonify(session)
-    return jsonify({'error': 'Session not found'}), 404
-
-@app.route('/sessions/<session_id>/activity', methods=['POST'])
-def update_activity(session_id):
-    session_manager.update_activity(session_id)
-    return jsonify({'status': 'success'})
-
-@app.route('/sessions/<session_id>/terminate', methods=['POST'])
-def terminate_session(session_id):
-    if session_manager.terminate_session(session_id):
-        return jsonify({'status': 'success'})
-    return jsonify({'error': 'Session not found'}), 404
+def update_cost_data():
+    while True:
+        time.sleep(300)  # Update every 5 minutes
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
