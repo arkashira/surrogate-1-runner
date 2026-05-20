@@ -1,4 +1,5 @@
 name: Compose Guard
+
 on:
   pull_request:
     branches:
@@ -7,38 +8,26 @@ on:
 jobs:
   health-check:
     runs-on: ubuntu-latest
+    if: ${{ secrets.COMPOSE_GUARD_DISABLED != 'true' }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup Docker
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-    - name: Run Compose Guard
-      env:
-        COMPOSE_GUARD_DISABLED: ${{ secrets.COMPOSE_GUARD_DISABLED }}
-      run: |
-        if [ -z "$COMPOSE_GUARD_DISABLED" ] || [ "$COMPOSE_GUARD_DISABLED" != "true" ]; then
-          docker-compose up -d
-          HEALTHY=false
-          for container in $(docker-compose ps -q); do
-            if docker inspect -f '{{.State.Health.Status}}' "$container" | grep -q 'healthy'; then
-              HEALTHY=true
-            fi
-          done
-          if [ "$HEALTHY" != "true" ]; then
-            echo "Some containers are unhealthy"
+      - name: Start Docker Compose
+        run: docker compose up -d
+
+      - name: Run Health Wait Script
+        run: |
+          ./health_wait.sh
+          if [ $? -ne 0 ]; then
+            echo "Health check failed for some services."
             exit 1
           fi
-        fi
-        echo "All containers are healthy"
 
-## Summary
-- Added a new workflow file `.github/workflows/compose_guard.yml`.
-- The workflow runs on every PR targeting the `main` branch.
-- The workflow brings up the compose stack and runs a health-wait script.
-- If any container remains unhealthy after 60 seconds, the job fails.
-- The workflow prints a concise summary of health results to the GitHub Actions log.
-- The workflow can be disabled via a repository secret `COMPOSE_GUARD_DISABLED`.
+      - name: Print Health Summary
+        run: |
+          echo "Health check summary:"
+          docker ps --format "{{.Names}}: {{.Status}}"
