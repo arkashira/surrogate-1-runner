@@ -1,0 +1,47 @@
+{
+  "title": "Roth IRA Contributions and Recharacterizations Guide",
+  "steps": [
+    {
+      "title": "Determine Eligibility",
+      "description": "Confirm your modified adjusted gross income (MAGI) falls within IRS limits for Roth IRA contributions. For 2024, single filers must have MAGI under $161,000 and married filers under $214,000.",
+      "references": [
+        "https://www.irs.gov/retirement-plans/retirement-savings-contributions-calculation-worksheet"
+      ]
+    },
+    {
+      "title": "Calculate Contribution Limit",
+      "description": "For 2024, the maximum annual contribution is $7,000 ($8,000 if age 50+). Contributions phase out gradually if MAGI is near limits.",
+      "references": [
+        "https://www.irs.gov/publications/p590b#en_US_2024_publink1000246792"
+      ]
+    },
+    {
+      "title": "Gather Required Documents",
+      "description": "Collect W-2s, 1099s, and previous IRA statements. You'll need proof of income and existing retirement accounts.",
+      "references": [
+        "https://www.irs.gov/irs-forms/instructions-for-form-8606"
+      ]
+    },
+    {
+      "title": "Submit Contribution",
+      "description": "Work with your custodian to make a non-deductible contribution. Ensure funds are properly allocated to the Roth IRA.",
+      "references": [
+        "https://www.irs.gov/retirement-plans/ira-contribution-limits-annual-adjustments"
+      ]
+    },
+    {
+      "title": "Recharacterization Consideration",
+      "description": "If you over-contributed or changed retirement plans, you may recharacterize contributions to a Traditional IRA within 8 months of the tax year's end.",
+      "references": [
+        "https://www.irs.gov/retirement-plans/ira-recharacterization-rules"
+      ]
+    },
+    {
+      "title": "File IRS Form 8606",
+      "description": "Report non-deductible contributions and recharacterizations on Form 8606 to track basis for future tax-free withdrawals.",
+      "references": [
+        "https://www.irs.gov/forms-pubs/about-form-8606"
+      ]
+    }
+  ]
+}
