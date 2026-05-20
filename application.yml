@@ -1,22 +1,15 @@
-spring:
-  profiles:
-    active: dev
+package com.axentx.surrogate1.notification;
 
-llm:
-  provider: openai
-  providers:
-    openai: https://api.openai.com/v1
-    anthropic: https://api.anthropic.com/v1
-    huggingface: https://huggingface.co/api
+import org.springframework.stereotype.Service;
 
----
-spring:
-  profiles:
-    active: prod
+/**
+ * Stub for in‑app notification – replace with real push/notification logic.
+ */
+@Service
+public class InAppNotificationService {
 
-llm:
-  provider: anthropic
-  providers:
-    openai: https://api.openai.com/v1
-    anthropic: https://api.anthropic.com/v1
-    huggingface: https://huggingface.co/api
+    public void notifyAllUsers(String title, String message) {
+        // Placeholder: log the notification
+        System.out.printf("In‑app notification – %s: %s%n", title, message);
+    }
+}
