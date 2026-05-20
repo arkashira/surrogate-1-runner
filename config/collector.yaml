@@ -1,0 +1,37 @@
+collector:
+  enabled: true
+  service_name: "surrogate-1"
+  version_label: "1.0.0"
+
+  # 1 – 1.0 means 5% data loss
+  sampling_rate: 0.95
+
+  headers:
+    capture:
+      - "Content-Type"
+      - "Content-Length"
+      - "User-Agent"
+      - "Accept"
+      - "Accept-Encoding"
+      - "Accept-Language"
+      - "Cache-Control"
+      - "Connection"
+    redact:
+      - "Authorization"
+      - "Set-Cookie"
+      - "Cookie"
+      - "Proxy-Authorization"
+      - "X-Forwarded-For"
+      - "X-Real-IP"
+
+  body_schema:
+    enabled: true
+    max_depth: 5
+    max_items: 100
+
+  storage:
+    type: "file"
+    path: "/var/log/surrogate-1/collector"
+    rotation:
+      max_size: "100MB"
+      max_files: 7

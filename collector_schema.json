@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Collector Configuration",
+  "type": "object",
+  "properties": {
+    "collector": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "service_name": { "type": "string" },
+        "version_label": { "type": "string" },
+        "sampling_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "capture": { "type": "array", "items": { "type": "string" } },
+            "redact": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["capture", "redact"]
+        },
+        "body_schema": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "max_depth": { "type": "integer", "minimum": 0 },
+            "max_items": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["enabled", "max_depth", "max_items"]
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["file", "s3", "kafka"] },
+            "path": { "type": "string" },
+            "rotation": {
+              "type": "object",
+              "properties": {
+                "max_size": { "type": "string" },
+                "max_files": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["max_size", "max_files"]
+            }
+          },
+          "required": ["type", "path", "rotation"]
+        }
+      },
+      "required": [
+        "enabled",
+        "service_name",
+        "version_label",
+        "sampling_rate",
+        "headers",
+        "body_schema",
+        "storage"
+      ]
+    }
+  },
+  "required": ["collector"]
+}
