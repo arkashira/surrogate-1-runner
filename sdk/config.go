@@ -1,103 +1,62 @@
 package sdk
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 )
 
-// Config holds the relay configuration
+// Config represents the application configuration
 type Config struct {
-	RelayEndpoint string   `yaml:"relay_endpoint"`
-	JWTSecret     string   `yaml:"jwt_secret"`
-	ChainRPC      []string `yaml:"chain_rpc"`
+	RelayEndpoint   string            `yaml:"relay_endpoint"`
+	JWTSecret       string            `yaml:"jwt_secret"`
+	ChainRPCURLs    map[string]string `yaml:"chain_rpc_urls"`
 }
 
 // LoadConfig loads and validates the configuration from a YAML file
 func LoadConfig(configPath string) (*Config, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("config file not found: %s", configPath)
+		return nil, fmt.Errorf("configuration file not found: %s", configPath)
 	}
 
 	// Read the config file
 	data, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %v", err)
+		return nil, fmt.Errorf("failed to read configuration file: %v", err)
 	}
 
-	var cfg Config
-	err = yaml.Unmarshal(data, &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config: %v", err)
+	// Parse YAML
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML configuration: %v", err)
 	}
 
 	// Validate required fields
-	if cfg.RelayEndpoint == "" {
-		return nil, errors.New("relay_endpoint is required")
+	if config.RelayEndpoint == "" {
+		log.Println("ERROR: Missing required field 'relay_endpoint'")
+		return nil, fmt.Errorf("missing required field 'relay_endpoint'")
 	}
 
-	if cfg.JWTSecret == "" {
-		return nil, errors.New("jwt_secret is required")
+	if config.JWTSecret == "" {
+		log.Println("ERROR: Missing required field 'jwt_secret'")
+		return nil, fmt.Errorf("missing required field 'jwt_secret'")
 	}
 
-	if len(cfg.ChainRPC) == 0 {
-		return nil, errors.New("chain_rpc is required")
+	if config.ChainRPCURLs == nil {
+		log.Println("ERROR: Missing required field 'chain_rpc_urls'")
+		return nil, fmt.Errorf("missing required field 'chain_rpc_urls'")
 	}
 
-	// Log validation results
-	log.Printf("Config loaded successfully: %s", configPath)
-	log.Printf("Relay endpoint: %s", cfg.RelayEndpoint)
-	log.Printf("JWT secret: %s", cfg.JWTSecret)
-	log.Printf("Chain RPC URLs: %v", cfg.ChainRPC)
-
-	return &cfg, nil
-}
-
-// ValidateConfig checks if the config has all required fields
-func ValidateConfig(cfg *Config) error {
-	if cfg == nil {
-		return errors.New("config is nil")
+	// Validate chain RPC URLs is not empty
+	if len(config.ChainRPCURLs) == 0 {
+		log.Println("ERROR: 'chain_rpc_urls' cannot be empty")
+		return nil, fmt.Errorf("'chain_rpc_urls' cannot be empty")
 	}
 
-	if cfg.RelayEndpoint == "" {
-		return errors.New("relay_endpoint is missing")
-	}
-
-	if cfg.JWTSecret == "" {
-		return errors.New("jwt_secret is missing")
-	}
-
-	if len(cfg.ChainRPC) == 0 {
-		return errors.New("chain_rpc is missing")
-	}
-
-	return nil
-}
-
-// WriteConfig writes the config to a YAML file
-func WriteConfig(cfg *Config, configPath string) error {
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %v", err)
-	}
-
-	return ioutil.WriteFile(configPath, data, 0644)
-}
-
-// ValidateAndLog checks if the config is valid and logs errors if not
-func ValidateAndLog(cfg *Config) error {
-	if err := ValidateConfig(cfg); err != nil {
-		log.Printf("Config validation error: %v", err)
-		return err
-	}
-
-	return nil
+	log.Println("Configuration loaded successfully")
+	return &config, nil
 }

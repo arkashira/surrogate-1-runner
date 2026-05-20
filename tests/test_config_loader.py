@@ -1,46 +1,73 @@
-import unittest
-from config_loader import ConfigLoader, ServiceConfig
+import pytest
+import tempfile
+import os
+from unittest.mock import patch
+from src.config_loader import load_config
 
-class TestConfigLoader(unittest.TestCase):
-    def setUp(self):
-        self.config_path = '/tmp/services.yaml'
-        self.sample_config = """
-        services:
-          - service_name: test_service
-            internal_ip: 192.168.1.100
-            internal_port: 8080
-            match_criteria: path=/api/v1/test
-        """
-        with open(self.config_path, 'w') as file:
-            file.write(self.sample_config)
+def test_load_valid_config():
+    """Test loading a valid configuration file"""
+    config_content = """
+relay_endpoint: "https://relay.example.com"
+jwt_secret: "test-secret"
+chain_rpc_urls:
+  ethereum: "https://ethereum.example.com"
+  polygon: "https://polygon.example.com"
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write(config_content)
+        temp_path = f.name
+    
+    try:
+        result = load_config(temp_path)
+        assert result is not None
+        assert result['relay_endpoint'] == "https://relay.example.com"
+        assert result['jwt_secret'] == "test-secret"
+        assert 'ethereum' in result['chain_rpc_urls']
+    finally:
+        os.unlink(temp_path)
 
-    def tearDown(self):
-        if os.path.exists(self.config_path):
-            os.remove(self.config_path)
+def test_missing_required_fields():
+    """Test that missing required fields are detected"""
+    config_content = """
+relay_endpoint: "https://relay.example.com"
+# jwt_secret is missing
+chain_rpc_urls:
+  ethereum: "https://ethereum.example.com"
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write(config_content)
+        temp_path = f.name
+    
+    try:
+        result = load_config(temp_path)
+        assert result is None
+    finally:
+        os.unlink(temp_path)
 
-    def test_load_valid_config(self):
-        loader = ConfigLoader(self.config_path)
-        self.assertEqual(len(loader.services), 1)
-        self.assertIsInstance(loader.services[0], ServiceConfig)
+def test_invalid_yaml_format():
+    """Test handling of invalid YAML format"""
+    config_content = """
+relay_endpoint: "https://relay.example.com"
+jwt_secret: "test-secret"
+chain_rpc_urls:
+  ethereum: "https://ethereum.example.com"
+  polygon: "https://polygon.example.com"
+invalid: yaml: content
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write(config_content)
+        temp_path = f.name
+    
+    try:
+        result = load_config(temp_path)
+        assert result is None
+    finally:
+        os.unlink(temp_path)
 
-    def test_reload_config(self):
-        loader = ConfigLoader(self.config_path)
-        loader.reload_config()
-        self.assertEqual(len(loader.services), 1)
-
-    def test_invalid_config(self):
-        invalid_config = """
-        services:
-          - service_name: test_service
-            internal_ip: invalid_ip
-            internal_port: 8080
-            match_criteria: path=/api/v1/test
-        """
-        with open(self.config_path, 'w') as file:
-            file.write(invalid_config)
-        
-        with self.assertRaises(ValueError):
-            ConfigLoader(self.config_path)
-
-if __name__ == '__main__':
-    unittest.main()
+def test_file_not_found():
+    """Test handling when config file doesn't exist"""
+    result = load_config("nonexistent.yaml")
+    assert result is None
