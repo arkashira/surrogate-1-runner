@@ -1,38 +1,40 @@
-import logging
-from web3 import Web3
-from web3.middleware import geth_poa_middleware
+import time
+import threading
+import psutil
+from prometheus_client import start_http_server, Gauge
+from .config import AppConfig
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+class PerformanceMonitor:
+    def __init__(self, config: AppConfig):
+        self.config = config
+        self.cpu = Gauge('cpu_usage_percent', 'CPU usage percentage')
+        self.memory = Gauge('memory_usage_percent', 'Memory usage percentage')
+        self.disk = Gauge('disk_usage_percent', 'Disk usage percentage')
+        self.network = Gauge('network_io_bytes', 'Network I/O bytes')
+        self._stop_event = threading.Event()
 
-class DEXTransactionMonitor:
-    def __init__(self, rpc_url):
-        self.web3 = Web3(Web3.HTTPProvider(rpc_url))
-        self.web3.middleware_onion.inject(geth_poa_middleware, layer=0)
+    def _collect_once(self):
+        """Collect a single sample – used by tests."""
+        self.cpu.set(psutil.cpu_percent(interval=None))
+        self.memory.set(psutil.virtual_memory().percent)
+        self.disk.set(psutil.disk_usage('/').percent)
+        net = psutil.net_io_counters()
+        self.network.set(net.bytes_sent + net.bytes_recv)
 
-    def monitor_transactions(self):
-        latest_block = self.web3.eth.block_number
-        while True:
-            current_block = self.web3.eth.block_number
-            if current_block > latest_block:
-                for block_num in range(latest_block + 1, current_block + 1):
-                    block = self.web3.eth.get_block(block_num, full_transactions=True)
-                    for tx in block.transactions:
-                        self.detect_front_running(tx)
-                        self.detect_sandwich_attacks(tx)
-                latest_block = current_block
+    def _run(self):
+        """Background thread that samples every 15 s."""
+        while not self._stop_event.is_set():
+            self._collect_once()
+            # Sleep *after* collecting so we get a sample immediately on start.
+            self._stop_event.wait(15)
 
-    def detect_front_running(self, transaction):
-        # Placeholder logic for detecting front-running
-        if transaction['gasPrice'] > 100 * 10**9:  # Arbitrary threshold for high gas price
-            logger.warning(f"Potential front-running detected: {transaction['hash'].hex()}")
+    def start(self):
+        """Start the HTTP server and the background collector."""
+        start_http_server(self.config.metrics_port)
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
-    def detect_sandwich_attacks(self, transaction):
-        # Placeholder logic for detecting sandwich attacks
-        if '0x...' in transaction['input']:  # Placeholder condition for sandwich attack detection
-            logger.warning(f"Potential sandwich attack detected: {transaction['hash'].hex()}")
-
-if __name__ == "__main__":
-    rpc_url = "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
-    monitor = DEXTransactionMonitor(rpc_url)
-    monitor.monitor_transactions()
+    def stop(self):
+        """Gracefully stop the collector thread."""
+        self._stop_event.set()
+        self._thread.join()
