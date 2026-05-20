@@ -1,20 +1,19 @@
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RelayConfig {
-    pub enable_private_transaction: bool,
-    pub obscure_trade_intent_until_execution: bool,
+    pub relay_url: String,
+    pub private_key: String,
+    pub public_key: String,
 }
 
-impl Default for RelayConfig {
-    fn default() -> Self {
+impl RelayConfig {
+    pub fn new(relay_url: String, private_key: String, public_key: String) -> Self {
         RelayConfig {
-            enable_private_transaction: true,
-            obscure_trade_intent_until_execution: true,
+            relay_url,
+            private_key,
+            public_key,
         }
     }
-}
-
-pub fn load_relay_config() -> RelayConfig {
-    // Load config from file or environment variables
-    // For now, using default values
-    RelayConfig::default()
 }
