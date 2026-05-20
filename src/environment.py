@@ -1,94 +1,98 @@
-import os
-import shutil
+"""
+Sandbox environment management.
 
+This module provides an in-memory sandbox manager that creates isolated environment instances
+for testing purposes. Each sandbox is a shallow copy of the production configuration and is
+identified by a UUID. The manager supports creation, deletion, and lookup of sandbox environments.
+"""
+
+from __future__ import annotations
+
+import copy
+import datetime
+import uuid
+from dataclasses import dataclass, field
+from typing import Dict, Optional
+
+# Production configuration (in a real system this would be imported from a config module)
+PRODUCTION_CONFIG = {
+    "datadog_api_key": "prod-xxxx",
+    "datadog_app_key": "prod-yyyy",
+    "database_url": "postgres://prod:5432/db",
+    "logging_level": "INFO",
+}
+
+@dataclass
 class SandboxEnvironment:
-    def __init__(self, name):
+    """Represents a sandbox environment instance."""
+    id: str
+    config: Dict[str, str]
+    created_at: datetime.datetime = field(default_factory=datetime.datetime.utcnow)
+
+    def __post_init__(self):
+        """Ensure config is a copy to prevent accidental mutation of the global config."""
+        self.config = copy.deepcopy(self.config)
+
+class SandboxManager:
+    """
+    Manages sandbox environments with in-memory storage.
+
+    In a production setting, this could be backed by a database or orchestrator.
+    """
+
+    def __init__(self) -> None:
+        self._sandboxes: Dict[str, SandboxEnvironment] = {}
+
+    def create_sandbox(self, config_overrides: Optional[Dict[str, str]] = None) -> SandboxEnvironment:
         """
-        Initialize a SandboxEnvironment instance.
+        Create a new sandbox environment with optional config overrides.
 
         Args:
-            name (str): The name of the sandbox environment.
-        """
-        self.name = name
-        self.path = f"/opt/axentx/surrogate-1/sandboxes/{name}"
-
-    def create(self):
-        """
-        Create a new sandbox environment.
+            config_overrides: Dictionary of configuration values to override
 
         Returns:
-            bool: True if the environment is created successfully, False otherwise.
+            The created SandboxEnvironment instance
         """
-        try:
-            if not os.path.exists(self.path):
-                os.makedirs(self.path)
-                # Copy production environment setup to sandbox
-                shutil.copytree("/opt/axentx/surrogate-1/production", self.path + "/production")
-                print(f"Sandbox environment {self.name} created successfully")
-                return True
-            else:
-                print(f"Sandbox environment {self.name} already exists")
-                return False
-        except Exception as e:
-            print(f"Error creating sandbox environment: {e}")
-            return False
+        sandbox_id = str(uuid.uuid4())
+        config = copy.deepcopy(PRODUCTION_CONFIG)
+        if config_overrides:
+            config.update(config_overrides)
+        sandbox = SandboxEnvironment(id=sandbox_id, config=config)
+        self._sandboxes[sandbox_id] = sandbox
+        return sandbox
 
-    def delete(self):
+    def delete_sandbox(self, sandbox_id: str) -> bool:
         """
-        Delete an existing sandbox environment.
+        Delete a sandbox environment.
+
+        Args:
+            sandbox_id: The ID of the sandbox to delete
 
         Returns:
-            bool: True if the environment is deleted successfully, False otherwise.
+            True if deletion succeeded, False if not found
         """
-        try:
-            if os.path.exists(self.path):
-                shutil.rmtree(self.path)
-                print(f"Sandbox environment {self.name} deleted successfully")
-                return True
-            else:
-                print(f"Sandbox environment {self.name} does not exist")
-                return False
-        except Exception as e:
-            print(f"Error deleting sandbox environment: {e}")
-            return False
+        return self._sandboxes.pop(sandbox_id, None) is not None
 
-    def isolate(self):
+    def get_sandbox(self, sandbox_id: str) -> Optional[SandboxEnvironment]:
         """
-        Isolate the sandbox environment from production data.
+        Retrieve a sandbox environment by ID.
+
+        Args:
+            sandbox_id: The ID of the sandbox
 
         Returns:
-            bool: True if the environment is isolated successfully, False otherwise.
+            The SandboxEnvironment instance or None if not found
         """
-        try:
-            data_path = f"{self.path}/data"
-            if not os.path.exists(data_path):
-                os.makedirs(data_path)
-                print(f"Sandbox environment {self.name} isolated from production data")
-                return True
-            else:
-                print(f"Sandbox environment {self.name} is already isolated from production data")
-                return False
-        except Exception as e:
-            print(f"Error isolating sandbox environment: {e}")
-            return False
+        return self._sandboxes.get(sandbox_id)
 
-def create_sandbox_environment(name):
-    """
-    Create a new sandbox environment and isolate it from production data.
+    def list_sandboxes(self) -> Dict[str, SandboxEnvironment]:
+        """
+        List all existing sandboxes.
 
-    Args:
-        name (str): The name of the sandbox environment.
-    """
-    sandbox = SandboxEnvironment(name)
-    if sandbox.create():
-        sandbox.isolate()
+        Returns:
+            Dictionary mapping sandbox IDs to SandboxEnvironment instances
+        """
+        return dict(self._sandboxes)
 
-def delete_sandbox_environment(name):
-    """
-    Delete an existing sandbox environment.
-
-    Args:
-        name (str): The name of the sandbox environment.
-    """
-    sandbox = SandboxEnvironment(name)
-    sandbox.delete()
+# Singleton instance for API layer
+sandbox_manager = SandboxManager()
