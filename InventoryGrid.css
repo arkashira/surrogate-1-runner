@@ -1,0 +1,29 @@
+.inventory-grid-wrapper {
+  overflow: auto;
+  max-height: 400px; /* adjust as needed */
+  border: 1px solid #ddd;
+}
+
+.inventory-grid {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.inventory-grid th,
+.inventory-grid td {
+  padding: 8px 12px;
+  border: 1px solid #eee;
+  text-align: left;
+}
+
+.inventory-grid th {
+  background: #f9f9f9;
+  position: sticky;
+  top: 0;          /* freeze header rows */
+  z-index: 2;
+}
+
+.inventory-grid td:focus {
+  outline: 2px solid #0066cc;
+  background: #e6f2ff;
+}
