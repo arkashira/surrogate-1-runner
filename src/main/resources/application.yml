@@ -1,23 +1,11 @@
 spring:
-  application:
-    name: surrogate-1
-
-llm:
-  providers:
-    minimax:
-      enabled: true
-      api:
-        key: ${MINIMAX_API_KEY:your-minimax-api-key}
-        url: https://api.minimax.chat/v1
-    claude:
-      enabled: true
-      api:
-        key: ${CLAUDE_API_KEY:your-claude-api-key}
-        url: https://api.anthropic.com
-
-# Default provider configuration
-llm:
-  default-provider: minimax
-  request:
-    temperature: 0.7
-    max-tokens: 2048
+  mvc:
+    view:
+      prefix: /WEB-INF/views/
+      suffix: .jsp
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+server:
+  port: 8080
