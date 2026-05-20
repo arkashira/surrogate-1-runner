@@ -1,27 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Connected Repositories</title>
+    <meta charset="UTF-8">
+    <title>Surrogate‑1 Dashboard</title>
+    <!-- Use Flask's url_for so the static path works in any deployment -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
-    <h1>GitHub Repositories</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Owner / Repo</th>
-                <th>Connected At</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for repo in repositories %}
-            <tr>
-                <td><a href="{{ repo.url }}">{{ repo.name }}</a></td>
-                <td>{{ repo.connected_at }}</td>
-                <td><button>Disconnect</button></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <header>
+        <h1>Surrogate‑1 Dashboard</h1>
+    </header>
+
+    <!-- -------------------------------------------------
+         Credit‑balance section – the new feature
+         ------------------------------------------------- -->
+    <section id="credits" class="card">
+        <h2>Credit Balances</h2>
+        <div class="credit-card">
+            <span class="credit-label">Bulk Credits:</span>
+            <span id="bulk-balance" class="credit-value">Loading…</span>
+        </div>
+        <div class="credit-card">
+            <span class="credit-label">Monthly Credits:</span>
+            <span id="monthly-balance" class="credit-value">Loading…</span>
+        </div>
+    </section>
+
+    <!-- -------------------------------------------------
+         Existing dashboard content (if any)
+         ------------------------------------------------- -->
+    {{ dashboard_content|safe }}
+
+    <footer>
+        <p>&copy; 2026 Axentx</p>
+    </footer>
+
+    <!-- -------------------------------------------------
+         JavaScript – fetches credit data and updates UI
+         ------------------------------------------------- -->
+    <script>
+        /**
+         * Pull the latest credit balances from the back‑end.
+         * Uses `credentials: 'same-origin'` so Flask session cookies are sent.
+         */
+        async function refreshCredits() {
+            try {
+                const resp = await fetch('/api/credits', { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+
+                // Guard against malformed payloads
+                const bulk   = typeof data.bulk   === 'number' ? data.bulk   : null;
+                const monthly= typeof data.monthly=== 'number' ? data.monthly: null;
+
+                document.getElementById('bulk-balance')
+                        .textContent = bulk !== null ? bulk.toLocaleString() : '—';
+                document.getElementById('monthly-balance')
+                        .textContent = monthly !== null ? monthly.toLocaleString() : '—';
+            } catch (err) {
+                console.error('Failed to fetch credit balances:', err);
+                // Show a non‑intrusive error state
+                document.getElementById('bulk-balance').textContent   = 'Error';
+                document.getElementById('monthly-balance').textContent = 'Error';
+            }
+        }
+
+        // Initial load
+        refreshCredits();
+
+        // Real‑time updates – poll every 15 seconds (fast enough for UI responsiveness,
+        // light on the server, and matches the more aggressive interval from Candidate 2)
+        setInterval(refreshCredits, 15000);
+    </script>
 </body>
 </html>
