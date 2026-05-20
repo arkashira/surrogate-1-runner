@@ -1,0 +1,109 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+
+  /* ------------------------------------------------------------------
+   *  Base configuration
+   * ------------------------------------------------------------------ */
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:jsx-a11y/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended"
+  ],
+
+  /* ------------------------------------------------------------------
+   *  Parser & parser options
+   * ------------------------------------------------------------------ */
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": { "jsx": true },
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+
+  /* ------------------------------------------------------------------
+   *  Plugins
+   * ------------------------------------------------------------------ */
+  "plugins": [
+    "react",
+    "react-hooks",
+    "jsx-a11y",
+    "@typescript-eslint",
+    "prettier"
+  ],
+
+  /* ------------------------------------------------------------------
+   *  Global rules
+   * ------------------------------------------------------------------ */
+  "rules": {
+    /* Formatting */
+    "prettier/prettier": "error",
+
+    /* TypeScript */
+    "@typescript-eslint/explicit-function-return-type": [
+      "error",
+      { "allowExpressions": true }
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+
+    /* React */
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off",          // TSX no longer needs React import
+    "react/jsx-uses-react": "off",
+    "react/jsx-uses-vars": "error",
+    "react/jsx-filename-extension": [
+      "error",
+      { "extensions": [".tsx"] }
+    ],
+    "react/display-name": "off",
+    "react/require-default-props": "off",
+
+    /* Hooks */
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+
+    /* Accessibility */
+    "jsx-a11y/alt-text": "warn",
+    "jsx-a11y/anchor-has-content": "warn",
+    "jsx-a11y/anchor-is-valid": "warn",
+
+    /* General JS */
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-debugger": "warn",
+    "no-var": "error",
+    "prefer-const": "error"
+  },
+
+  /* ------------------------------------------------------------------
+   *  Component‑specific overrides
+   * ------------------------------------------------------------------ */
+  "overrides": [
+    {
+      "files": ["src/components/**/*.tsx"],
+      "rules": {
+        /* Relax rules that are usually handled by TS types */
+        "@typescript-eslint/explicit-module-boundary-types": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "react/prop-types": "off",
+        "react/display-name": "off"
+      }
+    }
+  ],
+
+  /* ------------------------------------------------------------------
+   *  React auto‑detection
+   * ------------------------------------------------------------------ */
+  "settings": {
+    "react": { "version": "detect" }
+  }
+}
