@@ -1,13 +1,25 @@
 import unittest
-from unittest.mock import patch
-from alerts import AlertManager
+from src.alerts.email import EmailAlert
+from src.alerts.in_app import InAppNotification
 
-class TestAlertManager(unittest.TestCase):
-    @patch('logging.info')
-    def test_send_alert(self, mock_info):
-        alert_manager = AlertManager(50)
-        alert_manager.send_alert()
-        mock_info.assert_called_once_with("Cost spike alert sent")
+class TestEmailAlert(unittest.TestCase):
+    def setUp(self):
+        self.email_alert = EmailAlert('smtp.example.com', 587, 'sender@example.com', 'password')
 
-if __name__ == "__main__":
+    def test_send_alert(self):
+        # Mock SMTP server interaction
+        pass
+
+class TestInAppNotification(unittest.TestCase):
+    def setUp(self):
+        self.notification_service = MockNotificationService()
+        self.in_app_notification = InAppNotification(self.notification_service)
+
+    def test_send_alert(self):
+        user_id = 'user123'
+        message = 'An unusual pattern has been detected in your cloud costs.'
+        self.in_app_notification.send_alert(user_id, message)
+        self.assertTrue(self.notification_service.notified)
+
+if __name__ == '__main__':
     unittest.main()
