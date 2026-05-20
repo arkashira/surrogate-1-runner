@@ -1,0 +1,30 @@
+.variant-list {
+  margin: 20px;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.variant-list input,
+.variant-list select {
+  margin-bottom: 10px;
+  padding: 5px;
+  width: 100%;
+}
+
+.variant-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.variant-list li {
+  margin: 5px 0;
+  padding: 5px;
+  background-color: #f9f9f9;
+  border-radius: 3px;
+}
+
+.variant-list li strong {
+  display: block;
+  font-size: 1.1em;
+}
