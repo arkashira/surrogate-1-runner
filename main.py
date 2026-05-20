@@ -1,41 +1,35 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from routes.projects import router as projects_router
+import logging
+import time
+import threading
 
-# Database configuration
-SQLALCHEMY_DATABASE_URL = "sqlite:///./projects.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="iOS Compliance Project Management API",
-    description="API for managing iOS projects with compliance tracking",
-    version="1.0.0"
-)
+# Define a function to collect data in real-time
+def collect_data_in_real_time():
+    while True:
+        # Simulate data collection (replace with actual data collection logic)
+        data = {
+            'latency': 100,
+            'cost': 0.5,
+            'error_rate': 0.01
+        }
+        # Update the dashboard with the collected data
+        update_dashboard(data)
+        time.sleep(1)  # Collect data every second
 
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Define a function to update the dashboard
+def update_dashboard(data):
+    # Simulate updating the dashboard (replace with actual dashboard update logic)
+    url = 'http://localhost:8080/update'
+    response = requests.post(url, json=data)
+    if response.status_code == 200:
+        logger.info('Dashboard updated successfully')
+    else:
+        logger.error('Failed to update dashboard')
 
-# Include routers
-app.include_router(projects_router, prefix="/api/v1", tags=["projects"])
-
-# Database tables creation (run once)
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+# Start collecting data in real-time in a separate thread
+thread = threading.Thread(target=collect_data_in_real_time)
+thread.daemon = True
+thread.start()
