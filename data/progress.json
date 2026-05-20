@@ -1,0 +1,10 @@
+{
+  "alice": {
+    "Interactive Training Modules": 0.75,
+    "Hands‑On Exercises": 0.20
+  },
+  "bob": {
+    "Interactive Training Modules": 1.0,
+    "Hands‑On Exercises": 0.5
+  }
+}
