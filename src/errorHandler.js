@@ -1,38 +1,29 @@
-const logger = require('./logger');
-const { notifySupportTeam } = require('./notifier'); // see note below
-const { implementFallbackResolution } = require('./fallback');
+const { error: logError } = require('./logger');
 
 /**
- * Central error‑handling entry point for AX‑direct failures.
+ * Centralised error handling.
  *
- * @param {Error} error – The exception caught in resolver.js
- * @returns {Promise<void>}
+ * @param {Error|string} errOrMsg – Either an Error object or a short message.
+ * @param {Object} [context={}] – Arbitrary key/value pairs that describe where/why the error happened.
+ * @throws {Error} – The original (or a wrapped) error, enriched with `context`.
  */
-async function handleAxDirectError(error) {
-  logger.error('🛑 AX‑direct resolution failed: %s', error.message, { error });
+function handleError(errOrMsg, context = {}) {
+  const err = errOrMsg instanceof Error ? errOrMsg : new Error(String(errOrMsg));
 
-  // 1️⃣ Log detailed diagnostics (already done by winston)
-  logErrorDetails(error);
+  // Attach the context for upstream consumers.
+  err.context = context;
 
-  // 2️⃣ Notify the appropriate team / system
-  await notifySupportTeam(error);
+  // Build a readable log line.
+  const ctxString = Object.entries(context)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(' ');
+  const logMsg = `Resolver Error: ${err.message}${ctxString ? ' | ' + ctxString : ''}`;
 
-  // 3️⃣ Run a safe fallback so the request does not hang forever
-  await implementFallbackResolution();
+  // Persist the error.
+  logError(logMsg);
+
+  // Re‑throw so callers can decide (retry, abort, etc.).
+  throw err;
 }
 
-/**
- * Separate function makes unit‑testing easier.
- */
-function logErrorDetails(error) {
-  // Structured logging already captured stack & metadata.
-  // Add any domain‑specific fields you need, e.g. requestId, userId.
-  logger.debug('Error details: %O', {
-    name: error.name,
-    message: error.message,
-    stack: error.stack,
-    // custom fields can be merged here
-  });
-}
-
-module.exports = { handleAxDirectError };
+module.exports = { handleError };

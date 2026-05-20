@@ -1,22 +1,22 @@
-const { createLogger, format, transports } = require('winston');
+const fs   = require('fs');
+const path = require('path');
 
-const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: format.combine(
-    format.timestamp(),
-    format.errors({ stack: true }),          // keep stack traces
-    format.splat(),
-    format.json()
-  ),
-  transports: [
-    // Console is always enabled – useful in dev & CI
-    new transports.Console(),
+const LOG_FILE = path.join(__dirname, 'error.log');
 
-    // In production you can add a file or external service (e.g. Loggly)
-    ...(process.env.NODE_ENV === 'production'
-      ? [new transports.File({ filename: '/var/log/axentx/axentx.log' })]
-      : [])
-  ],
-});
+/**
+ * Append a line to the log file and also write to stderr.
+ * @param {string} message – Human‑readable log line (already formatted).
+ */
+function error(message) {
+  const line = `${new Date().toISOString()} ${message}\n`;
+  try {
+    fs.appendFileSync(LOG_FILE, line, { encoding: 'utf8' });
+  } catch (fsErr) {
+    // If the file can’t be written we still want the message visible.
+    console.error('⚠️  Logger failed:', fsErr);
+  }
+  // Always echo to the console so Docker/K8s log collectors see it.
+  console.error(message);
+}
 
-module.exports = logger;
+module.exports = { error };
