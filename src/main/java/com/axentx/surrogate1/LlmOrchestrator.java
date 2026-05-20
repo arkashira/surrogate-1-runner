@@ -1,31 +1,28 @@
-import java.util.ArrayList;
-import java.util.List;
-
 import com.axentx.surrogate1.LlmProvider;
-import com.axentx.surrogate1.LlmProviderMetrics;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class LlmOrchestrator {
-    private List<LlmProvider> providers;
+    private final List<LlmProvider> providers;
 
-    public LlmOrchestrator() {
-        this.providers = new ArrayList<>();
+    public LlmOrchestrator(List<LlmProvider> providers) {
+        this.providers = providers;
     }
 
-    public void addProvider(LlmProvider provider) {
-        this.providers.add(provider);
-    }
-
-    public List<LlmProviderMetrics> getMetrics() {
-        List<LlmProviderMetrics> metrics = new ArrayList<>();
-        for (LlmProvider provider : providers) {
-            metrics.add(provider.getMetrics());
-        }
-        return metrics;
-    }
-
-    public void updateMetrics() {
-        for (LlmProvider provider : providers) {
-            provider.updateMetrics();
-        }
+    public String getResponse(String input) {
+        AtomicReference<String> response = new AtomicReference<>();
+        providers.stream()
+                  .filter(LlmProvider::isAlive)
+                  .forEach(provider -> {
+                      try {
+                          String result = provider.generateResponse(input);
+                          if (result != null) {
+                              response.set(result);
+                          }
+                      } catch (Exception e) {
+                          // Handle or log exception
+                      }
+                  });
+        return response.get();
     }
 }
