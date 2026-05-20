@@ -1,11 +1,10 @@
 import unittest
-from unittest.mock import patch
-from src.surrogate.dashboard import app
+from src.dashboard.dashboard import app
 
 class TestDashboard(unittest.TestCase):
     def test_layout(self):
-        with patch('dash.Dash.layout', return_value='test_layout'):
-            self.assertEqual(app.layout, 'test_layout')
+        html_layout = app.layout.to_dict()
+        self.assertIn('H1', html_layout)
 
 if __name__ == '__main__':
     unittest.main()
