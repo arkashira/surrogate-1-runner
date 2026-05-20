@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Environment Wizard</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input[type="text"], select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        .service-checkbox { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Create AWS Simulated Environment</h1>
+    <form method="POST" action="/environment_wizard">
+        <div class="form-group">
+            <label for="region">AWS Region:</label>
+            <select id="region" name="region" required>
+                <option value="us-east-1">US East (N. Virginia)</option>
+                <option value="us-west-1">US West (N. California)</option>
+                <option value="eu-west-1">EU (Ireland)</option>
+                <!-- Add more regions as needed -->
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>AWS Services to Include:</label>
+            <div>
+                <input type="checkbox" id="ec2" name="services" value="ec2" class="service-checkbox">
+                <label for="ec2">EC2</label>
+
+                <input type="checkbox" id="s3" name="services" value="s3" class="service-checkbox">
+                <label for="s3">S3</label>
+
+                <input type="checkbox" id="rds" name="services" value="rds" class="service-checkbox">
+                <label for="rds">RDS</label>
+
+                <!-- Add more services as needed -->
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="vpc_cidr">VPC CIDR Block:</label>
+            <input type="text" id="vpc_cidr" name="vpc_cidr" required>
+        </div>
+
+        <div class="form-group">
+            <label>Subnets (comma separated):</label>
+            <input type="text" id="subnets" name="subnets" required>
+        </div>
+
+        <button type="submit">Create Environment</button>
+    </form>
+</body>
+</html>
