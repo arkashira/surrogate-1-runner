@@ -1,1 +1,1 @@
-chmod +x bin/dataset-enrich.sh
+jupyter notebook example_watermarking.ipynb
