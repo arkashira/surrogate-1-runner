@@ -1,0 +1,7 @@
+languages:
+  python:
+    formatter: black
+    rules: pep8
+  javascript:
+    formatter: prettier
+    rules: standard

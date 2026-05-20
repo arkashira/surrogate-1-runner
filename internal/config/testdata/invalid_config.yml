@@ -1,0 +1,9 @@
+languages:
+  python:
+    formatter: black
+    rules: pep8
+  javascript:
+    formatter: prettier
+    rules: standard
+  invalid:
+    formatter: invalid_formatter
