@@ -1,43 +1,59 @@
+package com.axentx.surrogate1;
+
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Orchestrates calls to multiple LLM providers. Providers are selected
+ * in a round‑robin fashion. The orchestrator retries a failed call
+ * up to {@code maxRetries} times before propagating the exception.
+ */
 public class LlmOrchestrator {
-    private List<LlmProvider> providers;
-    private Map<String, LlmProvider> providerMap;
+    private final List<LlmProvider> providers;
+    private final AtomicInteger counter = new AtomicInteger(0);
+    private final int maxRetries;
 
-    public LlmOrchestrator(List<LlmProvider> providers) {
-        this.providers = providers;
-        this.providerMap = providers.stream().collect(Collectors.toMap(LlmProvider::getId, p -> p));
-    }
-
-    public LlmProvider getProvider(String id) {
-        return providerMap.get(id);
-    }
-
-    public void configureLoadBalancing() {
-        // Implement load-balancing logic here
-        // For example, you can use a round-robin algorithm
-        int index = 0;
-        for (LlmProvider provider : providers) {
-            // Assign the current provider to the load-balancer
-            // ...
-            index = (index + 1) % providers.size();
+    /**
+     * Creates an orchestrator with the given providers.
+     *
+     * @param providers list of providers to use
+     * @param maxRetries maximum number of retries per request
+     */
+    public LlmOrchestrator(List<LlmProvider> providers, int maxRetries) {
+        if (providers == null || providers.isEmpty()) {
+            throw new IllegalArgumentException("At least one provider must be supplied");
         }
+        this.providers = providers;
+        this.maxRetries = maxRetries;
     }
 
-    public void configureFailover() {
-        // Implement failover logic here
-        // For example, you can use a simple failover strategy
-        // where if a provider fails, the next one in the list is used
-        int index = 0;
-        for (LlmProvider provider : providers) {
+    /**
+     * Sends the prompt to the next provider in the round‑robin cycle.
+     *
+     * @param prompt the prompt to send
+     * @return the provider's response
+     * @throws Exception if all retries fail
+     */
+    public String orchestrate(String prompt) throws Exception {
+        int attempts = 0;
+        while (attempts < maxRetries) {
+            LlmProvider provider = getNextProvider();
             try {
-                // Try to use the current provider
-                // ...
+                return provider.getResponse(prompt);
             } catch (Exception e) {
-                // If the provider fails, move to the next one
-                index = (index + 1) % providers.size();
+                attempts++;
+                // Simple back‑off: log and retry
+                System.err.println("Provider " + provider.getName() + " failed (attempt " + attempts + "): " + e.getMessage());
+                if (attempts >= maxRetries) {
+                    throw new Exception("All retries failed for prompt: " + prompt, e);
+                }
             }
         }
+        throw new Exception("Unexpected error in orchestrate");
+    }
+
+    private LlmProvider getNextProvider() {
+        int index = Math.abs(counter.getAndIncrement() % providers.size());
+        return providers.get(index);
     }
 }

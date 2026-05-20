@@ -1,25 +1,26 @@
-import java.util.UUID;
+package com.axentx.surrogate1;
 
-public class LlmProvider {
-    private String id;
-    private String name;
-    private String url;
+import java.io.IOException;
 
-    public LlmProvider(String id, String name, String url) {
-        this.id = id;
-        this.name = name;
-        this.url = url;
-    }
+/**
+ * Interface for an LLM provider. Implementations should provide a method
+ * to send a prompt to the underlying LLM service and return the response.
+ */
+public interface LlmProvider {
+    /**
+     * Sends the given prompt to the LLM provider and returns the response.
+     *
+     * @param prompt the prompt to send
+     * @return the LLM response
+     * @throws IOException          if an I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    String getResponse(String prompt) throws IOException, InterruptedException;
 
-    public String getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getUrl() {
-        return url;
-    }
+    /**
+     * Returns a human‑readable name for the provider.
+     *
+     * @return provider name
+     */
+    String getName();
 }
