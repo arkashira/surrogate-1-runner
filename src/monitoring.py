@@ -1,40 +1,54 @@
 import time
-import threading
-import psutil
-from prometheus_client import start_http_server, Gauge
-from .config import AppConfig
+from kubernetes import client, config
+from kubernetes.client.exceptions import ApiException
+from models.anomaly_detector import AnomalyDetector
 
-class PerformanceMonitor:
-    def __init__(self, config: AppConfig):
-        self.config = config
-        self.cpu = Gauge('cpu_usage_percent', 'CPU usage percentage')
-        self.memory = Gauge('memory_usage_percent', 'Memory usage percentage')
-        self.disk = Gauge('disk_usage_percent', 'Disk usage percentage')
-        self.network = Gauge('network_io_bytes', 'Network I/O bytes')
-        self._stop_event = threading.Event()
+class PodFailureDetector:
+    def __init__(self):
+        config.load_incluster_config()
+        self.v1 = client.CoreV1Api()
+        self.anomaly_detector = AnomalyDetector()
 
-    def _collect_once(self):
-        """Collect a single sample – used by tests."""
-        self.cpu.set(psutil.cpu_percent(interval=None))
-        self.memory.set(psutil.virtual_memory().percent)
-        self.disk.set(psutil.disk_usage('/').percent)
-        net = psutil.net_io_counters()
-        self.network.set(net.bytes_sent + net.bytes_recv)
+    def detect_failures(self):
+        while True:
+            self.check_pods()
+            self.check_daemonsets()
+            time.sleep(30)  # Check every 30 seconds
 
-    def _run(self):
-        """Background thread that samples every 15 s."""
-        while not self._stop_event.is_set():
-            self._collect_once()
-            # Sleep *after* collecting so we get a sample immediately on start.
-            self._stop_event.wait(15)
+    def check_pods(self):
+        try:
+            pods = self.v1.list_pod_for_all_namespaces(watch=False)
+            for pod in pods.items:
+                if pod.status.phase == 'Failed' or self.is_crash_loop_back_off(pod):
+                    self.anomaly_detector.report_anomaly(
+                        entity_type='pod',
+                        entity_name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        reason='CrashLoopBackOff' if self.is_crash_loop_back_off(pod) else 'Failed'
+                    )
+        except ApiException as e:
+            print(f"Exception when calling CoreV1Api->list_pod_for_all_namespaces: {e}")
 
-    def start(self):
-        """Start the HTTP server and the background collector."""
-        start_http_server(self.config.metrics_port)
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+    def check_daemonsets(self):
+        try:
+            apps_v1 = client.AppsV1Api()
+            daemonsets = apps_v1.list_daemon_set_for_all_namespaces(watch=False)
+            for ds in daemonsets.items:
+                for pod in ds.status.current_number_scheduled:
+                    pod_name = f"{ds.metadata.name}-{pod}"
+                    pod = self.v1.read_namespaced_pod(pod_name, ds.metadata.namespace)
+                    if pod.status.phase == 'Failed' or self.is_crash_loop_back_off(pod):
+                        self.anomaly_detector.report_anomaly(
+                            entity_type='daemonset',
+                            entity_name=ds.metadata.name,
+                            namespace=ds.metadata.namespace,
+                            reason='CrashLoopBackOff' if self.is_crash_loop_back_off(pod) else 'Failed'
+                        )
+        except ApiException as e:
+            print(f"Exception when calling AppsV1Api->list_daemon_set_for_all_namespaces: {e}")
 
-    def stop(self):
-        """Gracefully stop the collector thread."""
-        self._stop_event.set()
-        self._thread.join()
+    def is_crash_loop_back_off(self, pod):
+        for status in pod.status.container_statuses:
+            if status.last_state.terminated and status.last_state.terminated.reason == 'Error':
+                return True
+        return False
