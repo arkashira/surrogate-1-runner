@@ -1,33 +1,62 @@
 import logging
 from typing import Dict
 
-class WorkflowError(Exception):
-    """Base class for workflow-related exceptions."""
+class TaskError(Exception):
+    """Base class for task-related exceptions."""
     pass
 
-class WorkflowErrorHandler:
-    """Handles errors and logging for workflows."""
-    
-    def __init__(self, logger: logging.Logger = None):
-        """Initializes the error handler with a logger."""
-        self.logger = logger or logging.getLogger(__name__)
+class TaskExecutionError(TaskError):
+    """Raised when a task execution fails."""
+    def __init__(self, task_id: str, message: str, details: Dict = None):
+        self.task_id = task_id
+        self.message = message
+        self.details = details
+        super().__init__(f"Task {task_id} execution failed: {message}")
 
-    def handle_error(self, error: Exception, workflow_id: str, workflow_step: str) -> Dict:
-        """Handles an error by logging it and returning an error dictionary."""
-        error_message = f"Error in workflow {workflow_id} at step {workflow_step}: {str(error)}"
-        self.logger.error(error_message)
-        return {"error": error_message, "workflow_id": workflow_id, "step": workflow_step}
+def log_task_error(error: TaskError):
+    """Logs task-related errors."""
+    logging.error(error)
 
-    def log_workflow_completion(self, workflow_id: str, status: str) -> None:
-        """Logs the completion status of a workflow."""
-        self.logger.info(f"Workflow {workflow_id} completed with status: {status}")
+def handle_task_exception(task_id: str, exception: Exception):
+    """Handles task exceptions by logging and wrapping them in TaskExecutionError."""
+    error_message = f"Task {task_id} failed with exception: {str(exception)}"
+    log_task_error(TaskExecutionError(task_id, error_message, {"exception": str(exception)}))
 
-# Example usage
+# /opt/axentx/surrogate-1/src/utils/task_executor.py
+import logging
+from .error_handler import handle_task_exception
+
+class TaskExecutor:
+    def __init__(self, task_id: str):
+        self.task_id = task_id
+
+    def execute_task(self):
+        try:
+            # Task execution logic here
+            logging.info(f"Task {self.task_id} executed successfully")
+            # Simulate task logic
+            # raise Exception("Simulated task failure")  # Uncomment to simulate failure
+        except Exception as e:
+            handle_task_exception(self.task_id, e)
+
+# /opt/axentx/surrogate-1/tests/test_error_handler.py
+import unittest
+from src.utils.error_handler import TaskExecutionError, handle_task_exception
+import logging
+
+class TestErrorHandler(unittest.TestCase):
+    def test_task_execution_error(self):
+        task_id = "test_task"
+        message = "Test task execution failed"
+        error = TaskExecutionError(task_id, message)
+        self.assertEqual(str(error), f"Task {task_id} execution failed: {message}")
+
+    def test_handle_task_exception(self):
+        task_id = "test_task"
+        exception = Exception("Test exception")
+        with self.assertLogs('src.utils.error_handler', level='ERROR') as log:
+            handle_task_exception(task_id, exception)
+            self.assertIn(f'Task {task_id} execution failed: Task {task_id} failed with exception: Test exception', log.output)
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    error_handler = WorkflowErrorHandler()
-    try:
-        # Simulate a workflow error
-        raise WorkflowError("Simulated workflow error")
-    except Exception as e:
-        error_handler.handle_error(e, "example_workflow", "step_1")
+    unittest.main()
