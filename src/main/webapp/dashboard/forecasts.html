@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cost Forecast Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 10px; }
+    #accuracy { font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    #exportBtn { margin-top: 10px; padding: 6px 12px; }
+    #status { margin-top: 10px; color: #d00; }
+  </style>
+  <script src="forecasts.js" defer></script>
+</head>
+<body>
+  <h1>Predictive Cost Forecasts</h1>
+  <p>Accuracy: <span id="accuracy">--</span>%</p>
+
+  <table id="forecastTable" aria-describedby="status">
+    <caption>Daily cost forecasts with confidence intervals</caption>
+    <thead>
+      <tr>
+        <th scope="col">Date</th>
+        <th scope="col">Forecasted Cost ($)</th>
+        <th scope="col">Confidence Interval (95%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Rows injected by JavaScript -->
+    </tbody>
+  </table>
+
+  <button id="exportBtn">Export to CSV</button>
+
+  <div id="status" role="alert" aria-live="polite"></div>
+</body>
+</html>
