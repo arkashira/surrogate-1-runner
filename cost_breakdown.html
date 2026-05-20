@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Infrastructure Cost Breakdown</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cloud Infrastructure Cost Breakdown</h1>
+    <table id="cost-breakdown-table">
+        <thead>
+            <tr>
+                <th>Service</th>
+                <th>Cost</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data will be populated here by JavaScript -->
+        </tbody>
+    </table>
+
+    <script>
+        // Mock data for demonstration purposes
+        const costData = [
+            { service: 'Compute', cost: '$100.00', date: '2023-10-01' },
+            { service: 'Storage', cost: '$50.00', date: '2023-10-01' },
+            { service: 'Networking', cost: '$25.00', date: '2023-10-01' }
+        ];
+
+        function populateTable(data) {
+            const tableBody = document.querySelector('#cost-breakdown-table tbody');
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.service}</td>
+                    <td>${item.cost}</td>
+                    <td>${item.date}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Populate the table with mock data
+        populateTable(costData);
+
+        // In a real scenario, fetch the latest cost data from an API endpoint
+        // Example: fetch('/api/get-cost-breakdown').then(response => response.json()).then(populateTable);
+    </script>
+</body>
+</html>
