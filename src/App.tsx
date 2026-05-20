@@ -1,15 +1,11 @@
 import React from 'react';
-import { Provider } from 'react-redux';
-import store from './store';
-import InvoiceSummaryDashboard from './components/InvoiceSummaryDashboard';
+import MapWithOverlay from './components/MapWithOverlay';
 
 const App: React.FC = () => {
   return (
-    <Provider store={store}>
-      <div className="App">
-        <InvoiceSummaryDashboard />
-      </div>
-    </Provider>
+    <div className="App">
+      <MapWithOverlay />
+    </div>
   );
 };
 

@@ -1,0 +1,15 @@
+{
+  "entryPoints": [
+    "src"
+  ],
+  "out": "docs/api",
+  "mode": "file",
+  "includeDeclarations": true,
+  "exclude": [
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/node_modules/**"
+  ],
+  "tsconfig": "tsconfig.json",
+  "theme": "default"
+}
