@@ -1,0 +1,11 @@
+{
+  "authorized_keys": {
+    "alice": [
+      "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC1examplealicekey1 alice@example.com",
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplealicekey2 alice@example.com"
+    ],
+    "bob": [
+      "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2examplebobkey1 bob@example.com"
+    ]
+  }
+}
