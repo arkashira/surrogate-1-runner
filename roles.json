@@ -1,0 +1,18 @@
+{
+    "admin": [
+        "access_terminal",
+        "manage_users",
+        "manage_roles",
+        "view_logs"
+    ],
+    "devops": [
+        "access_terminal",
+        "view_logs"
+    ],
+    "developer": [
+        "access_terminal"
+    ],
+    "viewer": [
+        "view_logs"
+    ]
+}
