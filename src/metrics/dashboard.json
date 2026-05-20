@@ -1,0 +1,35 @@
+{
+  "title": "Surrogate Multiplexer Metrics",
+  "panels": [
+    {
+      "title": "Total Connections",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "surrogate_mux_total_connections",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    },
+    {
+      "title": "Service Connections",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "surrogate_mux_service_connections",
+          "legendFormat": "{{service}}"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "surrogate_mux_errors_total",
+          "legendFormat": "{{__name__}}"
+        }
+      ]
+    }
+  ]
+}
