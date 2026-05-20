@@ -1,9 +1,30 @@
----
-# Slack Integration Configuration
+# Slack integration configuration for cost anomaly alerts
 slack:
-  webhook_url: "${SLACK_WEBHOOK_URL}"  # Supports env var interpolation
-  default_channel: "#cost-alerts"
-  alert_settings:
-    include_forecast: true
-    include_recommendations: true
-    max_recommendations: 3
+  # Webhook URL for sending alerts to Slack
+  # Obtain this from: Slack App > Incoming Webhooks > Add New Webhook
+  webhook_url: ""
+
+  # Channel name or user ID to send alerts to
+  channel: "#cost-alerts"
+
+  # Enable/disable Slack notifications
+  enabled: false
+
+  # Alert settings
+  alerts:
+    # Include anomaly details in alerts
+    include_anomaly_details: true
+
+    # Include forecast summary in alerts
+    include_forecast_summary: true
+
+    # Include top N recommendations in alerts
+    top_recommendations_count: 3
+
+    # Minimum severity level to trigger alert (info, warning, critical)
+    minimum_severity: "warning"
+
+  # Test alert settings
+  test:
+    # Message to send for test alerts
+    message: "🔔 Test Alert: Surrogate-1 cost monitoring is active"
