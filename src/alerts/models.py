@@ -1,13 +1,31 @@
-from django.db import models
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
-class AlertLog(models.Model):
-    timestamp = models.DateTimeField(auto_now_add=True)
-    resource_id = models.CharField(max_length=255)
-    rule_name = models.CharField(max_length=255)
-    delivery_status = models.IntegerField()
+Base = declarative_base()
 
-    def save(self, *args, **kwargs):
-        super(AlertLog, self).save(*args, **kwargs)
+class Finding(Base):
+    __tablename__ = 'findings'
 
-    def __str__(self):
-        return f"{self.resource_id} - {self.rule_name} - {self.delivery_status}"
+    id = Column(Integer, primary_key=True)
+    resource_id = Column(String, nullable=False)
+    rule_name = Column(String, nullable=False)
+    severity = Column(String, nullable=False)
+    dashboard_link = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+
+class AlertLog(Base):
+    __tablename__ = 'alert_logs'
+
+    id = Column(Integer, primary_key=True)
+    finding_id = Column(Integer, ForeignKey('findings.id'), nullable=False)
+    delivered_at = Column(DateTime, nullable=False)
+    success = Column(Boolean, nullable=False)
+
+    finding = relationship("Finding", back_populates="alert_logs")
+
+class MutedRule(Base):
+    __tablename__ = 'muted_rules'
+
+    id = Column(Integer, primary_key=True)
+    rule_name = Column(String, nullable=False)
