@@ -1,0 +1,24 @@
+# /opt/axentx/surrogate-1/data/startup_benchmarks.csv
+company,industry,funding_stage,employees,revenue_mrr,users_moa,conversion_rate,retention_30d,retention_90d,market_segment,geographic_region,last_updated
+Stripe,FinTech,Series D,750,12000000,5000000,2.5,45,32,B2B Payments,US,2026-05-03
+Shopify,E-commerce,Series E,10000,150000000,20000000,3.2,42,28,E-commerce Platform,US,2026-05-03
+Airbnb,Travel,Series G,6800,250000000,15000000,4.1,55,40,Marketplace,US,2026-05-03
+Uber,Transportation,Series G,32000,180000000,100000000,1.8,38,25,On-Demand Service,US,2026-05-03
+Slack,Enterprise,Series H,2500,50000000,20000000,2.8,52,38,Enterprise SaaS,US,2026-05-03
+Notion,Productivity,Series D,400,15000000,10000000,3.5,48,35,Productivity Tools,US,2026-05-03
+Zoom,Video Conferencing,Series E,7400,20000000,30000000,3.1,50,36,Communication,US,2026-05-03
+Databricks,Data Analytics,Series F,3500,80000000,5000000,4.2,58,42,Data Infrastructure,US,2026-05-03
+Snowflake,Data Cloud,Series F,6800,100000000,15000000,3.8,54,40,Data Cloud,US,2026-05-03
+Twilio,Communications,Series F,6000,40000000,8000000,2.9,46,33,API Platform,US,2026-05-03
+Coinbase,Crypto,Series E,3800,25000000,12000000,3.3,44,30,Financial Services,US,2026-05-03
+Palantir,Enterprise Software,Series F,3200,18000000,2000000,4.5,60,45,Enterprise Analytics,US,2026-05-03
+Datadog,Monitoring,Series F,2800,22000000,5000000,3.6,51,37,DevOps Tools,US,2026-05-03
+Figma,Design,Series G,1100,35000000,10000000,4.0,56,41,Design Tools,US,2026-05-03
+Asana,Project Management,Series F,2200,12000000,15000000,3.4,49,36,Productivity,US,2026-05-03
+HubSpot,CRM,Series G,5000,45000000,20000000,3.7,53,39,Marketing Automation,US,2026-05-03
+Salesforce,CRM,Series I,73000,350000000,150000000,2.6,47,34,Enterprise CRM,US,2026-05-03
+MongoDB,Database,Series F,3800,16000000,8000000,3.9,55,40,Database,US,2026-05-03
+Cloudflare,Security,Series F,3500,28000000,10000000,3.2,48,35,Security Infrastructure,US,2026-05-03
+SendGrid,Email,Series F,1200,8000000,3000000,2.7,43,30,Email Infrastructure,US,2026-05-03
+Auth0,Identity,Series E,800,10000000,2000000,4.3,57,43,Identity & Access,US,2026-05-03
+Segment,Data Analytics,Series E,600,12000000,5000000,3.8,52,38,Customer Data Platform,US,2026-05-03
