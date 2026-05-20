@@ -1,0 +1,49 @@
+.performance-comparison {
+  font-family: Arial, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.performance-comparison h2 {
+  text-align: center;
+}
+
+.performance-comparison input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.current-rig, .upgrade-options {
+  margin-top: 20px;
+}
+
+.current-rig ul, .upgrade-options ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.current-rig li, .upgrade-options li {
+  background-color: #f9f9f9;
+  padding: 10px;
+  margin-bottom: 5px;
+  border-radius: 3px;
+}
+
+.upgrade-options select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.selected-upgrade {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #eef;
+  border-radius: 3px;
+}
