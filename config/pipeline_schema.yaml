@@ -1,0 +1,8 @@
+pipeline:
+  schema:
+    type: object
+    properties:
+      entity_resolution_enabled:
+        type: boolean
+        default: true
+      # other existing properties...
