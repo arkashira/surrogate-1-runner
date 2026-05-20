@@ -1,12 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Gaming Rig Performance Comparison</title>
-    <!-- Include Dash CSS and JS -->
-    <link rel="stylesheet" href="/assets/app.css">
-    <script src="/assets/bundle.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Axentx Platform</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="react-root"></div>
+    <nav class="nav-menu">
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+    </nav>
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
 </body>
 </html>
