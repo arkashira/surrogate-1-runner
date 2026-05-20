@@ -1,0 +1,42 @@
+name: Generate Synthetic Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      output_file:
+        description: 'Output file path'
+        required: false
+        default: 'synthetic_data.json'
+      metric_value:
+        description: 'Metric value for synthetic data'
+        required: false
+        default: '100'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate synthetic data
+        env:
+          OUTPUT_FILE: ${{ github.event.inputs.output_file || 'synthetic_data.json' }}
+          METRIC_VALUE: ${{ github.event.inputs.metric_value || '100' }}
+        run: |
+          python bin/generate-synthetic-data.py --output-file "$OUTPUT_FILE" --metric-value "$METRIC_VALUE"
+
+      - name: Upload generated data
+        uses: actions/upload-artifact@v3
+        with:
+          name: synthetic-data
+          path: ${{ github.event.inputs.output_file || 'synthetic_data.json' }}
