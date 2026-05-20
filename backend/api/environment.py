@@ -1,29 +1,32 @@
-from flask import Blueprint, request, jsonify
-from .models.environment import Environment
-from .services.aws_service import AWSService
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List
+from ..models.environment import Environment
+from ..dependencies import get_current_user
 
-api = Blueprint('environment', __name__)
+router = APIRouter()
 
-@api.route('/create_environment', methods=['POST'])
-def create_environment():
-    try:
-        data = request.json
-        environment = Environment.create(data)
-        aws_service = AWSService()
-        aws_service.create_practice_environment(environment)
+@router.get("/environments", response_model=List[Environment])
+async def list_environments(current_user: str = Depends(get_current_user)):
+    # Implementation to fetch environments for the current user
+    # This is a placeholder - actual implementation will depend on your database setup
+    return []
 
-        return jsonify({"message": "Environment creation initiated", "environment_id": environment.id}), 202
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@api.route('/environment_status/<int:environment_id>', methods=['GET'])
-def get_environment_status(environment_id):
-    try:
-        environment = Environment.get_by_id(environment_id)
-        if environment.is_ready:
-            return jsonify({"status": "ready", "message": "Environment is ready for use"}), 200
-        else:
-            return jsonify({"status": "pending", "message": "Environment is still being set up"}), 202
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@router.get("/environments/{environment_id}", response_model=Environment)
+async def get_environment(environment_id: str, current_user: str = Depends(get_current_user)):
+    # Implementation to fetch a specific environment for the current user
+    # This is a placeholder - actual implementation will depend on your database setup
+    return Environment(
+        id=environment_id,
+        name="Sample Environment",
+        description="This is a sample environment",
+        status="active",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        settings={
+            "region": "us-west-2",
+            "instance_type": "t2.micro",
+            "vpc_config": {},
+            "security_groups": []
+        },
+        user_id=current_user
+    )

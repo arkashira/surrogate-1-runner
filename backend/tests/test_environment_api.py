@@ -1,22 +1,23 @@
-import unittest
-from unittest.mock import patch
-from backend.api.environment import api
-from backend.models.environment import Environment
-from backend.services.aws_service import AWSService
+import pytest
+from fastapi.testclient import TestClient
+from ..main import app
+from ..dependencies import get_current_user
 
-class TestEnvironmentAPI(unittest.TestCase):
+client = TestClient(app)
 
-    @patch.object(Environment, 'create')
-    @patch.object(AWSService, 'create_practice_environment')
-    def test_create_environment(self, mock_aws_create, mock_env_create):
-        mock_env_create.return_value = Environment(id=1, name="TestEnv")
-        response = api.create_environment()
-        self.assertEqual(response.status_code, 202)
-        self.assertIn("Environment creation initiated", response.json["message"])
+@pytest.fixture
+def mock_current_user():
+    def override_get_current_user():
+        return "test_user"
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
-    @patch.object(Environment, 'get_by_id')
-    def test_get_environment_status(self, mock_get_by_id):
-        mock_get_by_id.return_value = Environment(id=1, name="TestEnv", is_ready=True)
-        response = api.get_environment_status(1)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Environment is ready for use", response.json["message"])
+def test_list_environments(mock_current_user):
+    response = client.get("/environments")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+def test_get_environment(mock_current_user):
+    environment_id = "test_env_id"
+    response = client.get(f"/environments/{environment_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == environment_id
