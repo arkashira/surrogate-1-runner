@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Google Ads Account</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main class="connection-container" aria-live="polite">
+        <h1>Connect Google Ads Account</h1>
+
+        <section class="connection-form">
+            <button id="connect-button" class="connect-button" aria-label="Connect with Google">
+                Connect with Google
+            </button>
+
+            <div id="account-info" class="account-info" hidden>
+                <p>Connected Account: <span id="account-email"></span></p>
+                <button id="disconnect-button" class="disconnect-button">
+                    Disconnect
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <script src="google_ads_connection.js" defer></script>
+</body>
+</html>
