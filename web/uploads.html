@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Surrogate‑1 – Upload Configs & Audit Logs</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2rem;
+    background:#f9f9f9;
+  }
+  h1 { color:#333; }
+  .container {
+    max-width: 600px;
+    margin:auto;
+    background:#fff;
+    padding:2rem;
+    border-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+  }
+  .field { margin-bottom:1.5rem; }
+  label {
+    display:block;
+    margin-bottom:.5rem;
+    font-weight:bold;
+  }
+  input[type="file"] { width:100%; }
+  button, a.button {
+    display:inline-block;
+    padding:.75rem 1.5rem;
+    background:#0066cc;
+    color:#fff;
+    text-decoration:none;
+    border:none;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  button:hover, a.button:hover { background:#004999; }
+  /* Disabled download button while PDF is not ready */
+  a.button.disabled {
+    background:#ccc;
+    pointer-events:none;
+    cursor:default;
+  }
+  /* Simple file‑list feedback */
+  #fileList {
+    margin-top:.5rem;
+    font-size:0.9rem;
+    color:#555;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Upload Configuration Files</h1>
+
+  <!--
+    NOTE: The server must generate a CSRF token on page load
+    and validate it on POST.  The token below is a placeholder.
+  -->
+  <form action="/upload" method="post" enctype="multipart/form-data">
+    <!-- CSRF token (replace value with server‑generated one) -->
+    <input type="hidden" name="csrf_token" value="<<CSRFSESSIONTOKEN>>">
+
+    <div class="field">
+      <label for="tfHelmFiles">Terraform / Helm Configurations</label>
+      <!-- accept list mirrors the original proposal -->
+      <input type="file"
+             id="tfHelmFiles"
+             name="tfHelmFiles"
+             multiple
+             required
+             accept=".tf,.tfvars,.yaml,.yml,.json,.tgz,.zip,.tar,.tar.gz"
+             aria-describedby="tfHelmFilesHelp">
+      <small id="tfHelmFilesHelp" style="display:block;margin-top:.25rem;color:#666;">
+        Select any combination of .tf, .tfvars, .yaml, .yml, .json, .tgz, .zip, .tar, .tar.gz files.
+      </small>
+      <div id="fileList" data-for="tfHelmFiles"></div>
+    </div>
+
+    <div class="field">
+      <label for="auditLogs">Audit Logs</label>
+      <input type="file"
+             id="auditLogs"
+             name="auditLogs"
+             multiple
+             required
+             accept=".log,.txt,.json,.csv"
+             aria-describedby="auditLogsHelp">
+      <small id="auditLogsHelp" style="display:block;margin-top:.25rem;color:#666;">
+        Allowed extensions: .log, .txt, .json, .csv.
+      </small>
+      <div id="fileList" data-for="auditLogs"></div>
+    </div>
+
+    <button type="submit">Upload Files</button>
+  </form>
+
+  <hr/>
+
+  <h2>Download Generated Documentation</h2>
+  <p id="downloadMsg">
+    After the server processes the uploaded files, a PDF will be available for download.
+  </p>
+  <!--
+    The download link is initially disabled (or hidden).  The server can either:
+    1) Render this page with the link enabled after processing (via a query param or session flag), or
+    2) Keep the link disabled until the PDF exists at /download/generated-documentation.pdf.
+    Below we use a class to disable it when the PDF is not ready.
+  -->
+  <a id="downloadLink"
+     class="button disabled"
+     href="/download/generated-documentation.pdf"
+     download
+     aria-disabled="true">
+    Download PDF
+  </a>
+</div>
+
+<script>
+  // ---- Simple client‑side feedback (optional but helpful) ----
+  const fileInputs = document.querySelectorAll('input[type="file"]');
+  fileInputs.forEach(input => {
+    // Show selected file names
+    input.addEventListener('change', () => {
+      const list = document.querySelector(`div[data-for="${input.id}"]`);
+      if (!list) return;
+      list.innerHTML = Array.from(input.files)
+        .map(f => `<div>• ${f.name} (${(f.size/1024).toFixed(1)} KB)</div>`)
+        .join('');
+    });
+  });
+
+  // ---- Enable download button if PDF already exists ----
+  // In a real app the server can set a data attribute or render the button without .disabled.
+  // Here we check if the PDF URL is reachable (GET) – a lightweight probe.
+  const downloadLink = document.getElementById('downloadLink');
+  fetch(downloadLink.href, { method: 'HEAD' })
+    .then(resp => {
+      if (resp.ok) {
+        downloadLink.classList.remove('disabled');
+        downloadLink.removeAttribute('aria-disabled');
+        document.getElementById('downloadMsg').textContent =
+          'Your documentation is ready for download.';
+      }
+    })
+    .catch(() => {
+      // PDF not ready yet – button stays disabled.
+    });
+</script>
+</body>
+</html>
