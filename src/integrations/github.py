@@ -1,0 +1,112 @@
+import os
+import logging
+import requests
+from typing import Optional, Dict, Any
+
+class GitHubAPI:
+    def __init__(self, github_token: str, repo: str):
+        """
+        Initialize GitHub API client with authentication and repository information.
+
+        Args:
+            github_token: GitHub personal access token
+            repo: Repository name in format 'owner/repo'
+        """
+        self.github_token = github_token
+        self.repo = repo
+        self.base_url = f"https://api.github.com/repos/{repo}"
+        self.headers = {
+            "Authorization": f"token {github_token}",
+            "Accept": "application/vnd.github.v3+json",
+            "Content-Type": "application/json"
+        }
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+
+    def create_workflow(self, workflow_name: str, workflow_file: str) -> bool:
+        """
+        Create a new GitHub Actions workflow.
+
+        Args:
+            workflow_name: Name of the workflow
+            workflow_file: Path to the workflow file
+
+        Returns:
+            bool: True if workflow was created successfully, False otherwise
+        """
+        url = f"{self.base_url}/actions/workflows"
+        data = {
+            "name": workflow_name,
+            "on": "workflow_dispatch",
+            "jobs": {
+                "build": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [
+                        {"name": "Checkout code", "uses": "actions/checkout@v3"},
+                        {"name": "Run script", "run": f"python {workflow_file}"}
+                    ]
+                }
+            }
+        }
+
+        try:
+            response = requests.post(url, json=data, headers=self.headers)
+            response.raise_for_status()
+            self.logger.info(f"Workflow {workflow_name} created successfully")
+            return True
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to create workflow {workflow_name}: {str(e)}")
+            return False
+
+    def dispatch_workflow(self, workflow_id: str, ref: str = "main") -> Optional[Dict[str, Any]]:
+        """
+        Dispatch a GitHub Actions workflow.
+
+        Args:
+            workflow_id: ID of the workflow to dispatch
+            ref: Git reference (branch/tag) to run the workflow on
+
+        Returns:
+            Optional[Dict]: Response JSON if successful, None otherwise
+        """
+        url = f"{self.base_url}/actions/workflows/{workflow_id}/dispatches"
+        data = {"ref": ref}
+
+        try:
+            response = requests.post(url, json=data, headers=self.headers)
+            response.raise_for_status()
+            self.logger.info(f"Workflow {workflow_id} dispatched successfully")
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to dispatch workflow {workflow_id}: {str(e)}")
+            return None
+
+    def get_workflow_runs(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get recent runs of a GitHub Actions workflow.
+
+        Args:
+            workflow_id: ID of the workflow to query
+
+        Returns:
+            Optional[Dict]: Response JSON if successful, None otherwise
+        """
+        url = f"{self.base_url}/actions/workflows/{workflow_id}/runs"
+
+        try:
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+            self.logger.info(f"Retrieved workflow runs for {workflow_id}")
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to get workflow runs for {workflow_id}: {str(e)}")
+            return None
+
+    def handle_error(self, error_message: str) -> None:
+        """
+        Log and handle errors consistently.
+
+        Args:
+            error_message: Error message to log
+        """
+        self.logger.error(f"Error occurred: {error_message}")
