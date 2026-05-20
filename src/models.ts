@@ -1,11 +1,18 @@
-export interface Policy {
+export interface Workflow {
   id: string;
-  limit: number; // The limit for the resource usage
-  // Add other policy properties as needed
+  name: string;
+  steps: Step[];
 }
 
-export interface Violation {
+export interface Step {
   id: string;
-  message: string;
-  details: object; // Additional details about the violation
+  type: string;          // e.g., 'http', 'db', 'ui'
+  config: Record<string, any>;
+}
+
+export interface StepResult {
+  stepId: string;
+  status: 'completed' | 'failed' | 'pending';
+  data?: any;
+  error?: string;
 }
