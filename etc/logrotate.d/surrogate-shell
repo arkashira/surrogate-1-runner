@@ -1,0 +1,19 @@
+# /etc/logrotate.d/surrogate-shell
+/var/log/axentx/surrogate-shell/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root axentx
+    sharedscripts
+
+    postrotate
+        if [ -f /var/run/surrogate-shell.pid ]; then
+            kill -HUP $(cat /var/run/surrogate-shell.pid 2>/dev/null || true)
+        fi
+        /bin/chown root:axentx /var/log/axentx/surrogate-shell/*.log
+        /bin/chmod 640 /var/log/axentx/surrogate-shell/*.log
+    endscript
+}
