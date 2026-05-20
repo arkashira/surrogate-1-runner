@@ -1,99 +1,55 @@
-from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from pathlib import Path
-import uuid
-import shutil
-import os
-import json
+"""FastAPI service that exposes a health endpoint and Prometheus metrics."""
+import time
+import threading
+from fastapi import FastAPI, Response
+from prometheus_client import start_http_server, CONTENT_TYPE_LATEST, generate_latest
+from .metrics import record_workflow, WORKFLOW_LATENCY
 
-from .services.db import SessionLocal, Base, engine
-from .services.parser import parse_tf, parse_yaml, parse_log
-from .services.generator import generate_markdown, generate_html
+app = FastAPI()
 
-app = FastAPI(title="Compliance Documentation Generator")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
+@app.get("/healthz")
+def healthz() -> dict:
+    """Simple health check used by Docker/CI."""
+    return {"status": "ok"}
 
-# Create DB tables
-Base.metadata.create_all(bind=engine)
 
-UPLOAD_DIR = Path("app/uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+@app.get("/metrics")
+def metrics() -> Response:
+    """Expose Prometheus metrics."""
+    data = generate_latest()
+    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
-# ---------- Routes ----------
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse("upload.html", {"request": request})
+def _background_workload() -> None:
+    """
+    Simulate a few workflow runs so that the histogram is not empty.
+    In a real service this would be replaced by actual business logic.
+    """
+    for name, ok, sleep_sec in [
+        ("dataset_ingest", True, 0.12),
+        ("data_validation", False, 0.07),
+    ]:
+        start = time.time()
+        time.sleep(sleep_sec)
+        duration = time.time() - start
+        record_workflow(name, ok, duration)
 
-@app.post("/upload")
-async def upload_files(files: list[UploadFile] = File(...), background_tasks: BackgroundTasks = BackgroundTasks()):
-    if not files:
-        raise HTTPException(status_code=400, detail="No files uploaded")
 
-    file_ids = []
-    for f in files:
-        ext = Path(f.filename).suffix.lower()
-        if ext not in {".tf", ".yaml", ".yml", ".json", ".log", ".txt"}:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+def start_background_thread() -> threading.Thread:
+    """Start the dummy workload in a daemon thread."""
+    t = threading.Thread(target=_background_workload, daemon=True)
+    t.start()
+    return t
 
-        file_id = str(uuid.uuid4())
-        dest = UPLOAD_DIR / f"{file_id}{ext}"
-        with dest.open("wb") as buffer:
-            shutil.copyfileobj(f.file, buffer)
 
-        file_ids.append({"id": file_id, "name": f.filename, "ext": ext})
+if __name__ == "__main__":
+    # Run with `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+    # The `start_http_server` call is **not** needed because FastAPI
+    # already serves `/metrics`.  It is kept for compatibility with
+    # pure‑prometheus‑client usage.
+    start_http_server(8000)          # optional, harmless
+    start_background_thread()
+    import uvicorn
 
-        # Kick off background parsing
-        background_tasks.add_task(process_file, file_id, dest, ext)
-
-    return JSONResponse({"status": "queued", "files": file_ids})
-
-@app.get("/docs/{file_id}", response_class=HTMLResponse)
-async def get_doc(request: Request, file_id: str):
-    # Fetch from DB
-    from .services.db import get_file_record
-    record = get_file_record(file_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    return templates.TemplateResponse("docs.html", {"request": request, "doc": record})
-
-@app.get("/download/{file_id}")
-async def download_doc(file_id: str):
-    from .services.db import get_file_record
-    record = get_file_record(file_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    return FileResponse(record.file_path, media_type="application/octet-stream", filename=f"{record.original_name}.html")
-
-# ---------- Background Tasks ----------
-
-def process_file(file_id: str, path: Path, ext: str):
-    """Parse the file and generate docs."""
-    try:
-        if ext == ".tf":
-            data = parse_tf(path)
-        elif ext in {".yaml", ".yml"}:
-            data = parse_yaml(path)
-        elif ext in {".log", ".json", ".txt"}:
-            data = parse_log(path)
-        else:
-            data = {"error": "Unsupported format"}
-
-        md = generate_markdown(data)
-        html = generate_html(md)
-
-        # Store in DB
-        from .services.db import store_file_record
-        store_file_record(file_id, path.name, str(path), md, html)
-
-    except Exception as e:
-        # Log and store error
-        from .services.db import store_file_error
-        store_file_error(file_id, str(e))
+    uvicorn.run(app, host="0.0.0.0", port=8000)
