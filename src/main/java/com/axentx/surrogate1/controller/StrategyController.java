@@ -1,29 +1,48 @@
 package com.axentx.surrogate1.controller;
 
+import com.axentx.surrogate1.service.StrategyService;
+import com.axentx.surrogate1.model.StrategyRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 
-@Controller
-@RequestMapping("/strategy")
+import java.io.ByteArrayInputStream;
+
+@RestController
+@RequestMapping("/api/strategies")
 public class StrategyController {
-    
-    @GetMapping("/results")
-    public String showResults(@RequestParam String strategyId, Model model) {
-        // In a real implementation, fetch strategy from database
-        model.addAttribute("strategyId", strategyId);
-        return "strategyResults";
-    }
-    
+
+    @Autowired
+    private StrategyService strategyService;
+
+    /**
+     * Generates strategies based on the provided business details and goals.
+     *
+     * @param request The strategy request containing business details and goals.
+     * @return A string indicating the generated strategies.
+     */
     @PostMapping("/generate")
-    @ResponseBody
-    public StrategyResponse generateStrategy(@RequestBody StrategyRequest request) {
-        // Business logic integration would go here
-        return new StrategyResponse("STRATEGY-12345");
+    public String generateStrategies(@RequestBody StrategyRequest request) {
+        return strategyService.generateStrategies(request);
     }
-    
-    record StrategyRequest(String businessName, String industry, String targetAudience, 
-                          String currentChallenges, String goals, Integer budgetRange) {}
-    
-    record StrategyResponse(String id) {}
+
+    /**
+     * Downloads the strategy content for a given strategy ID.
+     *
+     * @param strategyId The ID of the strategy to download.
+     * @return A response entity containing the strategy content as an attachment.
+     */
+    @GetMapping("/download/{strategyId}")
+    public ResponseEntity<InputStreamResource> downloadStrategy(@PathVariable String strategyId) {
+        String strategyContent = strategyService.getStrategyContent(strategyId);
+        InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(strategyContent.getBytes()));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + strategyId + ".txt")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(resource);
+    }
 }
