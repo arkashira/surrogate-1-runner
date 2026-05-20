@@ -1,83 +1,132 @@
 const redis = require('redis');
-const client = redis.createClient({
-  host: 'localhost',
-  port: 6379,
-});
+const { promisify } = require('util');
+const cacheMetrics = require('../monitoring/cacheMetrics');
 
-const cache = {};
-
-client.on('connect', () => {
-  console.log('Connected to Redis');
-});
-
-client.on('error', (err) => {
-  console.log(`Error: ${err}`);
-});
-
-const get = (key, ttl = 60) => {
-  return new Promise((resolve, reject) => {
-    client.get(key, (err, reply) => {
-      if (err) {
-        reject(err);
-      } else {
-        if (reply) {
-          resolve(reply);
-        } else {
-          resolve(null);
-        }
-      }
+class RedisCache {
+  constructor(options = {}) {
+    this.client = redis.createClient(options);
+    this.getAsync = promisify(this.client.get).bind(this.client);
+    this.setAsync = promisify(this.client.set).bind(this.client);
+    this.delAsync = promisify(this.client.del).bind(this.client);
+    this.expireAsync = promisify(this.client.expire).bind(this.client);
+    
+    // Default TTLs for different request types (in seconds)
+    this.defaultTTLs = {
+      'dataset': 3600,        // 1 hour
+      'metadata': 1800,       // 30 minutes
+      'processing': 900,      // 15 minutes
+      'result': 7200,        // 2 hours
+      'default': 600         // 10 minutes
+    };
+    
+    // Override with provided TTLs
+    if (options.ttls) {
+      Object.assign(this.defaultTTLs, options.ttls);
+    }
+    
+    // Connect to Redis
+    this.client.on('connect', () => {
+      console.log('Connected to Redis');
     });
-  });
-};
-
-const set = (key, value, ttl = 60) => {
-  return new Promise((resolve, reject) => {
-    client.setex(key, ttl, value, (err, reply) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(reply);
-      }
+    
+    this.client.on('error', (err) => {
+      console.error('Redis error:', err);
     });
-  });
-};
-
-const cacheHit = (key) => {
-  return get(key).then((reply) => {
-    if (reply) {
+  }
+  
+  /**
+   * Get value from cache
+   * @param {string} key - Cache key
+   * @returns {Promise<any>} - Cached value or null if not found
+   */
+  async get(key) {
+    try {
+      const value = await this.getAsync(key);
+      if (value) {
+        cacheMetrics.recordHit(key);
+        return JSON.parse(value);
+      }
+      cacheMetrics.recordMiss(key);
+      return null;
+    } catch (error) {
+      cacheMetrics.recordMiss(key);
+      console.error('Cache get error:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Set value in cache with TTL
+   * @param {string} key - Cache key
+   * @param {any} value - Value to cache
+   * @param {string} [type='default'] - Request type for TTL selection
+   * @returns {Promise<boolean>} - True if successful
+   */
+  async set(key, value, type = 'default') {
+    try {
+      const ttl = this.defaultTTLs[type] || this.defaultTTLs.default;
+      const serializedValue = JSON.stringify(value);
+      
+      await this.setAsync(key, serializedValue);
+      await this.expireAsync(key, ttl);
+      
       return true;
-    } else {
+    } catch (error) {
+      console.error('Cache set error:', error);
       return false;
     }
-  });
-};
-
-const cacheMiss = (key) => {
-  return get(key).then((reply) => {
-    if (!reply) {
+  }
+  
+  /**
+   * Delete value from cache
+   * @param {string} key - Cache key
+   * @returns {Promise<boolean>} - True if successful
+   */
+  async del(key) {
+    try {
+      await this.delAsync(key);
       return true;
-    } else {
+    } catch (error) {
+      console.error('Cache delete error:', error);
       return false;
     }
-  });
-};
+  }
+  
+  /**
+   * Check if key exists in cache
+   * @param {string} key - Cache key
+   * @returns {Promise<boolean>} - True if key exists
+   */
+  async exists(key) {
+    try {
+      const result = await promisify(this.client.exists).bind(this.client)(key);
+      return result === 1;
+    } catch (error) {
+      console.error('Cache exists error:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Get TTL for a key
+   * @param {string} key - Cache key
+   * @returns {Promise<number>} - TTL in seconds
+   */
+  async ttl(key) {
+    try {
+      return await promisify(this.client.ttl).bind(this.client)(key);
+    } catch (error) {
+      console.error('Cache TTL error:', error);
+      return -1;
+    }
+  }
+  
+  /**
+   * Close Redis connection
+   */
+  quit() {
+    return this.client.quit();
+  }
+}
 
-const cacheStats = () => {
-  return new Promise((resolve, reject) => {
-    client.hgetall('cache:stats', (err, reply) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(reply);
-      }
-    });
-  });
-};
-
-module.exports = {
-  get,
-  set,
-  cacheHit,
-  cacheMiss,
-  cacheStats,
-};
+module.exports = RedisCache;
