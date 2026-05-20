@@ -1,0 +1,7 @@
+{
+  "claude": {
+    "api_key": "REPLACE_ME",
+    "endpoint": "https://api.anthropic.com/v1"
+  },
+  "audit_log_path": "/var/log/axentx/audit.log"
+}
