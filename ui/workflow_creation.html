@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Creation</title>
+    <link rel="stylesheet" href="/static/workflow_creation.css">
+</head>
+<body>
+    <h1>Workflow Creation</h1>
+    <form id="workflow-form">
+        <label for="workflow-name">Workflow Name:</label>
+        <input type="text" id="workflow-name" name="workflow-name" required>
+
+        <label for="task-name">Task Name:</label>
+        <input type="text" id="task-name" name="task-name" required>
+
+        <label for="platforms">Platform:</label>
+        <select id="platforms" name="platforms" required>
+            <option value="">Select a platform</option>
+            <option value="github">GitHub</option>
+            <option value="trello">Trello</option>
+            <option value="asana">Asana</option>
+        </select>
+
+        <button type="submit">Create Workflow</button>
+    </form>
+    <script src="/static/workflow_creation.js"></script>
+</body>
+</html>
