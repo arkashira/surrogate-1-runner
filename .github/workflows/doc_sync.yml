@@ -5,23 +5,27 @@ on:
     branches:
       - '**'
 
+permissions:
+  contents: read
+
 jobs:
-  doc-sync:
+  docsync:
     runs-on: ubuntu-latest
-    container:
-      image: axentx/surrogate-1-ci:latest
-    env:
-      DOC_SYNC_TOKEN: ${{ secrets.DOC_SYNC_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run DocSync script
-        run: |
-          set -e
-          bash scripts/doc_sync.sh
+      - name: Run DocSync in Docker
         env:
           DOC_SYNC_TOKEN: ${{ secrets.DOC_SYNC_TOKEN }}
+        run: |
+          docker run --rm \
+            -e DOC_SYNC_TOKEN="$DOC_SYNC_TOKEN" \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            axentx/docsync:latest \
+            ./scripts/doc_sync.sh
+        shell: bash
 
       - name: Upload preview artifact
         if: success()
@@ -31,7 +35,7 @@ jobs:
           path: doc-preview.html
           retention-days: 7
 
-      - name: Report failure details
+      - name: Report failure
         if: failure()
         run: |
           echo "::error::DocSync failed. Check logs above for details."
