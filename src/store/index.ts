@@ -1,11 +1,10 @@
-import { configureStore } from '@reduxjs/toolkit';
-import costAlertReducer from './costAlertSlice';
+import { createStore } from 'vuex';
+import { alerts } from './modules/alerts';
 
-export const store = configureStore({
-  reducer: {
-    costAlert: costAlertReducer,
+export interface RootState {}
+
+export default createStore<RootState>({
+  modules: {
+    alerts,
   },
 });
-
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
