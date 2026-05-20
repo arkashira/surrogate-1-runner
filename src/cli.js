@@ -1,19 +1,17 @@
-const { generateMetricsCLI } = require('./generator/index');
-const yargs = require('yargs');
+# src/cli.js
+const { Command } = require('commander');
+const { run } = require('./runner');
 
-yargs.command({
-  command: 'generate-metrics',
-  describe: 'Generate synthetic metrics',
-  builder: (yargs) => {
-    yargs.option('profile', {
-      describe: 'Profile to use',
-      type: 'string',
-      demandOption: true,
-    });
-  },
-  handler: (argv) => {
-    generateMetricsCLI(argv.profile);
-  },
-});
+const program = new Command();
 
-yargs.parse();
+program
+  .option('-c, --ci', 'Run in CI mode')
+  .action((options) => {
+    if (options.ci) {
+      run({ ...options, ci: true });
+    } else {
+      run(options);
+    }
+  });
+
+program.parse(process.argv);
