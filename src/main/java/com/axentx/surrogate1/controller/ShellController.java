@@ -1,17 +1,23 @@
-
 package com.axentx.surrogate1.controller;
 
-import org.springframework.shell.standard.ShellComponent;
-import org.springframework.shell.standard.ShellMethod;
-import org.springframework.stereotype.Controller;
+import com.axentx.surrogate1.service.SessionService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
-@Controller
-@ShellComponent
+@RestController
 public class ShellController {
 
-    @ShellMethod(key = "init-ssh", value = "Initiate a secure shell session")
-    public String initSSH() {
-        // Implement the logic to initiate an SSH session and return a session ID
-        return "Session ID: example_session_id";
+    private final SessionService sessionService;
+
+    @Autowired
+    public ShellController(SessionService sessionService) {
+        this.sessionService = sessionService;
+    }
+
+    @PostMapping("/terminate-session")
+    public void terminateSession(@RequestBody String sessionId) {
+        sessionService.terminateSession(sessionId);
     }
 }
