@@ -1,0 +1,13 @@
+{
+    "templates": [
+        {
+            "name": "template1",
+            "content": "This is the content for template 1."
+        },
+        {
+            "name": "template2",
+            "content": "This is the content for template 2."
+        }
+    ],
+    "output_dir": "/path/to/output_directory"
+}
