@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Modal, TextInput, StyleSheet } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 
-const NodeItem = ({ node, onDelete, onSave }) => {
+const NodeItem = ({ node, onDelete, onRename }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [nodeName, setNodeName] = useState(node.name);
-
+  const [newName, setNewName] = useState(node.name);
+  
   const handleDelete = () => {
     Alert.alert(
       'Confirm Delete',
@@ -17,58 +18,95 @@ const NodeItem = ({ node, onDelete, onSave }) => {
     );
   };
 
-  const handleSave = () => {
-    onSave(node.id, nodeName);
+  const handleRename = () => {
+    onRename(node.id, newName);
     setIsEditing(false);
   };
 
+  const renderRightActions = () => (
+    <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
+      <Text style={styles.deleteText}>Delete</Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={styles.container}>
-      {isEditing ? (
-        <TextInput
-          style={styles.input}
-          value={nodeName}
-          onChangeText={setNodeName}
-          onBlur={handleSave}
-          autoFocus
-        />
-      ) : (
+    <Swipeable renderRightActions={renderRightActions}>
+      <View style={styles.container}>
         <TouchableOpacity onPress={() => setIsEditing(true)}>
-          <Text style={styles.nodeName}>{nodeName}</Text>
+          <Text style={styles.nodeText}>{node.name}</Text>
         </TouchableOpacity>
-      )}
-      <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
-        <Text style={styles.deleteText}>Delete</Text>
-      </TouchableOpacity>
-    </View>
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isEditing}
+          onRequestClose={() => setIsEditing(false)}
+        >
+          <View style={styles.modalView}>
+            <TextInput
+              style={styles.input}
+              value={newName}
+              onChangeText={setNewName}
+            />
+            <TouchableOpacity onPress={handleRename} style={styles.saveButton}>
+              <Text style={styles.saveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      </View>
+    </Swipeable>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
+    padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
+  nodeText: {
+    fontSize: 18,
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   input: {
-    flex: 1,
+    height: 40,
     borderColor: 'gray',
     borderWidth: 1,
-    padding: 5,
-    marginRight: 10,
+    marginBottom: 15,
+    width: '100%',
+    paddingHorizontal: 10,
   },
-  nodeName: {
-    fontSize: 16,
-    flex: 1,
+  saveButton: {
+    backgroundColor: '#2196F3',
+    padding: 10,
+    borderRadius: 5,
+  },
+  saveText: {
+    color: 'white',
   },
   deleteButton: {
-    padding: 5,
+    backgroundColor: 'red',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    height: '100%',
   },
   deleteText: {
-    color: 'red',
+    color: 'white',
   },
 });
 
