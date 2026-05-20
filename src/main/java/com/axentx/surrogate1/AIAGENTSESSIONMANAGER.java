@@ -1,43 +1,25 @@
 
-package com.axentx.surrogate1;
+import com.axentx.cloud.CloudClient;
+import com.axentx.cloud.models.SessionConfig;
+import com.axentx.utils.CostOptimizer;
 
-import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.web.client.RestTemplate;
-import com.google.cloud.pubsub.v1.Publisher;
-import com.google.cloud.pubsub.v1.PubsubMessage;
+import java.util.List;
 
-@Service
 public class AIAGENTSESSIONMANAGER {
 
-    @Value("${cloud.pubsub.topic}")
-    private String pubsubTopic;
+    private final CloudClient cloudClient;
+    private final CostOptimizer costOptimizer;
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final Publisher<String> pubsubPublisher;
-
-    public AIAGENTSESSIONMANAGER(Publisher<String> pubsubPublisher) {
-        this.pubsubPublisher = pubsubPublisher;
+    public AIAGENTSESSIONMANAGER(CloudClient cloudClient, CostOptimizer costOptimizer) {
+        this.cloudClient = cloudClient;
+        this.costOptimizer = costOptimizer;
     }
 
-    @Scheduled(fixedRate = 300000) // 300000 ms = 5 minutes
-    public void checkScaling() {
-        String scalingUrl = "https://my-scaling-service.com/api/scale";
-        String response = restTemplate.getForObject(scalingUrl, String.class);
-        if (response.equals("scaleUp")) {
-            String message = "{\"action\": \"scaleUp\"}";
-            publishToPubsub(message);
-        } else if (response.equals("scaleDown")) {
-            String message = "{\"action\": \"scaleDown\"}";
-            publishToPubsub(message);
+    public void optimizeSessionConfigurations() {
+        List<SessionConfig> sessionConfigs = cloudClient.getAllSessionConfigs();
+        for (SessionConfig sessionConfig : sessionConfigs) {
+            SessionConfig optimizedConfig = costOptimizer.optimize(sessionConfig);
+            cloudClient.updateSessionConfig(sessionConfig.getId(), optimizedConfig);
         }
-    }
-
-    private void publishToPubsub(String message) {
-        PubsubMessage pubsubMessage = PubsubMessage.newBuilder()
-                .setData(message)
-                .build();
-        pubsubPublisher.publish(pubsubTopic, pubsubMessage);
     }
 }
