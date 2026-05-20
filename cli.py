@@ -1,51 +1,46 @@
+#!/usr/bin/env python3
+
 import argparse
+import json
 import sys
+from typing import Dict, Any
 
-from src import config  # Adjust import path if package layout differs
+from surrogate1.reporter import Reporter
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="dbcompare",
-        description="Compare MySQL and MariaDB instances based on a shared config.",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help=(
-            "Path to a YAML configuration file containing `mysql` and/or `mariadb` "
-            "sections. If omitted, the tool will look for the DBCOMPARE_CONFIG "
-            "environment variable or fall back to built‑in defaults."
-        ),
-    )
-    # Existing arguments would be added here (e.g., --verbose, sub‑commands, etc.)
-    return parser
+def main():
+    parser = argparse.ArgumentParser(description='Run surrogate-1 checks.')
+    parser.add_argument('--output', help='Output file path for JSON results')
+    args = parser.parse_args()
 
-
-def main(argv: list[str] | None = None) -> int:
-    parser = _build_parser()
-    args = parser.parse_args(argv)
+    reporter = Reporter()
 
     try:
-        app_cfg = config.load_config(args.config)
-    except (FileNotFoundError, ValueError) as exc:
-        parser.error(str(exc))
+        reporter.run_checks()
+        result = {
+            'pass': True,
+            'details': reporter.details,
+            'summary': reporter.summary
+        }
+        print(json.dumps(result))
 
-    # At this point ``app_cfg`` holds validated connection strings (or None).
-    # The rest of the CLI can use ``app_cfg.mysql`` and ``app_cfg.mariadb``.
-    # For demonstration we simply print the resolved configuration.
-    if app_cfg.mysql:
-        print(f"MySQL DSN: {app_cfg.mysql.connection_string}")
-    else:
-        print("MySQL DSN: <default>")
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(result, f)
 
-    if app_cfg.mariadb:
-        print(f"MariaDB DSN: {app_cfg.mariadb.connection_string}")
-    else:
-        print("MariaDB DSN: <default>")
+        sys.exit(0)
+    except Exception as e:
+        result = {
+            'pass': False,
+            'details': reporter.details,
+            'summary': str(e)
+        }
+        print(json.dumps(result))
 
-    # TODO: invoke the actual DB comparison logic here, passing ``app_cfg``.
-    return 0
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(result, f)
 
+        sys.exit(1)
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    main()
