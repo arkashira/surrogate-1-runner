@@ -1,49 +1,59 @@
 package com.axentx.surrogate.model;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+@Entity
 public class CostIncrease {
 
-    private String service;
-    private String team;
-    private String project;
-    private double increaseAmount;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String serviceName;
+    private String teamName;
+    private String projectName;
+    private double costIncreasePercentage;
 
-    public CostIncrease(String service, String team, String project, double increaseAmount) {
-        this.service = service;
-        this.team = team;
-        this.project = project;
-        this.increaseAmount = increaseAmount;
+    // Getters and Setters
+    public Long getId() {
+        return id;
     }
 
-    // Getters and setters
-    public String getService() {
-        return service;
+    public void setId(Long id) {
+        this.id = id;
     }
 
-    public void setService(String service) {
-        this.service = service;
+    public String getServiceName() {
+        return serviceName;
     }
 
-    public String getTeam() {
-        return team;
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
     }
 
-    public void setTeam(String team) {
-        this.team = team;
+    public String getTeamName() {
+        return teamName;
     }
 
-    public String getProject() {
-        return project;
+    public void setTeamName(String teamName) {
+        this.teamName = teamName;
     }
 
-    public void setProject(String project) {
-        this.project = project;
+    public String getProjectName() {
+        return projectName;
     }
 
-    public double getIncreaseAmount() {
-        return increaseAmount;
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
     }
 
-    public void setIncreaseAmount(double increaseAmount) {
-        this.increaseAmount = increaseAmount;
+    public double getCostIncreasePercentage() {
+        return costIncreasePercentage;
+    }
+
+    public void setCostIncreasePercentage(double costIncreasePercentage) {
+        this.costIncreasePercentage = costIncreasePercentage;
     }
 }

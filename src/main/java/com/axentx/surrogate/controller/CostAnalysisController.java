@@ -15,24 +15,18 @@ public class CostAnalysisController {
     @Autowired
     private CostAnalysisService costAnalysisService;
 
-    @GetMapping
-    public List<CostAnalysis> getCostAnalysis() {
-        return costAnalysisService.getCostAnalysis();
-    }
-
-    @PostMapping
-    public CostAnalysis saveCostAnalysis(@RequestBody CostAnalysis costAnalysis) {
-        return costAnalysisService.saveCostAnalysis(costAnalysis);
-    }
-
-    @GetMapping("/increases")
+    @GetMapping("/cost-increases")
     public List<CostIncrease> getCostIncreases() {
         return costAnalysisService.getCostIncreases();
     }
 
-    @GetMapping("/recommendations")
-    public List<String> getRecommendations(@RequestParam String service, @RequestParam String team, @RequestParam String project, @RequestParam double increaseAmount) {
-        CostIncrease costIncrease = new CostIncrease(service, team, project, increaseAmount);
-        return costAnalysisService.generateRecommendations(costIncrease);
+    @GetMapping("/root-cause/{costIncreaseId}")
+    public CostAnalysis getRootCauseAnalysis(@PathVariable Long costIncreaseId) {
+        return costAnalysisService.getRootCauseAnalysis(costIncreaseId);
+    }
+
+    @PostMapping("/save")
+    public void saveCostAnalysis(@RequestBody CostAnalysis costAnalysis) {
+        costAnalysisService.saveCostAnalysis(costAnalysis);
     }
 }
