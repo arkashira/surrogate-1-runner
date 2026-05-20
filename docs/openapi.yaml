@@ -1,6 +1,150 @@
-{
-  "need_clarification": true,
-  "reason": "The existing /opt/axentx/surrogate-1/docs/openapi.yaml file (or its relevant sections) is required to accurately add the new GET /api/v1/credits/{account_id} endpoint without disrupting existing definitions or schemas.",
-  "request_to": "prd-daemon|architect-daemon|design-thinking",
-  "minimal_spec_needed": "Provide the current openapi.yaml file (or its structure, schemas, security, and rate-limit definitions) to ensure the new endpoint is integrated correctly with proper schema validation, security requirements, and response definitions."
-}
+openapi: 3.1.0
+info:
+  title: AxentX Cost‑Metrics API
+  version: 1.0.0
+  description: |
+    Returns aggregated cost information for the whole platform, broken down
+    by cloud provider and by individual worker.  The endpoint is secured with
+    a Bearer token and supports pagination for large worker sets.
+
+servers:
+  - url: https://api.axentx.com
+    description: Production server
+
+paths:
+  /api/v1/costs:
+    get:
+      summary: Retrieve aggregated cost metrics
+      operationId: getCostMetrics
+      tags:
+        - Cost Metrics
+      security:
+        - BearerAuth: []                     # JWT / OAuth2 access token
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1‑based) for the workers list.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: Number of worker records per page (max 100).
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Successful response containing cost metrics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostMetricsResponse'
+        '401':
+          description: Unauthorized – missing or invalid Bearer token.
+        '429':
+          description: Too Many Requests – rate limit exceeded.
+        '5XX':
+          description: Unexpected server error.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CostMetricsResponse:
+      type: object
+      required:
+        - totalSpend
+        - providers
+        - workers
+        - pagination
+      properties:
+        totalSpend:
+          type: number
+          format: double
+          description: Total spend across all providers (USD).
+          example: 124567.89
+        providers:
+          type: array
+          description: Cost breakdown per cloud provider.
+          items:
+            $ref: '#/components/schemas/ProviderCost'
+        workers:
+          type: array
+          description: List of workers with their individual cost.  The list is
+            paginated – only the records for the requested page are returned.
+          items:
+            $ref: '#/components/schemas/WorkerCost'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ProviderCost:
+      type: object
+      required:
+        - name
+        - spend
+      properties:
+        name:
+          type: string
+          description: Human‑readable provider name (e.g., “AWS”, “GCP”, “Azure”).
+          example: AWS
+        spend:
+          type: number
+          format: double
+          description: Total spend for this provider (USD).
+          example: 84231.45
+
+    WorkerCost:
+      type: object
+      required:
+        - id
+        - cost
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the worker (could be UUID or internal ID).
+          example: worker‑1234abcd
+        cost:
+          type: number
+          format: double
+          description: Total cost incurred by this worker during the reporting period (USD).
+          example: 12.34
+
+    Pagination:
+      type: object
+      required:
+        - page
+        - pageSize
+        - totalPages
+        - totalRecords
+      properties:
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        pageSize:
+          type: integer
+          description: Number of records per page (as requested).
+          example: 50
+        totalPages:
+          type: integer
+          description: Total number of pages available.
+          example: 20
+        totalRecords:
+          type: integer
+          description: Total number of worker records in the system.
+          example: 1000
+
+x-extension:
+  tokenExpiresInSeconds: 3600          # matches candidate‑2 “x‑oas‑tocken‑expires”
+  tokenHeader: Authorization           # matches candidate‑2 “x‑oas‑tocken‑header”
+  tokenType: access_token              # matches candidate‑2 “x‑oas‑tocken‑type”
