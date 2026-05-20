@@ -1,7 +1,2 @@
-"""
-Public interface for the battery‑guard package.
-"""
-
-from .collector import Collector
-
-__all__ = ["Collector"]
+"""Top‑level package for BatteryGuard."""
+__all__ = ["metrics", "recommendations", "cli"]
