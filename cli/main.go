@@ -1,40 +1,30 @@
 package main
 
 import (
-	"context"
+	"flag"
 	"fmt"
-	"log"
-	"os/exec"
-
-	"github.com/spf13/cobra"
 )
 
-func main() {
-	cmd := flags.NewFlags()
-
-	cmd.Run = func(cmd *cobra.Command, args []string) {
-		validate, _ := cmd.Flags().GetBool("validate")
-		if validate {
-			err := validateCode()
-			if err != nil {
-				log.Fatal(err)
-			}
-			fmt.Println("Validation passed.")
-		}
-		// Existing code generation logic here
-	}
-
-	if err := cmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+type Metric struct {
+	Name  string
+	Value float64
 }
 
-func validateCode() error {
-	cmd := exec.Command("trivy", "image", "your-image-name")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println(string(output))
-		return err
+func main() {
+	metricName := flag.String("metric-name", "", "Metric name")
+	metricValue := flag.Float64("metric-value", 0, "Metric value")
+
+	flag.Parse()
+
+	if *metricName == "" {
+		fmt.Println("Metric name is required")
+		return
 	}
-	return nil
+
+	metric := Metric{
+		Name:  *metricName,
+		Value: *metricValue,
+	}
+
+	fmt.Printf("Generated metric: %+v\n", metric)
 }
