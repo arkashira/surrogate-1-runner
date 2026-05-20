@@ -1,0 +1,33 @@
+# Home Assistant sample configuration that demonstrates an Axentx Surrogate‑1 sensor.
+# --------------------------------------------------------------
+# 1️⃣ Create an Axentx API key (see the Quick‑Start guide below).
+# 2️⃣ Add this file to your Home Assistant config directory (usually
+#    /config/ or ~/.homeassistant/).
+# 3️⃣ Restart Home Assistant – the sensor will appear as
+#    "sensor.surrogate_1_inference".
+# --------------------------------------------------------------
+# The sensor uses Home Assistant's built‑in REST platform to call the
+# Axentx public inference endpoint. Adjust the URL, headers, and
+# `value_template` as needed for your own deployment.
+
+sensor:
+  - platform: rest
+    name: "Surrogate 1 Inference"
+    resource: "https://api.axentx.com/v1/surrogate-1/inference"
+    method: GET
+    headers:
+      Authorization: "Bearer YOUR_AXENTX_API_KEY"
+    # The API returns JSON like:
+    # {
+    #   "result": "some text",
+    #   "metadata": {
+    #     "timestamp": "2026-05-13T12:34:56Z",
+    #     "model_version": "v1.2.3"
+    #   }
+    # }
+    value_template: "{{ value_json.result }}"
+    json_attributes_path: "$.metadata"
+    json_attributes:
+      - timestamp
+      - model_version
+    scan_interval: 300  # seconds (5 minutes)
