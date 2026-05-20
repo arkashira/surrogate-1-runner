@@ -1,0 +1,26 @@
+name: Add New Dataset
+description: Standard workflow for adding a new dataset to the ingest pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset_path:
+        description: HuggingFace dataset path (e.g., organization/dataset-name)
+        required: true
+        type: string
+      schema_config:
+        description: Path to schema configuration file
+        required: false
+        default: "configs/schemas/default.yaml"
+        type: string
+      priority:
+        description: Ingest priority
+        required: false
+        default: "normal"
+        type: choice
+        options:
+          - "low"
+          - "normal"
+          - "high"
+
+# ... (rest of the code)

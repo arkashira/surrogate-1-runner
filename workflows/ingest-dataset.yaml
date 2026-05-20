@@ -1,0 +1,27 @@
+name: Ingest Dataset
+description: Standard workflow for ingesting a new dataset into surrogate-1
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset_name:
+        description: Name of the dataset to ingest
+        required: true
+        type: string
+      shard_count:
+        description: Number of parallel shards (1-16)
+        required: false
+        default: "16"
+        type: choice
+        options:
+          - "1"
+          - "4"
+          - "8"
+          - "16"
+      dry_run:
+        description: Perform dry run without uploading
+        required: false
+        default: "false"
+        type: boolean
+
+# ... (rest of the code)

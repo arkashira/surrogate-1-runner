@@ -1,0 +1,16 @@
+name: Debug Failed Ingest
+description: Standard workflow for investigating and debugging failed ingest jobs
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: GitHub Actions run ID to investigate
+        required: true
+        type: string
+      shard_id:
+        description: Specific shard to debug (optional)
+        required: false
+        type: string
+
+# ... (rest of the code)
