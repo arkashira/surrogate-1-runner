@@ -1,0 +1,11 @@
+CREATE TABLE locks (
+    id VARCHAR(36) PRIMARY KEY,
+    doc_id VARCHAR(255) NOT NULL,
+    section_id VARCHAR(255) NOT NULL,
+    owner VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '2 hours'),
+    ttl INTEGER NOT NULL DEFAULT 7200
+);
+
+CREATE INDEX idx_locks_doc_section ON locks(doc_id, section_id);
