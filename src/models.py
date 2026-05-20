@@ -1,55 +1,47 @@
-from __future__ import annotations
+"""
+Database models for surrogate-1.
+"""
+from datetime import datetime
+from typing import Optional
 
-import sqlalchemy as sa
-from sqlalchemy.orm import declarative_base, Mapped, mapped_column
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric
+from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
 
+class Organization(Base):
+    """Organization that owns resources and budgets."""
+    __tablename__ = 'organizations'
 
-class AccountCredit(Base):
-    """
-    One row per account.  Two independent credit buckets:
-      * monthly – refreshed each calendar month
-      * bulk    – long‑lived “pay‑as‑you‑go” pool
-    """
-    __tablename__ = "account_credit"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    account_id: Mapped[str] = mapped_column(sa.String, primary_key=True)
+    # Relationships
+    budgets = relationship("Budget", back_populates="organization", cascade="all, delete-orphan")
 
-    # Totals are immutable from the service’s point of view;
-    # they can be changed only by an admin operation (not shown here).
-    monthly_total: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
-    bulk_total: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+class Budget(Base):
+    """Monthly budget limit for an organization."""
+    __tablename__ = 'budgets'
 
-    # How much of each bucket has already been consumed.
-    monthly_used: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
-    bulk_used: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey('organizations.id'), nullable=False)
+    month = Column(String(7), nullable=False, index=True)  # Format: YYYY-MM
+    limit = Column(Numeric(12, 2), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # --------------------------------------------------------------------- #
-    # Helper methods
-    # --------------------------------------------------------------------- #
-    def to_dict(self) -> dict:
-        """Serialise the row for API responses or tests."""
+    # Relationships
+    organization = relationship("Organization", back_populates="budgets")
+
+    def to_dict(self):
+        """Serialize Budget instance to dictionary."""
         return {
-            "account_id": self.account_id,
-            "monthly_total": self.monthly_total,
-            "monthly_used": self.monthly_used,
-            "bulk_total": self.bulk_total,
-            "bulk_used": self.bulk_used,
+            "id": self.id,
+            "organization_id": self.organization_id,
+            "month": self.month,
+            "limit": float(self.limit),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
-
-    @property
-    def monthly_remaining(self) -> int:
-        return max(self.monthly_total - self.monthly_used, 0)
-
-    @property
-    def bulk_remaining(self) -> int:
-        return max(self.bulk_total - self.bulk_used, 0)
-
-    @property
-    def monthly_usage_pct(self) -> float:
-        return (self.monthly_used / self.monthly_total * 100) if self.monthly_total else 0.0
-
-    @property
-    def bulk_usage_pct(self) -> float:
-        return (self.bulk_used / self.bulk_total * 100) if self.bulk_total else 0.0
