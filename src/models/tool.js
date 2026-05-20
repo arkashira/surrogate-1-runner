@@ -1,25 +1,21 @@
+/**
+ * Tool Model
+ *
+ * Represents a creator's tool or workflow in the system.
+ * Uses Mongoose for persistence.
+ */
+
 const mongoose = require('mongoose');
 
-const toolSchema = new mongoose.Schema({
-  id: String,
-  name: String,
-  userId: String,
-  isConnected: Boolean,
-});
-
-toolSchema.methods.connect = async function(userId) {
-  try {
-    // Simulate automated tool connection process
-    this.isConnected = true;
-    this.userId = userId;
-    await this.save();
-    return { success: true };
-  } catch (error) {
-    console.error(error);
-    return { success: false };
+const ToolSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, unique: true, trim: true },
+    description: { type: String, default: '', trim: true },
+    config: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  {
+    timestamps: { createdAt: 'createdAt', updatedAt: false },
   }
-};
+);
 
-const Tool = mongoose.model('Tool', toolSchema);
-
-module.exports = Tool;
+module.exports = mongoose.model('Tool', ToolSchema);
