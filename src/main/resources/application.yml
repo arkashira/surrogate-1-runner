@@ -1,11 +1,25 @@
+# General configuration
+server:
+  port: 8080
 spring:
-  task:
-    scheduling:
-      pool:
-        size: 5
+  application:
+    name: surrogate-1
 
-# Workflow status configuration
-workflow:
-  status:
-    enabled: true
-    reportInterval: 5000 # milliseconds
+# LLM Orchestra configuration
+llm-orchestra:
+  enabled: true
+  endpoint: http://localhost:5000
+  api-key: your-api-key-here
+  timeout: 30000
+  max-retries: 3
+  retry-interval: 1000
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.axentx.surrogate1: DEBUG
+  file:
+    name: /var/log/surrogate-1/llm-orchestra.log
+    max-size: 10MB
+    max-history: 7
