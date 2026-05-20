@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Validation Dashboard</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        th { background: #f4f4f4; }
+    </style>
+</head>
+<body>
+<h1>Validation Dashboard</h1>
+
+<div th:if="${message}">
+    <p th:text="${message}" style="color: green;"></p>
+</div>
+
+<form th:action="@{/dashboard/validation/run}" method="post">
+    <label for="collectionId">Collection ID:</label>
+    <input type="text" id="collectionId" name="collectionId" required/>
+    <button type="submit">Run Validation</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Collection ID</th>
+            <th>Status</th>
+            <th>Issues</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr th:each="result : ${results}">
+            <td th:text="${result.collectionId}">id</td>
+            <td th:text="${result.status}">status</td>
+            <td>
+                <ul>
+                    <li th:each="issue : ${result.issues}" th:text="${issue}">issue</li>
+                </ul>
+            </td>
+        </tr>
+    </tbody>
+</table>
+</body>
+</html>
