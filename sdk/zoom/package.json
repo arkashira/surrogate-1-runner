@@ -1,0 +1,22 @@
+{
+  "name": "@axentx/audio-gain-zoom",
+  "version": "1.0.0",
+  "description": "An npm package that injects AudioGain Guard into the Zoom meeting audio pipeline.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "publish": "npm publish --access public"
+  },
+  "keywords": [
+    "audio",
+    "gain",
+    "zoom",
+    "transcription"
+  ],
+  "author": "Axentx Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "lodash": "^4.17.21"
+  }
+}
