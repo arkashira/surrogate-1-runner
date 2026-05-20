@@ -1,0 +1,42 @@
+{
+  "uid": "kafka_probe_dashboard",
+  "title": "Kafka Probe Metrics",
+  "rows": [
+    {
+      "title": "Probe Successes",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Kafka Probe Successes",
+          "type": "graph",
+          "span": 12,
+          "targets": [
+            {
+              "expr": "kafka_probe_success_total",
+              "legendFormat": "{{ job }}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Probe Failures",
+      "panels": [
+        {
+          "id": 2,
+          "title": "Kafka Probe Failures",
+          "type": "graph",
+          "span": 12,
+          "targets": [
+            {
+              "expr": "kafka_probe_failure_total",
+              "legendFormat": "{{ job }}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
