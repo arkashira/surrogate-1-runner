@@ -1,10 +1,14 @@
-from django.db import models
-from django.utils import timezone
+import time
+from sqlalchemy import Column, Integer, Float, String, JSON, DateTime
+from sqlalchemy.orm import declarative_base
 
-class RecordingJob(models.Model):
-    url = models.URLField()
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-    status = models.CharField(max_length=20, default='scheduled')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+Base = declarative_base()
+
+class SimulationResult(Base):
+    __tablename__ = "simulation_result"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, index=True, nullable=False)
+    payload = Column(JSON, nullable=False)
+    results = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=lambda: time.time(), index=True)
