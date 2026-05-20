@@ -12,8 +12,20 @@ of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
 normalizes per-schema, dedups via the central md5 hash store, and uploads
 its output to a unique path on the dataset repo:
 
-## Configuration
-The `MAX_SIZE_MB` environment variable can be set to configure the maximum dataset size per ingestion. The default value is 5000 MB. If a dataset exceeds this limit, it will be skipped and logged, and a warning will be emitted to the metrics endpoint.
+## Setup Process
 
-## Environment Variables
-* `MAX_SIZE_MB`: The maximum dataset size per ingestion in megabytes. Default: 5000 MB.
+To set up Surrogate-1, follow these steps:
+
+1. Clone the repository: `git clone https://github.com/axentx/surrogate-1.git`
+2. Install dependencies: `pip install -r requirements.txt`
+3. Configure environment variables: `cp .env.example .env` and edit `.env` to set your credentials
+4. Run the setup script: `bin/setup.sh`
+5. Verify the setup: `bin/verify-setup.sh`
+
+## Guided Setup
+
+The guided setup process is designed to be intuitive and easy to follow. It should take less than 15 minutes to complete on average, and users should be able to complete it without assistance.
+
+## Troubleshooting
+
+If you encounter any issues during the setup process, refer to the troubleshooting guide: [Troubleshooting](https://github.com/axentx/surrogate-1/blob/main/docs/TROUBLESHOOTING.md)
