@@ -1,0 +1,9 @@
+   @app.route('/dashboard')
+   def dashboard():
+       stage = request.args.get('stage', '')
+       matches = Match.query.filter_by(stage=stage).all() if stage else Match.query.all()
+       stages = sorted(set(m.stage for m in Match.query.all()))
+       return render_template('dashboard.html',
+                              matches=matches,
+                              stages=stages,
+                              selected_stage=stage)
