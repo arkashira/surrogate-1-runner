@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Formatting Status</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:hover {background-color: #f5f5f5;}
+    </style>
+</head>
+<body>
+    <h1>Formatting Status</h1>
+    <table>
+        <tr>
+            <th>Repository</th>
+            <th>Status</th>
+            <th>Last Updated</th>
+        </tr>
+        {% for status in formatting_status %}
+        <tr>
+            <td>{{ status.repository }}</td>
+            <td>{{ status.status }}</td>
+            <td>{{ status.last_updated }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
