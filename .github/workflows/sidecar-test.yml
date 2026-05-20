@@ -1,0 +1,36 @@
+name: Sidecar Test Workflow
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *' # Runs every 30 minutes
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      sidecar:
+        image: ghcr.io/axentx/surrogate-1-sidecar:latest
+        ports:
+          - 8080:8080
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Build and push sidecar image
+        run: |
+          docker build -t ghcr.io/axentx/surrogate-1-sidecar:latest .
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/axentx/surrogate-1-sidecar:latest
+
+      - name: Run dummy test job
+        run: |
+          # This is a placeholder for your actual test command
+          echo "Running dummy test job"
+          # Simulate a test failure for demonstration purposes
+          exit 1
+
+      - name: Print FD list on failure
+        if: failure()
+        run: |
+          curl -X GET http://localhost:8080/fd
