@@ -1,93 +1,170 @@
-import os
+"""
+Coverage report generator for surrogate-1.
+
+This module loads the coverage data produced by `coverage run` (default
+`.coverage` file), computes overall coverage, per-file uncovered lines,
+and generates two artifacts:
+  * coverage_report.json
+  * coverage_report.md
+
+The JSON output is machine‑readable and can be consumed by CI
+pipelines. The Markdown output is human‑friendly and suitable for
+embedding in release notes or PR comments.
+
+The module can be executed as a script:
+
+    python -m report_generator [--coverage-file <path>] [--output-dir <dir>]
+
+If no coverage file is provided, the default `.coverage` in the current
+working directory is used. If no output directory is provided, the
+current working directory is used.
+
+Author: axentx
+"""
+
+import argparse
 import json
-import jinja2
+import os
 import sys
-import logging
-from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+try:
+    # coverage is a heavy dependency; import lazily to avoid import errors
+    from coverage import CoverageData
+except Exception as exc:  # pragma: no cover
+    # Provide a clear error message if coverage is missing
+    raise RuntimeError(
+        "The `coverage` package is required to generate reports. "
+        "Install it with `pip install coverage`."
+    ) from exc
 
-REPORT_DIR = '/opt/axentx/surrogate-1/reports'
 
-def load_compliance_data(account_id):
+def load_coverage_data(coverage_file: Path) -> CoverageData:
+    """Load coverage data from the given file."""
+    data = CoverageData()
+    data.read_file(str(coverage_file))
+    return data
+
+
+def compute_overall_coverage(data: CoverageData) -> float:
+    """Return overall coverage percentage (0-100)."""
+    total_statements = 0
+    total_executed = 0
+    for file_stat in data.measured_files():
+        totals = data.file_data(file_stat)
+        total_statements += totals["statements"]
+        total_executed += totals["executed"]
+    if total_statements == 0:
+        return 100.0
+    return round((total_executed / total_statements) * 100, 2)
+
+
+def uncovered_lines_per_file(data: CoverageData) -> Dict[str, List[int]]:
+    """Return a mapping from file path to list of uncovered line numbers."""
+    result: Dict[str, List[int]] = {}
+    for file_path in data.measured_files():
+        uncovered = data.lines(file_path, missing=True)
+        if uncovered:
+            result[file_path] = sorted(uncovered)
+    return result
+
+
+def recommend_tests(uncovered: List[int]) -> str:
     """
-    Loads compliance data from JSON file.
-
-    Args:
-        account_id (str): The ID of the account.
-
-    Returns:
-        dict: The loaded compliance data.
+    Very naive recommendation: if there are uncovered lines, suggest
+    writing tests for those lines. In a real system this could be
+    replaced with a smarter heuristic or integration with a test
+    generator.
     """
-    json_path = os.path.join(REPORT_DIR, f'{account_id}', 'compliance_report.json')
-    try:
-        with open(json_path, 'r') as f:
-            return json.load(f)
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON from {json_path}: {e}")
-        sys.exit(1)
+    if not uncovered:
+        return "All lines covered."
+    return f"Consider adding tests for lines: {', '.join(map(str, uncovered))}"
 
-def generate_html_report(account_id, compliance_data):
-    """
-    Generates an HTML report using a Jinja2 template.
 
-    Args:
-        account_id (str): The ID of the account.
-        compliance_data (dict): The compliance data.
-    """
-    # Load Jinja2 environment
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(REPORT_DIR),
-        autoescape=True
-    )
+def generate_json_report(
+    overall: float,
+    uncovered_map: Dict[str, List[int]],
+    output_path: Path,
+) -> None:
+    """Write the JSON report to the given path."""
+    report = {
+        "overall_coverage_percent": overall,
+        "files": [
+            {
+                "path": file_path,
+                "uncovered_lines": lines,
+                "recommended_tests": recommend_tests(lines),
+            }
+            for file_path, lines in uncovered_map.items()
+        ],
+    }
+    output_path.write_text(json.dumps(report, indent=2))
+    print(f"JSON report written to {output_path}")
 
-    # Get the template
-    template_path = os.path.join(REPORT_DIR, f'{account_id}', 'compliance_template.html')
-    try:
-        template = env.get_template('compliance_template.html')
-    except jinja2.TemplateNotFound as e:
-        logger.error(f"Template not found: {e}")
-        sys.exit(1)
 
-    # Render the template
-    try:
-        html_output = template.render(
-            account_id=account_id,
-            summary=compliance_data.get('summary', {}),
-            controls=compliance_data.get('controls', []),
-            timestamp=datetime.now().isoformat()
+def generate_markdown_report(
+    overall: float,
+    uncovered_map: Dict[str, List[int]],
+    output_path: Path,
+) -> None:
+    """Write the Markdown report to the given path."""
+    lines = [
+        "# Coverage Report",
+        "",
+        f"**Overall Coverage:** {overall:.2f}%",
+        "",
+        "## Uncovered Lines by File",
+        "",
+        "| File | Uncovered Lines | Recommendation |",
+        "|------|-----------------|----------------|",
+    ]
+
+    for file_path, lines_uncovered in sorted(uncovered_map.items()):
+        rec = recommend_tests(lines_uncovered)
+        lines.append(
+            f"| `{file_path}` | {', '.join(map(str, lines_uncovered))} | {rec} |"
         )
-    except Exception as e:
-        logger.error(f"Error rendering template: {e}")
+
+    output_path.write_text("\n".join(lines))
+    print(f"Markdown report written to {output_path}")
+
+
+def main(argv: List[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate coverage reports in JSON and Markdown."
+    )
+    parser.add_argument(
+        "--coverage-file",
+        type=Path,
+        default=Path(".coverage"),
+        help="Path to the coverage data file (default: .coverage)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("."),
+        help="Directory to write the reports (default: current directory)",
+    )
+    args = parser.parse_args(argv)
+
+    if not args.coverage_file.exists():
+        print(f"Coverage file not found: {args.coverage_file}", file=sys.stderr)
         sys.exit(1)
 
-    # Write output file
-    output_path = os.path.join(REPORT_DIR, f'{account_id}', 'compliance.html')
-    try:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'w') as f:
-            f.write(html_output)
-        logger.info(f"Report generated successfully at {output_path}")
-    except IOError as e:
-        logger.error(f"Error writing report file: {e}")
-        sys.exit(1)
+    data = load_coverage_data(args.coverage_file)
+    overall = compute_overall_coverage(data)
+    uncovered_map = uncovered_lines_per_file(data)
 
-def main(account_id):
-    """
-    Main function to generate and save the HTML report.
+    output_dir = args.output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    Args:
-        account_id (str): The ID of the account.
-    """
-    compliance_data = load_compliance_data(account_id)
-    generate_html_report(account_id, compliance_data)
+    json_path = output_dir / "coverage_report.json"
+    md_path = output_dir / "coverage_report.md"
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: python report_generator.py <account_id>")
-        sys.exit(1)
+    generate_json_report(overall, uncovered_map, json_path)
+    generate_markdown_report(overall, uncovered_map, md_path)
 
-    account_id = sys.argv[1]
-    main(account_id)
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
