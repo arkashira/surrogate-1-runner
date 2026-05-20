@@ -1,0 +1,55 @@
+{
+  "dashboard": {
+    "title": "Surrogate-1 Orchestration Engine Metrics",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "Task Queue Length",
+        "datasource": { "type": "prometheus", "uid": "PBFA97B1B506B2093" },
+        "query": {
+          "query": "task_queue_length",
+          "interval": ""
+        },
+        "xaxis": { "mode": "time" },
+        "yaxis": { "format": "short" }
+      },
+      {
+        "type": "graph",
+        "title": "Average Latency",
+        "datasource": { "type": "prometheus", "uid": "PBFA97B1B506B2093" },
+        "query": {
+          "query": "avg_latency",
+          "interval": ""
+        },
+        "xaxis": { "mode": "time" },
+        "yaxis": { "format": "short" }
+      },
+      {
+        "type": "graph",
+        "title": "Success/Failure Counts",
+        "datasource": { "type": "prometheus", "uid": "PBFA97B1B506B2093" },
+        "query": {
+          "query": "task_success_count, task_failure_count",
+          "interval": ""
+        },
+        "xaxis": { "mode": "time" },
+        "yaxis": { "format": "short" }
+      },
+      {
+        "type": "graph",
+        "title": "Clarification Loop Count",
+        "datasource": { "type": "prometheus", "uid": "PBFA97B1B506B2093" },
+        "query": {
+          "query": "clarification_loop_count",
+          "interval": ""
+        },
+        "xaxis": { "mode": "time" },
+        "yaxis": { "format": "short" }
+      }
+    ]
+  }
+}
+## Summary
+- Created Grafana dashboard JSON file for real-time metrics on task latency and failure rates.
+- Included metrics for task queue length, average latency, success/failure counts, and clarification loop count.
+- Configured appropriate labels for metrics.
