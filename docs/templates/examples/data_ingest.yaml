@@ -1,0 +1,38 @@
+name: Data Ingest
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      DATASET_LIST_URL: "https://example.com/dataset-list.txt"
+      SHARD_COUNT: "16"
+      OUTPUT_REPO: "axentx/surrogate-1-training-pairs"
+      BATCH_SIZE: "1000"
+      WORKER_COUNT: "16"
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run dataset ingest script
+        env:
+          DATASET_LIST_URL: ${{ env.DATASET_LIST_URL }}
+          SHARD_COUNT: ${{ env.SHARD_COUNT }}
+          OUTPUT_REPO: ${{ env.OUTPUT_REPO }}
+          BATCH_SIZE: ${{ env.BATCH_SIZE }}
+          WORKER_COUNT: ${{ env.WORKER_COUNT }}
+        run: |
+          ./bin/dataset-enrich.sh \
+            --list-url "$DATASET_LIST_URL" \
+            --shards "$SHARD_COUNT" \
+            --output-repo "$OUTPUT_REPO" \
+            --batch-size "$BATCH_SIZE" \
+            --workers "$WORKER_COUNT"

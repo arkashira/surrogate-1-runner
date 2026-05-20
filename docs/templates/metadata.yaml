@@ -1,0 +1,21 @@
+templates:
+  - id: ci_cd_pipeline
+    name: CI/CD Pipeline
+    category: DevOps
+    description: Standard CI/CD workflow using GitHub Actions.
+    documentation: docs/templates/ci_cd.md
+    example_config: docs/templates/examples/ci_cd.yaml
+
+  - id: data_ingest
+    name: Data Ingest
+    category: Data Engineering
+    description: Workflow to ingest public datasets into the surrogate-1 pipeline.
+    documentation: docs/templates/data_ingest.md
+    example_config: docs/templates/examples/data_ingest.yaml
+
+  - id: model_training
+    name: Model Training
+    category: ML Engineering
+    description: Distributed training workflow for Surrogate-1 models.
+    documentation: docs/templates/model_training.md
+    example_config: docs/templates/examples/model_training.yaml

@@ -1,0 +1,38 @@
+name: Model Training
+on:
+  workflow_dispatch:
+    inputs:
+      model_version:
+        description: 'Model version to train'
+        required: true
+        default: 'v1.0'
+      gpu_count:
+        description: 'Number of GPUs'
+        required: true
+        default: '8'
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    env:
+      MODEL_VERSION: ${{ github.event.inputs.model_version }}
+      GPU_COUNT: ${{ github.event.inputs.gpu_count }}
+      OUTPUT_REPO: "axentx/surrogate-1-training-pairs"
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install torch transformers accelerate
+
+      - name: Run distributed training
+        run: |
+          python -m torchrun --nproc_per_node=${{ env.GPU_COUNT }} \
+            train.py --model_version ${{ env.MODEL_VERSION }} \
+            --output_repo ${{ env.OUTPUT_REPO }}
