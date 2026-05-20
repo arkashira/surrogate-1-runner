@@ -1,11 +1,52 @@
 version: '3.8'
 
+# Enable user namespace isolation for all containers
+userns_mode: "private"
+
 services:
-  multiplexer:
-    image: axentx/multiplexer:latest
-    ports:
-      - "8080:8080"
+  terminal:
+    image: axentx/secure-terminal:latest
+    container_name: secure_terminal
+    restart: unless-stopped
+
+    # Environment variables required for authentication and collaboration
     environment:
-      - NETWORK_ACCESS=restricted
+      - AUTH_PROTOCOL=oauth2
+      - AUTH_CLIENT_ID=${AUTH_CLIENT_ID}
+      - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET}
+      - COLLAB_ENDPOINT=${COLLAB_ENDPOINT}
+
+    # Isolated network that cannot reach the host or other services
+    networks:
+      - isolated
+
+    # Persist only the data needed for the terminal session
     volumes:
-      - /opt/axentx/surrogate-1/data:/data
+      - terminal_data:/data
+
+    # Run as a non‑root user to prevent privilege escalation
+    user: 1000:1000
+
+    # Harden the container
+    security_opt:
+      - seccomp=unconfined
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+
+    # Enable interactive terminal
+    stdin_open: true
+    tty: true
+
+    # Default command that keeps the container alive
+    command: /bin/bash
+
+networks:
+  isolated:
+    driver: bridge
+    internal: true   # No external connectivity
+
+volumes:
+  terminal_data:
+    driver: local
