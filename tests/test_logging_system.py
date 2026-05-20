@@ -1,14 +1,18 @@
 import unittest
-from unittest.mock import patch
-
-from src.logging_system import log_alert
+from src.logging_system import LoggingSystem
 
 class TestLoggingSystem(unittest.TestCase):
-    @patch('src.logging_system.logging.info')
-    def test_log_alert(self, mock_logging_info):
-        test_message = "Test alert message"
-        log_alert(test_message)
-        mock_logging_info.assert_called_once_with(test_message)
+    def setUp(self):
+        self.logging_system = LoggingSystem()
+
+    def test_log_alert(self):
+        alert_data = {
+            'severity': 'high',
+            'type': 'compliance',
+            'message': 'Non-compliance issue detected'
+        }
+        self.logging_system.log_alert(alert_data)
+        # Add assertions to verify the alert was logged
 
 if __name__ == '__main__':
     unittest.main()

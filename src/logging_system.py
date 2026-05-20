@@ -1,12 +1,10 @@
 import logging
-from datetime import datetime
+from typing import Dict, Any
 
-from src.config import settings
+class LoggingSystem:
+    def __init__(self):
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger('centralized_logging')
 
-def log_alert(message: str) -> None:
-    logging.basicConfig(
-        filename=settings.ALERT_LOG_FILE,
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    logging.info(message)
+    def log_alert(self, alert_data: Dict[str, Any]) -> None:
+        self.logger.info(f"Alert logged: {alert_data}")
