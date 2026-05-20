@@ -1,0 +1,52 @@
+name: Compliance Validation
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run compliance validator
+        run: |
+          python -m axentx.compliance.validator --config .github/workflows/validate-config.yaml
+
+      - name: Upload validation results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compliance-validation-results
+          path: |
+            .compliance-report.json
+            .compliance-report.html
+          retention-days: 7
+
+      - name: Display validation summary
+        run: |
+          if [ -f .compliance-report.json ]; then
+            echo "=== Compliance Validation Report ==="
+            cat .compliance-report.json
+            echo "====================================="
+          fi
