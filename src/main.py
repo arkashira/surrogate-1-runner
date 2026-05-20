@@ -1,27 +1,29 @@
-from fps_calculator import FPSCalculator
+import argparse
+from sop_creator import SOPCreator
 
 def main():
-    base_fps = 60.0
-    fps_calculator = FPSCalculator(base_fps)
+    parser = argparse.ArgumentParser(description='Create and sync SOPs.')
+    parser.add_argument('--template', type=str, required=True, help='Template name')
+    parser.add_argument('--variables', type=str, required=True, help='Variables in JSON format')
+    parser.add_argument('--sync_to', type=str, choices=['slack', 'github', 'notion'], help='Sync to a specific tool')
+    parser.add_argument('--channel', type=str, help='Slack channel')
+    parser.add_argument('--repo', type=str, help='GitHub repository')
+    parser.add_argument('--branch', type=str, help='GitHub branch')
+    parser.add_argument('--page_id', type=str, help='Notion page ID')
 
-    # Add performance data for components
-    performance_data = {
-        'gpu': {1: 70.0, 2: 80.0, 3: 90.0},
-        'cpu': {1: 65.0, 2: 75.0, 3: 85.0},
-        'ram': {1: 62.0, 2: 72.0, 3: 82.0}
-    }
-    for component, data in performance_data.items():
-        fps_calculator.add_component_performance_data(component, data)
+    args = parser.parse_args()
 
-    # Calculate FPS gains per dollar for each component
-    costs = {'gpu': 100.0, 'cpu': 80.0, 'ram': 60.0}
-    upgrade_level = 1
-    sorted_components = fps_calculator.get_sorted_components_by_fps_gain_per_dollar(upgrade_level, costs)
+    sop_creator = SOPCreator('templates', 'output')
 
-    # Display the results
-    print(f"Expected FPS gains per dollar for upgrade level {upgrade_level}:")
-    for component in sorted_components:
-        print(f"{component['component_name']}: {component['fps_gain_per_dollar']:.2f}")
+    variables = eval(args.variables)
+    output_path = sop_creator.create_sop(args.template, variables)
+
+    if args.sync_to == 'slack' and args.channel:
+        sop_creator.sync_to_slack(output_path, args.channel)
+    elif args.sync_to == 'github' and args.repo and args.branch:
+        sop_creator.sync_to_github(output_path, args.repo, args.branch)
+    elif args.sync_to == 'notion' and args.page_id:
+        sop_creator.sync_to_notion(output_path, args.page_id)
 
 if __name__ == '__main__':
     main()
