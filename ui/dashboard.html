@@ -2,89 +2,100 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Contract Changes Dashboard</title>
-
-    <!-- Optional external stylesheet (you can add more styling there) -->
-    <link rel="stylesheet" href="/static/css/dashboard.css">
-
-    <!-- Inline CSS for the core layout – can be moved to dashboard.css later -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Locks</title>
     <style>
-        body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
-        h1   { margin-bottom: 0.5rem; }
-
-        .filter-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            align-items: baseline;
-            margin-bottom: 1.5rem;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
         }
-        .filter-group label { margin-right: 0.25rem; }
-
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
         }
         th, td {
-            border: 1px solid #ddd;
             padding: 8px;
-            vertical-align: top;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
         }
-        th { background:#f4f4f4; text-align: left; }
-        .diff {
-            white-space: pre-wrap;
-            font-family: monospace;
-            background:#fafafa;
-            padding:10px;
-            border:1px solid #e0e0e0;
-            overflow-x:auto;
+        th {
+            background-color: #f2f2f2;
         }
-        .no-data { text-align:center; color:#777; }
+        .filter {
+            margin-bottom: 20px;
+        }
     </style>
-
-    <!-- Dashboard logic -->
-    <script src="/static/js/dashboard.js" defer></script>
 </head>
 <body>
-    <h1>Contract Changes Dashboard</h1>
-
-    <div class="filter-group">
-        <label for="serviceFilter">Service:</label>
-        <select id="serviceFilter">
-            <option value="">All</option>
-        </select>
-
-        <label for="typeFilter">Change Type:</label>
-        <select id="typeFilter">
-            <option value="">All</option>
-            <option value="add">Add</option>
-            <option value="update">Update</option>
-            <option value="remove">Remove</option>
-        </select>
-
-        <label for="dateFrom">From:</label>
-        <input type="date" id="dateFrom">
-
-        <label for="dateTo">To:</label>
-        <input type="date" id="dateTo">
-
-        <button id="applyFilters">Apply</button>
+    <h1>Locks Dashboard</h1>
+    <div class="filter">
+        <label for="documentFilter">Filter by Document:</label>
+        <input type="text" id="documentFilter" onkeyup="filterTable('document')">
+        <label for="ownerFilter">Filter by Owner:</label>
+        <input type="text" id="ownerFilter" onkeyup="filterTable('owner')">
     </div>
-
-    <table id="changesTable">
+    <table id="locksTable">
         <thead>
             <tr>
-                <th>Timestamp</th>
-                <th>Service</th>
-                <th>Type</th>
-                <th>Contract ID</th>
-                <th>Diff</th>
+                <th>Document Name</th>
+                <th>Section Title</th>
+                <th>Lock Owner</th>
+                <th>Remaining TTL</th>
             </tr>
         </thead>
         <tbody>
-            <!-- Rows are injected by dashboard.js -->
+            <!-- Data will be populated dynamically via WebSocket -->
         </tbody>
     </table>
+
+    <script>
+        function filterTable(filterType) {
+            const input = document.getElementById(`${filterType}Filter`);
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById("locksTable");
+            const rows = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const cell = row.getElementsByTagName("td")[filterType === 'document' ? 0 : 2];
+                if (cell) {
+                    const txtValue = cell.textContent || cell.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        row.style.display = "";
+                    } else {
+                        row.style.display = "none";
+                    }
+                }
+            }
+        }
+
+        // WebSocket setup for real-time data updates
+        const socket = new WebSocket('ws://your-websocket-endpoint');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const tableBody = document.querySelector('#locksTable tbody');
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            data.forEach(lock => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${lock.documentName}</td>
+                    <td>${lock.sectionTitle}</td>
+                    <td>${lock.owner}</td>
+                    <td>${lock.remainingTTL}s</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        };
+
+        socket.onopen = function() {
+            console.log('WebSocket connection established');
+        };
+
+        socket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+    </script>
 </body>
 </html>
