@@ -1,0 +1,60 @@
+<!-- /opt/axentx/surrogate-1/templates/report.html.j2 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Compliance Report for Account {{ account_id }}</h1>
+    <p><strong>Generated:</strong> {{ timestamp }}</p>
+
+    <h2>Summary</h2>
+    <ul>
+        {% for key, value in summary.items() %}
+            <li>{{ key }}: {{ value }}</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Per-Control Results</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Control ID</th>
+                <th>Status</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for control in controls %}
+                <tr>
+                    <td>{{ control.control_id }}</td>
+                    <td>{{ control.status }}</td>
+                    <td>{{ control.description }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
