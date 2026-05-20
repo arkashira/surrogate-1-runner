@@ -1,0 +1,15 @@
+version: 1.0.0
+description: "Pipeline to convert data from S3 bucket to Parquet format"
+parameters:
+  - name: "s3_bucket"
+    type: "string"
+    description: "Name of the source S3 bucket"
+    required: true
+  - name: "s3_prefix"
+    type: "string"
+    description: "Prefix for objects in the S3 bucket"
+    required: false
+  - name: "output_path"
+    type: "string"
+    description: "Destination path for Parquet files"
+    required: true

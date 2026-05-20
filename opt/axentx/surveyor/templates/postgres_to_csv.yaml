@@ -1,0 +1,23 @@
+version: 1.0.0
+description: "Pipeline to convert PostgreSQL table data to CSV format"
+parameters:
+  - name: "postgres_host"
+    type: "string"
+    description: "PostgreSQL server hostname or IP"
+    required: true
+  - name: "postgres_port"
+    type: "integer"
+    description: "PostgreSQL server port (default: 5432)"
+    required: true
+  - name: "postgres_database"
+    type: "string"
+    description: "Name of the database containing the table"
+    required: true
+  - name: "postgres_table"
+    type: "string"
+    description: "Name of the table to export"
+    required: true
+  - name: "output_path"
+    type: "string"
+    description: "Destination path for CSV files"
+    required: true

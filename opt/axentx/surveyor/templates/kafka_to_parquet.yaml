@@ -1,0 +1,15 @@
+version: 1.0.0
+description: "Pipeline to convert Kafka topic data to Parquet format"
+parameters:
+  - name: "kafka_brokers"
+    type: "string"
+    description: "Comma-separated list of Kafka brokers (host:port)"
+    required: true
+  - name: "kafka_topic"
+    type: "string"
+    description: "Name of the Kafka topic to consume"
+    required: true
+  - name: "output_path"
+    type: "string"
+    description: "Destination path for Parquet files"
+    required: true

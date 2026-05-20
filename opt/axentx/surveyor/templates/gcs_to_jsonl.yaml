@@ -1,0 +1,15 @@
+version: 1.0.0
+description: "Pipeline to convert data from GCS bucket to JSONL format"
+parameters:
+  - name: "gcs_bucket"
+    type: "string"
+    description: "Name of the source GCS bucket"
+    required: true
+  - name: "gcs_prefix"
+    type: "string"
+    description: "Prefix for objects in the GCS bucket"
+    required: false
+  - name: "output_path"
+    type: "string"
+    description: "Destination path for JSONL files"
+    required: true

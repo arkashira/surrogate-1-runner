@@ -1,0 +1,23 @@
+version: 1.0.0
+description: "Pipeline to convert MySQL table data to Avro format"
+parameters:
+  - name: "mysql_host"
+    type: "string"
+    description: "MySQL server hostname or IP"
+    required: true
+  - name: "mysql_port"
+    type: "integer"
+    description: "MySQL server port (default: 3306)"
+    required: true
+  - name: "mysql_database"
+    type: "string"
+    description: "Name of the database containing the table"
+    required: true
+  - name: "mysql_table"
+    type: "string"
+    description: "Name of the table to export"
+    required: true
+  - name: "output_path"
+    type: "string"
+    description: "Destination path for Avro files"
+    required: true
