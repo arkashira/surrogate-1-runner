@@ -1,87 +1,73 @@
-import json
+import argparse
 import sys
-from typing import Dict, Any, Optional
-from src.main.logger import logger
+import logging
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
 
-class Emulator:
-    """Emulator for surrogate-1 dataset processing."""
-    
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.status = {
-            "running": False,
-            "shard_id": None,
-            "workers": 0,
-            "status_endpoint": "/status"
-        }
-        logger.info("Emulator initialized with config: %s", json.dumps(config, indent=2))
-    
-    def validate_config(self) -> bool:
-        """Validate emulator configuration."""
-        required_keys = ["shard_id", "workers", "dataset_path"]
-        
-        for key in required_keys:
-            if key not in self.config:
-                logger.error(f"Missing required config key: {key}")
-                raise ValueError(f"Configuration error: missing '{key}'")
-        
-        if not isinstance(self.config["workers"], int) or self.config["workers"] <= 0:
-            logger.error("Invalid workers value: must be positive integer")
-            raise ValueError("Configuration error: invalid 'workers' value")
-        
-        logger.info("Configuration validated successfully")
-        return True
-    
-    def start(self):
-        """Start the emulator."""
-        if not self.validate_config():
-            return
-        
-        self.status["running"] = True
-        self.status["shard_id"] = self.config.get("shard_id")
-        self.status["workers"] = self.config.get("workers", 1)
-        
-        logger.info("Emulator started with %d workers on shard %s", 
-                   self.status["workers"], self.status["shard_id"])
-    
-    def stop(self):
-        """Stop the emulator."""
-        self.status["running"] = False
-        logger.info("Emulator stopped")
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Return current emulator status."""
-        return self.status.copy()
-    
-    def run(self):
-        """Main run loop."""
-        try:
-            self.start()
-            logger.info("Emulator running...")
-            # Simulate work
-            for i in range(10):
-                logger.debug("Processing iteration %d", i)
-                self.status["workers"] = self.config.get("workers", 1)
-                logger.info("Workers active: %d", self.status["workers"])
-        except Exception as e:
-            logger.exception("Emulator failed: %s", str(e))
-        finally:
-            self.stop()
+from .config_validator import load_config, validate_config
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class DummyHandler(BaseHTTPRequestHandler):
+    """
+    Simple HTTP handler that mimics a Datadog API endpoint.
+    """
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Datadog emulator response")
+
+    def log_message(self, format, *args):
+        # Override to suppress default logging to stderr
+        logger.info("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), format % args))
+
+
+def run_server(port: int = 8080):
+    """
+    Start a basic HTTP server on the specified port.
+    """
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    logger.info(f"Starting Datadog emulator on port {port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("Shutting down emulator")
+        server.server_close()
 
 
 def main():
-    """Entry point for emulator."""
-    config = {
-        "shard_id": "default",
-        "workers": 1,
-        "dataset_path": "/data/dataset"
-    }
-    
-    try:
-        emulator = Emulator(config)
-        emulator.run()
-    except Exception as e:
-        logger.exception("Failed to start emulator: %s", str(e))
+    parser = argparse.ArgumentParser(description="Datadog emulator")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Start command
+    start_parser = subparsers.add_parser("start", help="Start the emulator")
+    start_parser.add_argument("service", choices=["datadog"], help="Service to emulate")
+    start_parser.add_argument("--config", required=True, help="Path to YAML config file")
+
+    # Stop command
+    stop_parser = subparsers.add_parser("stop", help="Stop the emulator")
+    stop_parser.add_argument("service", choices=["datadog"], help="Service to stop")
+
+    args = parser.parse_args()
+
+    if args.command == "start" and args.service == "datadog":
+        try:
+            cfg = load_config(args.config)
+            validate_config(cfg)
+            logger.info(f"Loaded config: {cfg}")
+        except Exception as exc:
+            logger.error(f"Configuration error: {exc}")
+            sys.exit(1)
+
+        run_server()
+    elif args.command == "stop" and args.service == "datadog":
+        # Placeholder: In a real implementation, this would signal the running process.
+        logger.info("Stop command received – no running process to stop in this stub.")
+    else:
+        parser.print_help()
         sys.exit(1)
 
 
