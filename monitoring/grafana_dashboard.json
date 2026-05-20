@@ -1,0 +1,95 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "surrogate-1-ingestion-metrics",
+    "title": "Surrogate-1 Ingestion Metrics",
+    "tags": [],
+    "timezone": "",
+    "schemaVersion": 34,
+    "version": 0,
+    "panels": [
+      {
+        "id": 1,
+        "type": "graph",
+        "title": "Ingestion Per Minute",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(ingestion_throughput_total[1m])",
+            "legendFormat": "{{instance}}",
+            "instant": false,
+            "intervalFactor": 2
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 9
+        }
+      },
+      {
+        "id": 2,
+        "type": "graph",
+        "title": "Average Latency",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "avg_over_time(ingestion_latency_seconds[1m])",
+            "legendFormat": "{{instance}}",
+            "instant": false,
+            "intervalFactor": 2
+          }
+        ],
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 9
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "High Latency Alert",
+          "datasource": "Prometheus",
+          "enable": true,
+          "iconColor": "red",
+          "hide": false,
+          "seriesOverrides": [],
+          "alert": {
+            "conditions": [
+              {
+                "evaluator": {
+                  "params": [60],
+                  "type": "gt"
+                },
+                "operator": {
+                  "type": "and"
+                },
+                "query": {
+                  "params": ["A"]
+                },
+                "reducer": {
+                  "params": [],
+                  "type": "last"
+                },
+                "type": "query"
+              }
+            ],
+            "executionErrorState": "keep_state",
+            "frequency": "60s",
+            "handler": 1,
+            "name": "High Latency Alert",
+            "noDataState": "keep_state",
+            "notifications": []
+          },
+          "query": "avg_over_time(ingestion_latency_seconds[1m])",
+          "interval": "1m",
+          "intervalFactor": 2
+        }
+      ]
+    }
+  }
+}
