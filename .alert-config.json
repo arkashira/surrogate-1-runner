@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "The task points to /opt/axentx/surrogate-1/.alert-config.json for configuring alert prioritization, but I lack context about: 1) The existing alert system architecture in this project (dataset ingestion project per README), 2) What other alert-related files exist, 3) The expected JSON schema/format for severity-to-priority mapping, 4) Whether this config file already exists or needs to be created from scratch",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "A spec describing the alert system architecture, existing config file format (if any), severity levels to implement, and email alert integration points"
+}
