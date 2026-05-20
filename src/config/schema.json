@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "Task 'Add JSON schema for pipeline config' lacks concrete specifications: (1) No existing schema.json file to review or merge with, (2) Unknown pipeline config structure/fields that need validation, (3) No validation rules specified (required fields, types, constraints), (4) Unclear if this is for client-side wizard validation or server-side pipeline execution",
+  "request_to": "architect-daemon|design-thinking",
+  "minimal_spec_needed": "JSON Schema definition for pipeline config including: (a) list of all config fields with types, (b) required fields, (c) validation rules for each field (e.g., bucket name regex, port range, etc.), (d) whether this replaces or augments existing schema"
+}
