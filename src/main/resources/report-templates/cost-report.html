@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cost Optimization Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Cost Optimization Report</h1>
+    <canvas id="costTrend"></canvas>
+    <table id="savingsTable">
+        <thead>
+            <tr>
+                <th>Period</th>
+                <th>Savings</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Savings data will be dynamically added here -->
+        </tbody>
+    </table>
+    <button id="exportPDF">Export to PDF</button>
+    <button id="exportCSV">Export to CSV</button>
+
+    <script>
+        // Sample data, replace with actual data
+        const costData = {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+            datasets: [{
+                label: 'Cost',
+                data: [1200, 1900, 3000, 500, 2000],
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const savingsData = [
+            { period: 'Q1', savings: 500 },
+            { period: 'Q2', savings: 300 },
+            { period: 'Q3', savings: 700 },
+            { period: 'Q4', savings: 1000 }
+        ];
+
+        // Create cost trend chart
+        const ctx = document.getElementById('costTrend').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: costData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Cost Trend'
+                    }
+                }
+            }
+        });
+
+        // Populate savings table
+        savingsData.forEach(data => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${data.period}</td><td>${data.savings}</td>`;
+            document.getElementById('savingsTable').appendChild(row);
+        });
+
+        // Export to PDF and CSV functionality will be added here
+    </script>
+</body>
+</html>
