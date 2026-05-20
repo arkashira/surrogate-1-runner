@@ -1,49 +1,33 @@
 package formatter
 
 import (
-	"bytes"
-	"io"
-	"log"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestDefaultMappingExists(t *testing.T) {
-	f := NewFormatter(log.New(io.Discard, "", 0))
+func TestFormatter_Format(t *testing.T) {
+	f := NewFormatter()
 
-	tests := []struct {
-		ext string
-		cmd string
+	testCases := []struct {
+		name     string
+		filePath string
+		wantErr  bool
 	}{
-		{".go", "gofmt"},
-		{".py", "black"},
-		{".js", "prettier"},
-		{".ts", "prettier"},
-		{".json", "prettier"},
-		{".css", "prettier"},
-		{".html", "prettier"},
+		{"go", "testdata/go/main.go", false},
+		{"py", "testdata/python/main.py", false},
+		{"js", "testdata/js/main.js", false},
+		{"unknown", "testdata/unknown/file.txt", true},
 	}
 
-	for _, tt := range tests {
-		args, ok := f.extMap[tt.ext]
-		if !ok {
-			t.Fatalf("extension %s not found in mapping", tt.ext)
-		}
-		if args[0] != tt.cmd {
-			t.Fatalf("expected command %s for %s, got %s", tt.cmd, tt.ext, args[0])
-		}
-	}
-}
-
-func TestUnsupportedExtensionProducesWarning(t *testing.T) {
-	var buf bytes.Buffer
-	logger := log.New(&buf, "", 0)
-	f := NewFormatter(logger)
-
-	err := f.FormatFile("example.unknown")
-	if err != nil {
-		t.Fatalf("expected nil error for unsupported file, got %v", err)
-	}
-	if !bytes.Contains(buf.Bytes(), []byte("warning: no formatter configured")) {
-		t.Fatalf("expected warning log, got %q", buf.String())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := f.Format(tc.filePath)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
