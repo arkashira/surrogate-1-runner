@@ -1,36 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { setProvider } from '../redux/actions/providerActions';
-import { RootState } from '../redux/reducers';
+import React, { useState } from 'react';
+import { Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 
-const ProviderSelector: React.FC = () => {
-  const dispatch = useDispatch();
-  const currentProvider = useSelector((state: RootState) => state.provider.currentProvider);
-  const [selectedProvider, setSelectedProvider] = useState(currentProvider);
+interface ProviderSelectorProps {
+  onProviderChange: (provider: string) => void;
+}
 
-  useEffect(() => {
-    setSelectedProvider(currentProvider);
-  }, [currentProvider]);
+const ProviderSelector: React.FC<ProviderSelectorProps> = ({ onProviderChange }) => {
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
 
-  const handleProviderChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newProvider = event.target.value;
-    setSelectedProvider(newProvider);
-    dispatch(setProvider(newProvider));
+  const handleChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    const provider = event.target.value as string;
+    setSelectedProvider(provider);
+    onProviderChange(provider);
   };
 
   return (
-    <div className="provider-selector">
-      <label htmlFor="provider-select">Select LLM Provider:</label>
-      <select
-        id="provider-select"
+    <FormControl fullWidth>
+      <InputLabel id="provider-selector-label">Cloud Provider</InputLabel>
+      <Select
+        labelId="provider-selector-label"
+        id="provider-selector"
         value={selectedProvider}
-        onChange={handleProviderChange}
+        onChange={handleChange}
       >
-        <option value="openai">OpenAI</option>
-        <option value="anthropic">Anthropic</option>
-        <option value="custom">Custom API</option>
-      </select>
-    </div>
+        <MenuItem value="aws">AWS</MenuItem>
+        <MenuItem value="gcp">GCP</MenuItem>
+        <MenuItem value="azure">Azure</MenuItem>
+      </Select>
+    </FormControl>
   );
 };
 
