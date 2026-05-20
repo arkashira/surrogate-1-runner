@@ -1,63 +1,55 @@
-# Project Surrogate‑1 – Onboarding Guide
+# Onboarding Guide
 
-*Version: 1.0 – 2026‑05‑15*  
-*Author: <Your Name>*
+Welcome to our platform! This guide will help you understand the key features and benefits of our service.
 
-## 1. Overview
-Brief description of the project, its purpose, and what “onboarding” means in this context.
+## How to Start the Guided Tour
 
-## 2. Who This Guide Is For
-Define the intended audience and required background knowledge.
+1. **Log in** to the platform with your credentials.
+2. Click the **Help** icon (question mark) in the top‑right corner of the UI.
+3. Select **Start Guided Tour** from the dropdown menu.
+4. A modal will appear with the first step. Click **Next** to proceed.
 
-## 3. Prerequisites
-- List of required tools (Docker, Python, Git, etc.)
-- Access requirements (internal repositories, cloud credentials)
-- Environment setup (OS, shell, etc.)
+## Tour Steps
 
-## 4. Quick‑Start Workflow
-| Step | Command | Expected Result |
-|------|---------|-----------------|
-| 1. Clone the repo | `git clone …` | Repository copied locally |
-| 2. Install dependencies | `pip install -r requirements.txt` | Packages installed |
-| 3. Set up environment variables | `cp .env.example .env` → edit | `.env` ready |
-| 4. Start services | `docker compose up -d` | Containers running |
-| 5. Run tests | `make test` | All tests pass |
-| 6. Verify local server | Open `http://localhost:8000` | UI loads |
+We've prepared a guided tour to help you navigate through the platform's main features:
 
-*(Add as many rows as needed.)*
+| Step | Feature | What You’ll Learn |
+|------|---------|-------------------|
+| 1 | **Dataset Explorer** | Browse available datasets, view metadata, and filter by tags. |
+| 2 | **Dataset Upload** | Upload your own dataset, choose schema, and preview validation. |
+| 3 | **Training Job Creation** | Configure a training job, set hyperparameters, and submit. |
+| 4 | **Job Monitoring** | Track job progress, view logs, and inspect checkpoints. |
+| 5 | **Results Dashboard** | Analyze model performance, compare runs, and export metrics. |
+| 6 | **Account Settings** | Update profile, manage API keys, and configure notifications. |
 
-## 5. Detailed Steps
-### 5.1 Clone the Repository
-Explain any special SSH keys or submodule handling.
+> **Tip:** Each step includes a short description and a “Learn More” link that opens the relevant help article.
 
-### 5.2 Install Python Dependencies
-Explain virtual‑env usage, `pyenv`, or `conda` if relevant.
+## Benefits You'll Experience
 
-### 5.3 Configure Environment
-Provide a full `.env.example` snippet and explain each variable.
+By using our platform, you'll gain access to:
+- Streamlined workflows that save time
+- Powerful analytics to drive decision-making
+- Secure collaboration tools for teams
+- Regular updates and improvements based on user feedback
 
-### 5.4 Docker / Service Setup
-Explain any custom Docker networks, volume mounts, or required cloud resources.
+## Feeling Confident?
 
-### 5.5 Running the Test Suite
-Explain unit, integration, and end‑to‑end tests, and how to interpret failures.
+Once the tour is finished, you should be able to:
 
-## 6. Common Issues & Troubleshooting
-- **Docker permission errors** – how to fix.
-- **Missing AWS credentials** – where to obtain them.
-- **Port conflicts** – how to change the default ports.
+- Upload and validate a dataset.
+- Launch a training job and monitor its status.
+- Interpret the results and export them for further analysis.
+- Manage your account settings securely.
 
-## 7. Verification Checklist
-- [ ] All services up (`docker ps` shows …)
-- [ ] Tests pass (`make test` returns 0)
-- [ ] UI reachable at `http://localhost:8000`
+## Next Steps
 
-## 8. Further Reading
-- Architecture diagram → `docs/architecture.md`
-- Contributing guide → `CONTRIBUTING.md`
-- Issue tracker → `<link>`
+After completing this tour, we recommend:
+1. Exploring the Help Center for more detailed guides
+2. Setting up your first project or task
+3. Connecting with other users in our community forum
 
-## 9. Change Log
-| Date | Author | Change |
-|------|--------|--------|
-| 2026‑05‑15 | ChatGPT | Initial draft based on user request |
+If you have any questions during your onboarding process, don't hesitate to reach out to our support team. We're here to help you succeed!
+
+---
+
+*This documentation is part of the Axentx onboarding experience. For the latest updates, check the release notes or contact the support team.*
