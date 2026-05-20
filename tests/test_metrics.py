@@ -1,33 +1,33 @@
 import pytest
+from fastapi.testclient import TestClient
+from src.metrics import app, bearer_token
 
-from monitoring.metrics import monitor_resource_usage, log_metrics
+client = TestClient(app)
 
+def test_metrics_endpoint_without_token():
+    response = client.get("/metrics")
+    assert response.status_code == 401
 
-def test_monitor_resource_usage_basic():
-    """Ensure the context manager returns a dict with expected keys."""
-    with monitor_resource_usage() as before:
-        # simple workload
-        sum(i for i in range(1000000))
-    metrics = before  # the yielded value is the 'before' snapshot
-    # The context manager returns the metrics dict after the block
-    # but the 'before' snapshot is yielded; we capture it here
-    # and then call the context manager again to get the full dict.
-    with monitor_resource_usage() as _:
-        pass
-    # The returned dict should contain all keys
-    assert isinstance(metrics, dict)
-    for key in ("before", "after", "delta_cpu_percent",
-                "delta_memory_rss", "delta_memory_vms"):
-        assert key in metrics
+def test_metrics_endpoint_with_invalid_token():
+    response = client.get("/metrics", headers={"Authorization": "Bearer invalid_token"})
+    assert response.status_code == 401
 
+def test_metrics_endpoint_with_valid_token():
+    response = client.get("/metrics", headers={"Authorization": f"Bearer {bearer_token}"})
+    assert response.status_code == 200
+    assert b"surrogate_checks_total" in response.content
 
-def test_log_metrics_captures_output(capsys):
-    """log_metrics should print to stdout."""
-    with monitor_resource_usage() as before:
-        pass
-    metrics = before
-    log_metrics("test_block", metrics)
-    captured = capsys.readouterr()
-    assert "CPU percent before" in captured.out
-    assert "CPU percent after" in captured.out
-    assert "RSS delta" in captured.out
+def test_check_endpoint():
+    response = client.post("/check?service=test_service")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Check recorded"}
+
+def test_check_error_endpoint():
+    response = client.post("/check_error?service=test_service")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Check error recorded"}
+
+def test_health_endpoint():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "healthy"}

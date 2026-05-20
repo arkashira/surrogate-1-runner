@@ -1,0 +1,5 @@
+metrics:
+  # IMPORTANT: Replace with a secure, randomly generated token for production
+  # Use: python -c "import secrets; print(secrets.token_hex(32))"
+  bearer_token: "YOUR_STATIC_BEARER_TOKEN"
+  refresh_interval: 5
