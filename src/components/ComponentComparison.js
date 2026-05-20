@@ -1,35 +1,42 @@
 import React, { useState } from 'react';
-import { getRefinedBuildRecommendations } from '../utils/buildRecommendations';
+import { filterComponents } from '../utils/filtering';
 
 const ComponentComparison = ({ components }) => {
-  const [preferences, setPreferences] = useState({});
+  const [filters, setFilters] = useState({ cpu: '', gpu: '', ram: '' });
 
-  const handlePreferenceChange = (event) => {
+  const handleFilterChange = (event) => {
     const { name, value } = event.target;
-    setPreferences((prevPrefs) => ({
-      ...prevPrefs,
+    setFilters((prevFilters) => ({
+      ...prevFilters,
       [name]: value,
     }));
   };
 
-  const refineRecommendations = () => {
-    const refinedRecs = getRefinedBuildRecommendations(components, preferences);
-    // Assuming there's a way to display these refined recommendations
-    console.log('Refined Recommendations:', refinedRecs);
-  };
+  const filteredComponents = filterComponents(components, filters);
 
   return (
     <div>
-      <h2>Refine Build Recommendations</h2>
       <form>
-        {/* Example preference input */}
         <label>
-          Performance Priority:
-          <input type="range" name="performance" min="0" max="100" onChange={handlePreferenceChange} />
+          CPU:
+          <input type="text" name="cpu" value={filters.cpu} onChange={handleFilterChange} />
         </label>
-        {/* Add more preference inputs as needed */}
+        <label>
+          GPU:
+          <input type="text" name="gpu" value={filters.gpu} onChange={handleFilterChange} />
+        </label>
+        <label>
+          RAM:
+          <input type="text" name="ram" value={filters.ram} onChange={handleFilterChange} />
+        </label>
       </form>
-      <button onClick={refineRecommendations}>Refine Recommendations</button>
+      <ul>
+        {filteredComponents.map((component) => (
+          <li key={component.id}>
+            {component.name} - CPU: {component.cpu}, GPU: {component.gpu}, RAM: {component.ram}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
