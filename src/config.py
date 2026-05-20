@@ -1,18 +1,10 @@
-from pathlib import Path
+from pydantic import BaseSettings
 
+class Settings(BaseSettings):
+    RABBITMQ_HOST: str = "localhost"
+    ALERT_LOG_FILE: str = "/var/log/axentx/alerts.log"
 
-class Config:
-    """
-    Centralised configuration for the surrogate service.
-    """
+    class Config:
+        env_file = ".env"
 
-    def __init__(self, service_name: str):
-        self.service_name = service_name
-        # Base directory can be overridden via env var for easier testing
-        base = Path(
-            getenv("SCHEMA_STORAGE_ROOT", "/opt/axentx/surrogate-1/storage/schemas")
-        )
-        self.schema_storage_path = base / service_name
-
-    def __repr__(self) -> str:
-        return f"Config(service_name={self.service_name!r}, schema_storage_path={self.schema_storage_path})"
+settings = Settings()
