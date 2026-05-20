@@ -13,8 +13,6 @@ of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
 normalizes per-schema, dedups via the central md5 hash store, and uploads
 its output to a unique path on the dataset repo:
 
-## Setup Guide
-
-Follow these 5 steps to enable the compliance scan:
+## Setup
 
 1. Clone the repository:
