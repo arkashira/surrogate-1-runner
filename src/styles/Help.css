@@ -1,0 +1,33 @@
+.help-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  text-align: center;
+}
+
+.help-container h1 {
+  font-size: 2em;
+  margin-bottom: 20px;
+}
+
+.help-container p {
+  font-size: 1.2em;
+  margin-bottom: 30px;
+}
+
+.help-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.help-links a {
+  text-decoration: none;
+  color: #007bff;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.help-links a:hover {
+  color: #0056b3;
+}
