@@ -1,0 +1,16 @@
+{
+  "components": [
+    {
+      "component_id": 1,
+      "price_usd": 100.0
+    },
+    {
+      "component_id": 2,
+      "price_usd": 200.0
+    },
+    {
+      "component_id": 3,
+      "price_usd": 50.0
+    }
+  ]
+}
