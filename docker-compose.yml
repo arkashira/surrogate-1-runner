@@ -1,24 +1,36 @@
-# Simple compose file to run the surrogate image in CI/CD environments.
-# It builds the image from the Dockerfile in the current directory,
-# passes any environment variables defined in the runner, and mounts
-# the source directory for debugging or local overrides.
-
-version: "3.8"
+version: '3.8'
 
 services:
-  surrogate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # Environment variables can be set in the CI runner or via an
-    # env_file.  The surrogate CLI will read these to configure
-    # synthetic data generation.
+  mysql:
+    image: mysql:latest
     environment:
-      - SURROGATE_CONFIG=/app/config.yaml
-      - SURROGATE_LOG_LEVEL=INFO
-    # Mount the source tree for local debugging; remove in production.
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
-      - .:/app
-    # Override the default command if needed; otherwise the Dockerfile
-    # entrypoint will run the surrogate module.
-    command: ["--config", "/app/config.yaml"]
+      - ./mysql-init:/docker-entrypoint-initdb.d
+
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./mariadb-init:/docker-entrypoint-initdb.d
