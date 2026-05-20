@@ -1,36 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unified Observability Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cost Insights Dashboard</title>
+  <link rel="stylesheet" href="styles/dashboard.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>Unified Observability Dashboard</h1>
-    <div id="metrics-container">
-        <div id="latency-container">
-            <h2>Latency</h2>
-            <canvas id="latency-chart"></canvas>
-        </div>
-        <div id="cost-container">
-            <h2>Cost</h2>
-            <canvas id="cost-chart"></canvas>
-        </div>
-        <div id="error-container">
-            <h2>Error Rates</h2>
-            <canvas id="error-chart"></canvas>
-        </div>
+  <header class="dashboard-header">
+    <h1>Cost Insights & Recommendations</h1>
+  </header>
+
+  <section class="filters">
+    <label for="date-range">Date Range:</label>
+    <input type="date" id="start-date">
+    <input type="date" id="end-date">
+    <label for="service-select">Service:</label>
+    <select id="service-select">
+      <option value="all">All</option>
+      <option value="compute">Compute</option>
+      <option value="storage">Storage</option>
+      <option value="network">Network</option>
+    </select>
+    <button id="apply-filters">Apply</button>
+  </section>
+
+  <section class="dashboard-content">
+    <div class="chart-container">
+      <canvas id="costChart"></canvas>
     </div>
-    <div id="filter-sort-container">
-        <label for="filter-input">Filter:</label>
-        <input type="text" id="filter-input" placeholder="Search...">
-        <label for="sort-select">Sort:</label>
-        <select id="sort-select">
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-        </select>
+    <div class="table-container">
+      <table id="recommendations-table">
+        <thead>
+          <tr>
+            <th data-sort="service">Service</th>
+            <th data-sort="cost">Cost</th>
+            <th data-sort="recommendation">Recommendation</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
-    <script src="dashboard.js"></script>
+  </section>
+
+  <script>
+    const mockData = {
+      costs: [
+        { date: '2024-05-01', service: 'Compute', cost: 120 },
+        { date: '2024-05-02', service: 'Storage', cost: 80 },
+        { date: '2024-05-03', service: 'Network', cost: 50 },
+        { date: '2024-05-04', service: 'Compute', cost: 110 },
+        { date: '2024-05-05', service: 'Storage', cost: 90 }
+      ],
+      recommendations: [
+        { service: 'Compute', cost: 120, recommendation: 'Right‑size instances' },
+        { service: 'Storage', cost: 80, recommendation: 'Delete unused snapshots' },
+        { service: 'Network', cost: 50, recommendation: 'Enable VPC flow logs' }
+      ]
+    };
+
+    const ctx = document.getElementById('costChart').getContext('2d');
+    const costChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: mockData.costs.map(d => d.date),
+        datasets: [{
+          label: 'Daily Cost ($)',
+          data: mockData.costs.map(d => d.cost),
+          backgroundColor: '#4CAF50'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    const tableBody = document.querySelector('#recommendations-table tbody');
+    function renderTable(data) {
+      tableBody.innerHTML = '';
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.service}</td><td>${row.cost}</td><td>${row.recommendation}</td>`;
+        tableBody.appendChild(tr);
+      });
+    }
+    renderTable(mockData.recommendations);
+
+    // Simple sorting
+    document.querySelectorAll('#recommendations-table th').forEach(th => {
+      th.addEventListener('click', () => {
+        const sortKey = th.dataset.sort;
+        const sorted = [...mockData.recommendations].sort((a, b) => {
+          if (a[sortKey] < b[sortKey]) return -1;
+          if (a[sortKey] > b[sortKey]) return 1;
+          return 0;
+        });
+        renderTable(sorted);
+      });
+    });
+
+    // Filter button (demo only, no real filtering)
+    document.getElementById('apply-filters').addEventListener('click', () => {
+      alert('Filters applied (demo only)');
+    });
+  </script>
 </body>
 </html>
