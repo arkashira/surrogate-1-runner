@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Resource Right‑Sizing Recommendations</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    /* Minimal reset */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; line-height: 1.6; }
+    .container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: 0.5rem; color: #2c3e50; }
+    p { margin-bottom: 1rem; color: #555; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.75rem; border: 1px solid #ddd; text-align: left; }
+    th { background-color: #f5f5f5; }
+    tr:nth-child(even) { background-color: #fafafa; }
+    .cost { color: #e74c3c; font-weight: 600; }
+    .perf { color: #27ae60; font-weight: 600; }
+    .error { color: #e74c3c; font-weight: 600; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #222; color: #ddd; }
+      th { background: #333; }
+      tr:nth-child(even) { background: #2a2a2a; }
+      .cost { color: #ff6b6b; }
+      .perf { color: #58d68d; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Resource Right‑Sizing Recommendations</h1>
+    <p>
+      Below are the latest recommendations for optimizing your cloud resources
+      based on cost and performance data. The data is refreshed every hour.
+    </p>
+
+    <table aria-live="polite">
+      <thead>
+        <tr>
+          <th scope="col">Resource ID</th>
+          <th scope="col">Current Size</th>
+          <th scope="col">Recommended Size</th>
+          <th scope="col">Cost Impact</th>
+          <th scope="col">Performance Impact</th>
+        </tr>
+      </thead>
+      <tbody id="recommendations">
+        <tr><td colspan="5">Loading recommendations…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // Fetch recommendations from the backend API
+    async function loadRecommendations() {
+      const tbody = document.getElementById('recommendations');
+      try {
+        const res = await fetch('/api/rightsize');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5">No recommendations available.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = ''; // clear loading row
+        data.forEach(rec => {
+          const tr = document.createElement('tr');
+
+          const tdId = document.createElement('td');
+          tdId.textContent = rec.resourceId || rec.id || 'N/A';
+          tr.appendChild(tdId);
+
+          const tdCurrent = document.createElement('td');
+          tdCurrent.textContent = rec.currentSize || rec.current || 'N/A';
+          tr.appendChild(tdCurrent);
+
+          const tdRecommended = document.createElement('td');
+          tdRecommended.textContent = rec.recommendedSize || rec.recommended || 'N/A';
+          tr.appendChild(tdRecommended);
+
+          const tdCost = document.createElement('td');
+          tdCost.textContent = rec.costImpact || rec.cost || 'N/A';
+          tdCost.className = 'cost';
+          tr.appendChild(tdCost);
+
+          const tdPerf = document.createElement('td');
+          tdPerf.textContent = rec.performanceImpact || rec.perf || 'N/A';
+          tdPerf.className = 'perf';
+          tr.appendChild(tdPerf);
+
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Failed to load recommendations:', err);
+        tbody.innerHTML = `<tr><td colspan="5" class="error">Error loading recommendations.</td></tr>`;
+      }
+    }
+
+    // Load data on page load
+    window.addEventListener('DOMContentLoaded', loadRecommendations);
+  </script>
+</body>
+</html>
