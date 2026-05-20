@@ -1,22 +1,28 @@
 import unittest
-from orchestrator import Orchestrator
+from orchestrator import Provider, Orchestrator
 
 class TestOrchestrator(unittest.TestCase):
     def setUp(self):
         self.providers = [
-            lambda x: f"response_{hashlib.sha256(x.encode()).hexdigest()}",
-            lambda x: f"alternative_{hashlib.sha256(x.encode()).hexdigest()}"
+            Provider("ProviderA"),
+            Provider("ProviderB"),
+            Provider("ProviderC")
         ]
         self.orchestrator = Orchestrator(self.providers)
 
-    def test_deterministic_order(self):
-        requests = ["request1", "request2"]
-        responses = self.orchestrator.execute_calls(requests)
-        expected_responses = [
-            f"response_{hashlib.sha256('request1'.encode()).hexdigest()}",
-            f"response_{hashlib.sha256('request2'.encode()).hexdigest()}"
-        ]
-        self.assertEqual(responses, expected_responses)
+    def test_load_balance_requests(self):
+        requests = ["Request1", "Request2", "Request3"]
+        responses = self.orchestrator.load_balance_requests(requests)
+        self.assertEqual(len(responses), len(requests))
+        for response in responses:
+            self.assertTrue(response.startswith("Processed by"))
+
+    def test_failover(self):
+        self.providers[0].available = False
+        request = "TestRequest"
+        response = self.orchestrator.process_request(request)
+        self.assertTrue(response.startswith("Processed by"))
+        self.assertNotIn("ProviderA", response)
 
 if __name__ == '__main__':
     unittest.main()
