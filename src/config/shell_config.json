@@ -1,0 +1,23 @@
+{
+  "default_timeout": 30,
+  "platforms": {
+    "linux": {
+      "shell_command": "bash",
+      "environment": {
+        "SHELL_PATH": "/bin/bash"
+      }
+    },
+    "darwin": {
+      "shell_command": "zsh",
+      "environment": {
+        "SHELL_PATH": "/bin/zsh"
+      }
+    },
+    "win32": {
+      "shell_command": "cmd.exe",
+      "environment": {
+        "SHELL_PATH": "C:\\Windows\\System32\\cmd.exe"
+      }
+    }
+  }
+}
