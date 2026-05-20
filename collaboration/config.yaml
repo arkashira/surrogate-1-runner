@@ -1,0 +1,15 @@
+collaboration:
+  session:
+    max_participants: 10
+    timeout_minutes: 30
+    heartbeat_interval_seconds: 30
+    
+  change_propagation:
+    buffer_size: 100
+    max_queue_size: 1000
+    retry_attempts: 3
+    retry_delay_seconds: 1
+    
+  security:
+    authentication_required: true
+    session_token_expiry_hours: 24
