@@ -1,0 +1,52 @@
+# Slack alerting configuration for drift detection notifications
+
+slack:
+  # Webhook URL for Slack Incoming Webhook (supports env var substitution)
+  webhook_url: "${SLACK_WEBHOOK_URL}"
+  
+  # Target Slack channel name (without # prefix)
+  channel: "on-call-alerts"
+  
+  # Bot name shown in Slack messages
+  username: "drift-detector"
+  
+  # Emoji icon for the bot
+  icon_emoji: ":warning:"
+
+# Retry configuration for webhook delivery
+retry:
+  # Maximum number of retry attempts (0 = no retries)
+  max_attempts: 3
+  
+  # Initial backoff delay in seconds
+  initial_delay: 1.0
+  
+  # Backoff multiplier for exponential backoff
+  backoff_multiplier: 2.0
+  
+  # Maximum backoff delay in seconds
+  max_delay: 30.0
+
+# Rate limiting configuration
+rate_limit:
+  # Minimum interval between messages in seconds
+  # Slack limit: 1 message per second per bot
+  min_interval: 1.0
+  
+  # Whether to enable rate limit enforcement
+  enabled: true
+
+# Message template configuration
+message:
+  # Include these fields in alerts
+  include_fields:
+    - service
+    - version
+    - timestamp
+    - diff_summary
+  
+  # Diff summary maximum length (characters)
+  diff_summary_max_length: 500
+  
+  # Enable short mode (single line message)
+  short_mode: false
