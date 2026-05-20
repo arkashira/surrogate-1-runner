@@ -1,0 +1,37 @@
+type: object
+properties:
+  policy_id:
+    type: string
+    description: Unique identifier for the policy
+  name:
+    type: string
+    description: Human-readable name of the policy
+  description:
+    type: string
+    description: Description of the policy purpose
+  rules:
+    type: array
+    items:
+      type: object
+      properties:
+        rule_id:
+          type: string
+          description: Identifier for the CAROL rule to reference
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+          description: Severity level of the rule violation
+        parameters:
+          type: object
+          description: Parameters to pass to the CAROL rule
+      required:
+        - rule_id
+        - severity
+  evaluation_frequency:
+    type: string
+    format: duration
+    description: How often the policy should be evaluated
+required:
+  - policy_id
+  - name
+  - rules
