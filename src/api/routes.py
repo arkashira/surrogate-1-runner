@@ -1,107 +1,63 @@
-"""
-API routes for managing token quota limits per team.
+from flask import Flask, jsonify, request
+from flask_oauthlib.provider import OAuth2Provider
+from functools import wraps
+from datetime import datetime, timedelta
+import time
+import os
 
-This module exposes CRUD operations for quota settings and a simple
-in-memory store. In a production environment this would be backed by
-a persistent database, but for the purposes of this feature and tests
-an in-memory dictionary is sufficient.
+app = Flask(__name__)
+oauth = OAuth2Provider(app)
 
-The routes are designed to be mounted on a FastAPI application
-via `app.include_router(quota_router)`.
-"""
+# In-memory data for demonstration
+spend_data = [
+    {
+        "date": (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d"),
+        "model": f"gpt-4.0-{i}",
+        "tokens": 123456 + i * 1000,
+        "cost": (0.02 + i * 0.001) * (123456 + i * 1000) / 1_000_000,
+        "team": f"team-{i % 5 + 1}"
+    }
+    for i in range(30)
+]
 
-from __future__ import annotations
+# Mock OAuth2 token validation
+@oauth.clientgetter
+def load_client(client_id):
+    return {'client_id': client_id}
 
-from dataclasses import dataclass, field
-from typing import Dict
+@oauth.grantgetter
+def load_grant(client_id, code):
+    return {'client_id': client_id, 'code': code}
 
-from fastapi import APIRouter, HTTPException, Body, status
+@oauth.tokengetter
+def load_token(access_token=None, refresh_token=None):
+    return {'access_token': access_token}
 
-# --------------------------------------------------------------------------- #
-# Data model
-# --------------------------------------------------------------------------- #
-@dataclass
-class Quota:
-    """Represents a token quota for a team."""
-    limit: int
-    used: int = field(default=0)
+# Rate limiting decorator with user identification
+def rate_limit(limit=1000, period=60):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user_id = request.headers.get('Authorization').split()[1]  # Extract user ID from token
+            key = f'{user_id}:{request.path}'
+            now = int(time.time())
+            if not hasattr(decorated_function, 'calls'):
+                decorated_function.calls = {}
+            calls = decorated_function.calls.get(key, [])
+            calls = [call for call in calls if call > now - period]
+            if len(calls) >= limit:
+                return jsonify({'error': 'Rate limit exceeded'}), 429
+            calls.append(now)
+            decorated_function.calls[key] = calls
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
-    def to_dict(self) -> Dict[str, int]:
-        return {"limit": self.limit, "used": self.used}
+@app.route('/api/finance/spend', methods=['GET'])
+@oauth.require_oauth()
+@rate_limit(limit=1000, period=60)
+def get_spend():
+    return jsonify(spend_data)
 
-# --------------------------------------------------------------------------- #
-# In-memory store
-# --------------------------------------------------------------------------- #
-# In a real system this would be replaced by a database or cache.
-_quota_store: Dict[str, Quota] = {}
-
-# --------------------------------------------------------------------------- #
-# Router
-# --------------------------------------------------------------------------- #
-quota_router = APIRouter(prefix="/quota", tags=["quota"])
-
-@quota_router.get("/", status_code=status.HTTP_200_OK)
-async def list_quotas() -> Dict[str, Dict[str, int]]:
-    """
-    Return all quota settings for all teams.
-    """
-    return {team: quota.to_dict() for team, quota in _quota_store.items()}
-
-@quota_router.get("/{team_id}", status_code=status.HTTP_200_OK)
-async def get_quota(team_id: str) -> Dict[str, int]:
-    """
-    Return the quota for a specific team.
-    """
-    quota = _quota_store.get(team_id)
-    if quota is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Quota for team '{team_id}' not found.")
-    return quota.to_dict()
-
-@quota_router.post("/{team_id}", status_code=status.HTTP_201_CREATED)
-async def create_or_update_quota(
-    team_id: str,
-    limit: int = Body(..., embed=True, description="Maximum allowed tokens per period")
-) -> Dict[str, int]:
-    """
-    Create or update the quota limit for a team.
-    """
-    if limit < 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Limit must be non-negative.")
-    quota = _quota_store.get(team_id)
-    if quota:
-        quota.limit = limit
-    else:
-        _quota_store[team_id] = Quota(limit=limit)
-    return _quota_store[team_id].to_dict()
-
-@quota_router.patch("/{team_id}/usage", status_code=status.HTTP_200_OK)
-async def increment_usage(
-    team_id: str,
-    increment: int = Body(..., embed=True, description="Number of tokens to add to usage")
-) -> Dict[str, int]:
-    """
-    Increment the used token count for a team. This is typically called
-    by the API gateway after a successful request.
-    """
-    if increment < 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Increment must be non-negative.")
-    quota = _quota_store.get(team_id)
-    if quota is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Quota for team '{team_id}' not found.")
-    quota.used += increment
-    return quota.to_dict()
-
-@quota_router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_quota(team_id: str) -> None:
-    """
-    Remove a team's quota configuration.
-    """
-    if team_id in _quota_store:
-        del _quota_store[team_id]
-    else:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Quota for team '{team_id}' not found.")
+if __name__ == '__main__':
+    app.run(debug=True)
