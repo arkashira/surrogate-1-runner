@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pipeline Status</title>
+</head>
+<body>
+    <h1>Pipeline Status</h1>
+    <ul>
+        {% for pipeline in pipelines %}
+            <li>{{ pipeline.name }} - {{ pipeline.status }} - {{ pipeline.last_run }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

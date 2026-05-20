@@ -1,9 +1,6 @@
-from flask import render_template
-from flask_mail import Message
-from . import mail
+import json
+import requests
 
-def send_email(to, subject, template, **kwargs):
-    msg = Message(subject, recipients=[to])
-    msg.body = render_template(template + '.txt', **kwargs)
-    msg.html = render_template(template + '.html', **kwargs)
-    mail.send(msg)
+def get_pipeline_status():
+    response = requests.get('http://localhost:8000/pipelines')
+    return json.loads(response.text)
