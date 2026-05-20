@@ -1,31 +1,51 @@
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, func
-from sqlalchemy.orm import declarative_base
+from datetime import datetime
+from enum import Enum
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field
 
-Base = declarative_base()
+class ArtifactSource(str, Enum):
+    GITHUB = "github"
+    JENKINS = "jenkins"
+    CUSTOM = "custom"
 
-class CostActual(Base):
-    __tablename__ = "cost_actuals"
-    id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, nullable=False, index=True)
-    amount = Column(Float, nullable=False)
-    category = Column(String, default="general")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+class ArtifactStatus(str, Enum):
+    PENDING = "pending"
+    COLLECTING = "collecting"
+    COLLECTED = "collected"
+    FAILED = "failed"
+    EXPIRED = "expired"
 
-class CostForecast(Base):
-    __tablename__ = "cost_forecasts"
-    id = Column(Integer, primary_key=True, index=True)
-    forecast_date = Column(Date, nullable=False, index=True)
-    target_date = Column(Date, nullable=False, index=True)
-    predicted_amount = Column(Float, nullable=False)
-    model_version = Column(String, default="v1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+class Artifact(BaseModel):
+    id: str = Field(..., description="Unique artifact ID")
+    name: str
+    source: ArtifactSource
+    source_url: str
+    pipeline_id: str
+    pipeline_name: str
+    build_number: int
+    version: str
+    size_bytes: Optional[int] = None
+    checksum: Optional[str] = None
+    checksum_algorithm: Optional[str] = None
+    download_url: Optional[str] = None
+    collected_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    status: ArtifactStatus = ArtifactStatus.PENDING
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    tags: List[str] = Field(default_factory=list)
 
-class ForecastMetric(Base):
-    __tablename__ = "forecast_metrics"
-    id = Column(Integer, primary_key=True, index=True)
-    evaluation_date = Column(Date, nullable=False, index=True)
-    period_start = Column(Date, nullable=False)
-    period_end = Column(Date, nullable=False)
-    mae = Column(Float, nullable=False)
-    mape = Column(Float, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    class Config:
+        use_enum_values = True
+
+class ArtifactQuery(BaseModel):
+    source: Optional[ArtifactSource] = None
+    pipeline_name: Optional[str] = None
+    build_number: Optional[int] = None
+    version: Optional[str] = None
+    status: Optional[ArtifactStatus] = None
+    tags: Optional[List[str]] = None
+    from_date: Optional[datetime] = None
+    to_date: Optional[datetime] = None
+    limit: int = 100
+    offset: int = 0

@@ -1,14 +1,28 @@
-import os
-from pydantic import BaseSettings, Field
+import yaml
+from pathlib import Path
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field, validator
 
-class Settings(BaseSettings):
-    DATABASE_URL: str = Field(
-        default="sqlite:///./cost_data.db",
-        env="DATABASE_URL",
-        description="SQLAlchemy database URL",
-    )
-    FORECAST_DAYS_AHEAD: int = Field(default=30, env="FORECAST_DAYS_AHEAD")
-    MAPE_THRESHOLD: float = Field(default=5.0, env="MAPE_THRESHOLD")
-    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
+class CollectorConfig(BaseModel):
+    type: str = Field(..., description="Collector type (github, jenkins, custom)")
+    enabled: bool = Field(True)
+    api_url: str
+    api_token: str | None = None
+    interval_seconds: int = 300
+    retention_days: int = 30
+    filters: Dict[str, Any] = Field(default_factory=dict)
+    webhook_secret: str | None = None
 
-settings = Settings()
+class AppConfig(BaseModel):
+    collectors: List[CollectorConfig]
+    database_url: str = Field("sqlite+aiosqlite:///./artifacts.db")
+    log_level: str = Field("INFO")
+
+    @validator("log_level", pre=True)
+    def _normalize_log_level(cls, v):
+        return v.upper()
+
+def load_config(path: str | Path) -> AppConfig:
+    with open(path, "r") as f:
+        data = yaml.safe_load(f)
+    return AppConfig(**data)
