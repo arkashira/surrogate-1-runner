@@ -1,107 +1,55 @@
-"""
-SQLAlchemy models for the matching service.
-"""
-
 from datetime import datetime
-from typing import List
+from enum import Enum
 
 from sqlalchemy import (
     Column,
     DateTime,
-    Float,
+    Enum as SQLEnum,
     Integer,
     String,
-    Table,
-    Boolean,
-    create_engine,
-    MetaData,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
-
-# --------------------------------------------------------------------------- #
-# Engine / Session
-# --------------------------------------------------------------------------- #
-
-# In production this would be a real database URL.
-# For the demo we use SQLite in a file so that the data survives rest‑arts.
-DATABASE_URL = "sqlite:///matching.db"
-
-engine = create_engine(DATABASE_URL, echo=False, future=True)
-SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False))
-
-# --------------------------------------------------------------------------- #
-# Base
-# --------------------------------------------------------------------------- #
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-# --------------------------------------------------------------------------- #
-# Models
-# --------------------------------------------------------------------------- #
 
-class Provider(Base):
-    __tablename__ = "providers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    # Tags are stored as a comma‑separated string for SQLite compatibility.
-    tags = Column(String, nullable=False)  # e.g. "fintech,series_a,ny"
-
-    def tag_set(self) -> set[str]:
-        return {t.strip().lower() for t in self.tags.split(",") if t}
-
-    def __repr__(self) -> str:
-        return f"<Provider id={self.id} name={self.name}>"
+class UserRole(Enum):
+    """Enumeration of user roles used for access control."""
+    USER = "user"
+    ADMIN = "admin"
 
 
-class Investor(Base):
-    __tablename__ = "investors"
+class User(Base):
+    """User model with role‑based access control."""
+    __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    tags = Column(String, nullable=False)  # e.g. "fintech,series_a,ny"
-    active = Column(Boolean, default=True, nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
 
-    def tag_set(self) -> set[str]:
-        return {t.strip().lower() for t in self.tags.split(",") if t}
+    # Store the role as a PostgreSQL ENUM.  The server_default guarantees
+    # that new rows default to USER even if the application layer omits it.
+    role = Column(
+        SQLEnum(UserRole, name="user_role_enum", native_enum=False),
+        nullable=False,
+        server_default="user",
+    )
 
-    def __repr__(self) -> str:
-        return f"<Investor id={self.id} name={self.name}>"
-
-
-class MatchAudit(Base):
-    """
-    Persist every match that the service produces.
-    """
-    __tablename__ = "match_audit"
-
-    id = Column(Integer, primary_key=True, index=True)
-    provider_id = Column(Integer, nullable=False)
-    investor_id = Column(Integer, nullable=False)
-    score = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    # ------------------------------------------------------------------
+    # Helper methods
+    # ------------------------------------------------------------------
+    def is_admin(self) -> bool:
+        """Return True if the user has the ADMIN role."""
+        return self.role == UserRole.ADMIN
 
     def __repr__(self) -> str:
-        return (
-            f"<MatchAudit provider={self.provider_id} "
-            f"investor={self.investor_id} score={self.score:.3f}>"
-        )
-
-
-# --------------------------------------------------------------------------- #
-# Utility
-# --------------------------------------------------------------------------- #
-
-def init_db() -> None:
-    """
-    Create all tables.  In a real project you would use Alembic migrations.
-    """
-    Base.metadata.create_all(bind=engine)
-
-
-def get_session():
-    """
-    Return a thread‑local scoped session.
-    """
-    return SessionLocal()
+        return f"<User {self.username!r} ({self.role.value})>"
