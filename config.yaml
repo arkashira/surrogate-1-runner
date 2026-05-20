@@ -1,5 +1,1 @@
-hipaa_rules: true
-soc2_rules: true
-rule_sets:
-  hipaa: true
-  soc2: true
+slack_webhook_url: "https://hooks.slack.com/services/XXXXXXX/XXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
