@@ -1,36 +1,47 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/axentx/surrogate-1/pkg/api"
+	"surrogate-1/pkg/api"
 )
 
 func main() {
-	port := getEnv("PORT", "8080")
+	// Create event buffer with capacity for 1000 events
+	eventBuffer := api.NewEventBuffer(1000)
+
+	// Create events handler
+	eventsHandler := api.NewEventsHandler(eventBuffer)
+
+	// Set up routes
 	mux := http.NewServeMux()
 
-	// If the project already exposes a RegisterRoutes function, call it.
-	if registrar, ok := interface{}(api.RegisterRoutes).(func(*http.ServeMux)); ok {
-		registrar(mux)
-	}
+	// POST /api/v2/events - ingest synthetic events
+	mux.HandleFunc("/api/v2/events", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			eventsHandler.HandleEvents(w, r)
+		} else if r.Method == http.MethodGet {
+			eventsHandler.HandleGetEvents(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
-	// Register the health endpoint.
-	api.RegisterHealth(mux)
+	// Health check endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "OK")
+	})
 
-	addr := ":" + port
-	log.Printf("sandbox server listening on %s", addr)
+	addr := ":8080"
+	log.Printf("Starting sandbox server on %s", addr)
+	log.Printf("Event ingestion endpoint: POST %s/api/v2/events", addr)
+	log.Printf("Event retrieval endpoint: GET %s/api/v2/events", addr)
+	log.Printf("Use X-API-Key: %s", api.StaticAPIKey)
+
 	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("failed to start server: %v", err)
+		log.Fatalf("Server failed: %v", err)
 	}
-}
-
-// getEnv returns the value of the named environment variable or a fallback.
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }
