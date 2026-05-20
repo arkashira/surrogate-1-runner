@@ -1,0 +1,145 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Stepper from '@material-ui/core/Stepper';
+import Step from '@material-ui/core/Step';
+import StepLabel from '@material-ui/core/StepLabel';
+import Button from '@material-ui/core/Button';
+import { MemoryRouter } from 'react-router-dom';
+
+const steps = [
+  { id: 0, title: 'Source', component: Source },
+  { id: 1, title: 'Format', component: Format },
+  { id: 2, title: 'Destination', component: Destination },
+  { id: 3, title: 'Review', component: Review },
+];
+
+const Wizard = () => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState({
+    source: '',
+    format: 'json',
+    destination: '',
+  });
+  const navigate = useNavigate();
+
+  const nextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      // Save formData to pipeline.yaml and navigate to home
+      const fs = require('fs');
+      const path = require('path');
+      const yaml = require('js-yaml');
+      const pipelineYaml = path.join(process.cwd(), 'pipeline.yaml');
+      const pipeline = {
+        source: formData.source,
+        format: formData.format,
+        destination: formData.destination,
+      };
+      fs.writeFileSync(pipelineYaml, yaml.dump(pipeline));
+      alert('Pipeline configuration saved as pipeline.yaml');
+      navigate('/');
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const renderStep = () => {
+    const currentStepData = steps[currentStep];
+    return <currentStepData.component
+      key={currentStepData.id}
+      formData={formData}
+      setFormData={setFormData}
+      onNext={nextStep}
+      onPrev={prevStep}
+    />;
+  };
+
+  return (
+    <MemoryRouter>
+      <div>
+        <Stepper activeStep={currentStep}>
+          {steps.map((step, index) => (
+            <Step key={step.id}>
+              <StepLabel>{step.title}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+        <div>{renderStep()}</div>
+        {currentStep !== steps.length - 1 && (
+          <div>
+            <Button onClick={prevStep}>Back</Button>
+            <Button onClick={nextStep}>
+              {currentStep === steps.length - 2 ? 'Finish' : 'Next'}
+            </Button>
+          </div>
+        )}
+      </div>
+    </MemoryRouter>
+  );
+};
+
+// src/components/WizardSteps/Source.jsx
+import React from 'react';
+import { useState } from 'react';
+
+const Source = ({ formData, setFormData, onNext }) => {
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      source: e.target.value,
+    });
+  };
+
+  return (
+    <div>
+      <h2>Source</h2>
+      <input
+        type="text"
+        name="source"
+        value={formData.source}
+        onChange={handleChange}
+        placeholder="Enter source"
+      />
+      <div>
+        <Button onClick={onNext}>Next</Button>
+      </div>
+    </div>
+  );
+};
+
+// ... (Format, Destination, Review components)
+
+// src/App.jsx
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Wizard from './components/Wizard';
+
+const App = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<div>Home Page</div>} />
+        <Route path="/wizard" element={<Wizard />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
+
+// src/App.test.jsx
+import React from 'react';
+import { render } from '@testing-library/react';
+import App from './App';
+
+describe('App Component', () => {
+  it('renders correctly', () => {
+    const { getByText } = render(<App />);
+    expect(getByText('Home Page')).toBeInTheDocument();
+  });
+});
