@@ -1,0 +1,33 @@
+{
+  "tutorial": {
+    "version": "1.0.0",
+    "steps": [
+      {
+        "id": "setup",
+        "title": "Environment Setup",
+        "duration": "4:30",
+        "commands": [
+          "git clone https://github.com/axentx/surrogate-1-training-pairs.git",
+          "npm install -g @axentx/cli",
+          "npm install"
+        ],
+        "output_path": "./tutorial-output/setup.log"
+      },
+      {
+        "id": "first_run",
+        "title": "First Data Run",
+        "duration": "2:00",
+        "commands": [
+          "axentx run --shard 0 --dataset demo"
+        ],
+        "expected_files": [
+          "output/demo-0/_SUCCESS"
+        ]
+      }
+    ],
+    "validation": {
+      "required_files": ["output/demo-0/_SUCCESS"],
+      "expected_exit_code": 0
+    }
+  }
+}
