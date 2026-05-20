@@ -1,22 +1,15 @@
-
-export interface UsageRecord {
-  resourceId: string;
-  resourceName: string;
-  usage: number;
-  usageUnit: string; // e.g., 'GB-Hours', 'vCPU-Hours'
-  timestamp: string; // ISO 8601
-}
-
-export interface CostRecord {
-  resourceId: string;
-  cost: number; // Cost in USD
-  timestamp: string; // ISO 8601
-}
-
-export interface OptimizationSuggestion {
+export interface Summary {
+  id: string;
   title: string;
-  description: string;
-  estimatedSavings: number; // USD
-  resourceId: string;
-  action: 'TERMINATE' | 'DOWNSCALE' | 'RESIZE';
+  content: string;
+  tags: string[];
+  created_at: string;   // ISO‑like string, e.g. "2024-05-20 14:30"
+  model: string;
+  source: string;
 }
+
+/**
+ * The shape of the callback that receives the *current* list of selected tags.
+ * It is called **after** the internal state has been updated.
+ */
+export type TagFilterChangeHandler = (selectedTags: string[]) => void;
