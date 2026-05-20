@@ -1,0 +1,74 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "marketing_dashboard",
+    "title": "Marketing Dashboard",
+    "tags": [],
+    "style": "dark",
+    "timezone": "",
+    "editable": true,
+    "hideControls": false,
+    "sharedCrosshair": false,
+    "schemaVersion": 26,
+    "version": 0,
+    "panels": [
+      {
+        "id": 1,
+        "type": "graph",
+        "title": "Daily Active Users (DAU)",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(increase(surrogate1_marketing_active_users[1d]))",
+            "legendFormat": "{{instance}}",
+            "intervalFactor": 2
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 6
+        }
+      },
+      {
+        "id": 2,
+        "type": "graph",
+        "title": "Weekly Playbooks Per User",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(increase(surrogate1_marketing_playbooks_generated[7d])) / sum(increase(surrogate1_marketing_active_users[7d]))",
+            "legendFormat": "{{instance}}",
+            "intervalFactor": 2
+          }
+        ],
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 6
+        }
+      },
+      {
+        "id": 3,
+        "type": "graph",
+        "title": "Churn Rate",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "(sum(surrogate1_marketing_active_users) - sum(surrogate1_marketing_retained_users)) / sum(surrogate1_marketing_active_users)",
+            "legendFormat": "{{instance}}",
+            "intervalFactor": 2
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 6,
+          "w": 12,
+          "h": 6
+        }
+      }
+    ]
+  }
+}
