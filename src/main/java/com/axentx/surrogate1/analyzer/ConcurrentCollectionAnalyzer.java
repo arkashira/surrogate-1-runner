@@ -1,31 +1,29 @@
 package com.axentx.surrogate1.analyzer;
 
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ConcurrentCollectionAnalyzer {
-    private ConcurrentHashMap<String, Integer> raceConditionOccurrences;
+    private Map<String, String> efficientCollections;
 
     public ConcurrentCollectionAnalyzer() {
-        this.raceConditionOccurrences = new ConcurrentHashMap<>();
+        efficientCollections = new HashMap<>();
+        efficientCollections.put("List", "ArrayList");
+        efficientCollections.put("Set", "HashSet");
+        efficientCollections.put("Map", "HashMap");
+        // Add more collections as needed
     }
 
-    public void detectRaceConditions(String code) {
-        // Simulate race condition detection logic
-        List<String> detectedRaceConditions = /* Logic to detect race conditions */;
-        
-        for (String raceCondition : detectedRaceConditions) {
-            raceConditionOccurrences.merge(raceCondition, 1, Integer::sum);
+    public String getRecommendations(String codebaseState) {
+        StringBuilder recommendations = new StringBuilder();
+
+        // Simulate analyzing the codebase and generating recommendations
+        for (String collectionType : efficientCollections.keySet()) {
+            if (codebaseState.contains(collectionType)) {
+                recommendations.append("Consider using ").append(efficientCollections.get(collectionType)).append(" for ").append(collectionType).append(".\n");
+            }
         }
 
-        // Provide clear and actionable feedback
-        provideFeedback(detectedRaceConditions);
-    }
-
-    private void provideFeedback(List<String> detectedRaceConditions) {
-        System.out.println("Detected Race Conditions:");
-        for (String raceCondition : detectedRaceConditions) {
-            System.out.println("- " + raceCondition);
-        }
+        return recommendations.toString();
     }
 }
