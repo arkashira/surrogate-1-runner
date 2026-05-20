@@ -1,25 +1,11 @@
-from flask import Blueprint, request, jsonify
-from surrogate_1.api.middleware import validate_permissions
+"""
+Main router aggregation for the surrogate-1 API.
+"""
 
-routes = Blueprint('routes', __name__)
+from fastapi import APIRouter
+from .upload import router as upload_router
+from .health import router as health_router
 
-@routes.route('/session', methods=['GET'])
-@validate_permissions
-def get_session():
-    session_id = request.args.get('session_id')
-    # Return the session data
-    return jsonify({'session_id': session_id})
-
-@routes.route('/session/permissions', methods=['POST'])
-def set_permissions():
-    session_id = request.json['session_id']
-    user_id = request.json['user_id']
-    # Add or remove the user from the session's permissions list
-    permission = db.session.query(Permission).filter_by(session_id=session_id, user_id=user_id).first()
-    if permission:
-        db.session.delete(permission)
-    else:
-        new_permission = Permission(session_id=session_id, user_id=user_id)
-        db.session.add(new_permission)
-    db.session.commit()
-    return jsonify({'message': 'Permissions updated'})
+api_router = APIRouter()
+api_router.include_router(upload_router)
+api_router.include_router(health_router)
