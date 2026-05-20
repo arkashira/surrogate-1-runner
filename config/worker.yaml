@@ -1,0 +1,4 @@
+dataset_name: axentx/surrogate-1-training-pairs
+dataset_version: main
+s3_bucket: axentx-surrogate-1-datasets
+s3_key: surrogate-1-training-pairs.tar.gz
