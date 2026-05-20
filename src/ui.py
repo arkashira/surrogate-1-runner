@@ -1,23 +1,44 @@
-from flask import Flask, render_template, request
-import os
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import plotly.express as px
+import pandas as pd
 
-app = Flask(__name__)
+app = dash.Dash(__name__)
 
-@app.route('/')
-def home():
-    return render_template('templates.html', active_page='home')
+# Mock data for demonstration purposes
+data = {
+    'Component': ['CPU', 'GPU', 'RAM', 'Storage'],
+    'Current Rig Performance': [100, 200, 300, 400],
+    'Proposed Upgrade Performance': [150, 250, 350, 450],
+    'Game': ['Game A', 'Game B', 'Game C', 'Game D']
+}
 
-@app.route('/hardware')
-def hardware():
-    return render_template('templates.html', active_page='hardware')
+df = pd.DataFrame(data)
 
-@app.route('/games')
-def games():
-    return render_template('templates.html', active_page='games')
+app.layout = html.Div([
+    html.H1("Gaming Rig Performance Comparison"),
+    dcc.Dropdown(
+        id='component-dropdown',
+        options=[{'label': i, 'value': i} for i in df['Component'].unique()],
+        value='CPU'
+    ),
+    dcc.Dropdown(
+        id='game-dropdown',
+        options=[{'label': i, 'value': i} for i in df['Game'].unique()],
+        value='Game A'
+    ),
+    dcc.Graph(id='performance-graph')
+])
 
-@app.route('/community')
-def community():
-    return render_template('templates.html', active_page='community')
+@app.callback(
+    Output('performance-graph', 'figure'),
+    [Input('component-dropdown', 'value'), Input('game-dropdown', 'value')]
+)
+def update_graph(selected_component, selected_game):
+    filtered_df = df[(df['Component'] == selected_component) & (df['Game'] == selected_game)]
+    fig = px.bar(filtered_df, x=['Current Rig Performance', 'Proposed Upgrade Performance'], y='Component', title=f'Performance Comparison for {selected_game}')
+    return fig
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run_server(debug=True)
