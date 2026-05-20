@@ -1,0 +1,10 @@
+{
+    "security_scan_results": [
+        {"resource": "resource1", "status": "compliant"},
+        {"resource": "resource2", "status": "non-compliant"}
+    ],
+    "recommendations": [
+        {"resource": "resource2", "recommendation": "fix vulnerability"}
+    ],
+    "generated_at": "2024-09-16 14:30:00"
+}
