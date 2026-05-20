@@ -2,21 +2,20 @@ package main
 
 import (
 	"log"
-	"net/http"
 
-	"axentx/surrogate-1/backend/lineage"
+	"github.com/gin-gonic/gin"
+	"surrogate-1/backend/routes"
 )
 
 func main() {
-	mux := http.NewServeMux()
+	r := gin.Default()
 
-	// Register lineage routes
-	lineage.RegisterRoutes(mux)
+	// Register all approval‑link routes
+	routes.RegisterApprovalLinkRoutes(r)
 
-	// TODO: register other routes here
+	// TODO: register other route groups here
 
-	log.Println("Starting server on :8080")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatalf("server failed: %v", err)
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Server failed: %v", err)
 	}
 }
