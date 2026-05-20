@@ -1,0 +1,14 @@
+[
+    {
+        "resource": "cpu",
+        "savings": 0.05
+    },
+    {
+        "resource": "memory",
+        "savings": 0.14
+    },
+    {
+        "resource": "storage",
+        "savings": 0.09
+    }
+]
