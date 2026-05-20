@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dependency Recommendations</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="recommendations-container">
+        <h1>Dependency Recommendations</h1>
+        <ul id="recommendations-list"></ul>
+    </div>
+
+    <script>
+        // Mock data for demonstration purposes
+        const recommendations = [
+            { packageName: 'axios', currentVersion: '0.21.1', recommendedVersion: '1.0.0' },
+            { packageName: 'lodash', currentVersion: '4.17.21', recommendedVersion: '4.17.22' }
+        ];
+
+        const recommendationsList = document.getElementById('recommendations-list');
+
+        recommendations.forEach(recommendation => {
+            const listItem = document.createElement('li');
+            listItem.textContent = `${recommendation.packageName}: Current Version ${recommendation.currentVersion}, Recommended Version ${recommendation.recommendedVersion}`;
+            recommendationsList.appendChild(listItem);
+        });
+    </script>
+</body>
+</html>
