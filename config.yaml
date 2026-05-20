@@ -1,0 +1,5 @@
+hipaa_rules: true
+soc2_rules: true
+rule_sets:
+  hipaa: true
+  soc2: true
