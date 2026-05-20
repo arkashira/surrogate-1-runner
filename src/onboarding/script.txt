@@ -1,0 +1,18 @@
+
+5. Troubleshooting
+   • **Common Issues**  
+     - *“File too large”* – split the file or increase `--max_file_size` in `config.yaml`.  
+     - *“Duplicate rows detected”* – review the `dedupe.log` for offending keys.  
+     - *“HF upload fails”* – ensure your HF token has `write` scope and the repo exists.
+   • **Support** – Email support@axentx.com or open a ticket in the dashboard.
+
+6. Next Steps
+   • Explore the **Analytics** tab to see ingestion metrics.  
+   • Join the Axentx community Slack (#surrogate-1) for tips.  
+   • Schedule a quarterly review to update the ingestion pipeline as data grows.
+
+Resources
+---------
+• Documentation: https://docs.axentx.com/surrogate-1  
+• API Reference: https://api.axentx.com/docs  
+• Community Forum: https://forum.axentx.com
