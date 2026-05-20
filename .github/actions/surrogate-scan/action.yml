@@ -1,0 +1,16 @@
+name: 'Surrogate Scan'
+description: 'Scan code for vulnerabilities'
+inputs:
+  severity-threshold:
+    description: 'Minimum severity level to fail on'
+    required: false
+    default: 'HIGH'
+  # ... rest of the existing inputs ...
+runs:
+  using: 'composite'
+  steps:
+    - name: Run surrogate scan
+      shell: bash
+      run: |
+        surrogate-cli scan --fail-on-severity ${{ inputs.severity-threshold }}
+        # ... rest of the existing run commands ...
