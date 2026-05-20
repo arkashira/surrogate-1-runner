@@ -1,59 +1,49 @@
 import argparse
 import sys
-from review.engine import ReviewEngine, run_review
 
+from src import config  # Adjust import path if package layout differs
 
-def build_parser() -> argparse.ArgumentParser:
-    """
-    Build the ArgumentParser for the surrogate‑1 CLI.
-    Returns:
-        argparse.ArgumentParser: Configured parser.
-    """
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Surrogate‑1 Review CLI – run the review engine in single‑ or multi‑issue mode."
+        prog="dbcompare",
+        description="Compare MySQL and MariaDB instances based on a shared config.",
     )
     parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Run the review engine in multi‑issue mode (primary flag).",
+        "--config",
+        type=str,
+        help=(
+            "Path to a YAML configuration file containing `mysql` and/or `mariadb` "
+            "sections. If omitted, the tool will look for the DBCOMPARE_CONFIG "
+            "environment variable or fall back to built‑in defaults."
+        ),
     )
-    parser.add_argument(
-        "--full",
-        action="store_true",
-        help="Alias for --all; kept for backward compatibility.",
-    )
+    # Existing arguments would be added here (e.g., --verbose, sub‑commands, etc.)
     return parser
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """
-    Parse a list of command‑line arguments.
-    Args:
-        argv: List of arguments (defaults to ``sys.argv[1:]``).
-    Returns:
-        argparse.Namespace with the parsed flags.
-    """
-    parser = build_parser()
-    return parser.parse_args(argv)
-
-
 def main(argv: list[str] | None = None) -> int:
-    """
-    CLI entry‑point used by ``python -m surrogate-1`` or the installed console script.
-    Returns:
-        Exit status code (0 = success, non‑zero = error).
-    """
-    args = parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
 
-    # The engine itself is deliberately lightweight – we instantiate it once here.
-    engine = ReviewEngine()
+    try:
+        app_cfg = config.load_config(args.config)
+    except (FileNotFoundError, ValueError) as exc:
+        parser.error(str(exc))
 
-    # Dispatch based on the flags. ``--full`` is an alias for ``--all``.
-    if args.all or args.full:
-        engine.run_multi_issue_mode()
+    # At this point ``app_cfg`` holds validated connection strings (or None).
+    # The rest of the CLI can use ``app_cfg.mysql`` and ``app_cfg.mariadb``.
+    # For demonstration we simply print the resolved configuration.
+    if app_cfg.mysql:
+        print(f"MySQL DSN: {app_cfg.mysql.connection_string}")
     else:
-        engine.run_single_issue_mode()
+        print("MySQL DSN: <default>")
 
+    if app_cfg.mariadb:
+        print(f"MariaDB DSN: {app_cfg.mariadb.connection_string}")
+    else:
+        print("MariaDB DSN: <default>")
+
+    # TODO: invoke the actual DB comparison logic here, passing ``app_cfg``.
     return 0
 
 
