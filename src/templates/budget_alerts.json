@@ -1,0 +1,109 @@
+{
+  "version": "1.0.0",
+  "description": "Budget alert templates for cloud infrastructure cost monitoring",
+  "default_settings": {
+    "check_interval_minutes": 60,
+    "aggregation_period": "daily",
+    "currency": "USD",
+    "slack_webhook_env_var": "SLACK_WEBHOOK_URL",
+    "email_from_env_var": "ALERT_EMAIL_FROM",
+    "email_to_env_var": "ALERT_EMAIL_TO"
+  },
+  "templates": [
+    {
+      "id": "budget_warning_50",
+      "name": "Budget Warning - 50%",
+      "threshold": 50,
+      "threshold_type": "percentage",
+      "severity": "warning",
+      "description": "Alerts when project reaches 50% of monthly budget",
+      "slack": {
+        "enabled": true,
+        "title": "Budget Warning: {{project}}",
+        "message": "⚠️ *Budget Warning*\n\nProject: {{project}}\nThreshold: 50%\nCurrent Spend: ${{current_spend}}\nBudget Limit: ${{budget_limit}}\n\nPlease review resource usage.",
+        "color": "#FFA500"
+      },
+      "email": {
+        "enabled": true,
+        "subject": "[WARNING] Budget Alert - {{project}} at 50%",
+        "body": "Hello Team,\n\nThis is an automated notification that the budget for project **{{project}}** has reached 50% of the monthly limit.\n\nCurrent spend: ${{current_spend}}\nBudget limit: ${{budget_limit}}\n\nPlease review resource usage and ensure spending remains within limits.\n\nRegards,\nAxentx Budget Monitor"
+      }
+    },
+    {
+      "id": "budget_warning_75",
+      "name": "Budget Warning - 75%",
+      "threshold": 75,
+      "threshold_type": "percentage",
+      "severity": "warning",
+      "description": "Alerts when project reaches 75% of monthly budget - action recommended",
+      "slack": {
+        "enabled": true,
+        "title": "Budget Alert: {{project}}",
+        "message": "🔥 *Budget Warning - Action Required*\n\nProject: {{project}}\nThreshold: 75%\nCurrent Spend: ${{current_spend}}\nBudget Limit: ${{budget_limit}}\n\nImmediate review of resource usage is recommended.",
+        "color": "#FF8C00"
+      },
+      "email": {
+        "enabled": true,
+        "subject": "[ACTION REQUIRED] Budget Alert - {{project}} at 75%",
+        "body": "Hello Team,\n\nThis is an automated notification that the budget for project **{{project}}** has reached 75% of the monthly limit.\n\nCurrent spend: ${{current_spend}}\nBudget limit: ${{budget_limit}}\n\nImmediate review of resource usage is recommended.\n\nRegards,\nAxentx Budget Monitor"
+      }
+    },
+    {
+      "id": "budget_critical_90",
+      "name": "Budget Critical - 90%",
+      "threshold": 90,
+      "threshold_type": "percentage",
+      "severity": "critical",
+      "description": "Critical alert when project reaches 90% of monthly budget",
+      "slack": {
+        "enabled": true,
+        "title": "CRITICAL: Budget Alert - {{project}}",
+        "message": "🚨 *CRITICAL Budget Alert*\n\nProject: {{project}}\nThreshold: 90%\nCurrent Spend: ${{current_spend}}\nBudget Limit: ${{budget_limit}}\n\nIMMEDIATE action is required to prevent budget overrun!",
+        "color": "#FF0000"
+      },
+      "email": {
+        "enabled": true,
+        "subject": "[CRITICAL] Budget Alert - {{project}} at 90% - Immediate Action Required",
+        "body": "Hello Team,\n\n**CRITICAL**: The budget for project **{{project}}** has reached 90% of the monthly limit.\n\nCurrent spend: ${{current_spend}}\nBudget limit: ${{budget_limit}}\n\nIMMEDIATE action is required to prevent budget overrun. Please investigate immediately.\n\nRegards,\nAxentx Budget Monitor"
+      }
+    },
+    {
+      "id": "budget_exceeded_100",
+      "name": "Budget Exceeded - 100%+",
+      "threshold": 100,
+      "threshold_type": "percentage",
+      "severity": "critical",
+      "description": "Emergency alert when project has exceeded monthly budget",
+      "slack": {
+        "enabled": true,
+        "title": "🛑 EMERGENCY: Budget Exceeded - {{project}}",
+        "message": "🛑 *BUDGET EXCEEDED*\n\nProject: {{project}}\nCurrent Spend: ${{current_spend}}\nBudget Limit: ${{budget_limit}}\nStatus: **EXCEEDED**\n\nEmergency measures may be required. Contact infrastructure team immediately!",
+        "color": "#8B0000"
+      },
+      "email": {
+        "enabled": true,
+        "subject": "[EMERGENCY] Budget Exceeded - {{project}} has overrun!",
+        "body": "Hello Team,\n\n**EMERGENCY**: The budget for project **{{project}}** has been exceeded.\n\nCurrent spend: ${{current_spend}}\nBudget limit: ${{budget_limit}}\nStatus: EXCEEDED\n\nEmergency measures may be required. Contact the infrastructure team immediately.\n\nRegards,\nAxentx Budget Monitor"
+      }
+    },
+    {
+      "id": "daily_spend_spike",
+      "name": "Daily Spend Spike Alert",
+      "threshold": 150,
+      "threshold_type": "daily_multiplier",
+      "severity": "warning",
+      "description": "Alerts when daily spend exceeds 150% of average daily budget",
+      "slack": {
+        "enabled": true,
+        "title": "Spend Spike Alert: {{project}}",
+        "message": "📈 *Unusual Spending Pattern*\n\nProject: {{project}}\nToday's Spend: ${{today_spend}}\nDaily Average: ${{daily_average}}\nMultiplier: {{multiplier}}x\n\nPlease verify this is expected usage.",
+        "color": "#FFD700"
+      },
+      "email": {
+        "enabled": true,
+        "subject": "[INFO] Unusual spending pattern detected - {{project}}",
+        "body": "Hello Team,\n\nAn unusual spending pattern has been detected for project **{{project}}**.\n\nToday's spend: ${{today_spend}}\nDaily average: ${{daily_average}}\nMultiplier: {{multiplier}}x\n\nPlease verify this is expected usage.\n\nRegards,\nAxentx Budget Monitor"
+      }
+    }
+  ]
+}
