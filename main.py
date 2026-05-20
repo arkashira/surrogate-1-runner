@@ -1,7 +1,18 @@
-from fastapi import FastAPI
+from logging import getLogger
+from access_logger import access_logger
 
-from .api.routes import router as jobs_router
-
-app = FastAPI(title="Surrogate‑1 Job API")
-
-app.include_router(jobs_router)
+def handle_shell_access(user, session_id, ip_address):
+    # Original shell handling logic...
+    
+    # Log access event
+    access_logger.info(
+        "Shell session initiated",
+        extra={
+            'user': user,
+            'session_id': session_id,
+            'action': 'shell_access',
+            'ip': ip_address
+        }
+    )
+    
+    # Continue with session establishment
