@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Profit &amp; Loss Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background:#f5f5f5; }
+        header { background:#2c3e50; color:#fff; padding:1rem; text-align:center; }
+        nav { background:#34495e; padding:0.5rem; display:flex; justify-content:center; }
+        nav a { color:#ecf0f1; margin:0 1rem; text-decoration:none; font-weight:bold; }
+        main { padding:2rem; max-width:1200px; margin:auto; }
+        table { width:100%; border-collapse:collapse; background:#fff; }
+        th, td { padding:0.75rem; text-align:left; border-bottom:1px solid #ddd; }
+        th { background:#ecf0f1; }
+        .positive { color:green; }
+        .negative { color:red; }
+        .loading { text-align:center; padding:2rem; font-size:1.2rem; color:#777; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Profit &amp; Loss Dashboard</h1>
+</header>
+
+<nav>
+    <a href="/" th:href="@{/}">Home</a>
+    <a href="/pnl" th:href="@{/pnl}">P&amp;L</a>
+    <a href="/reports" th:href="@{/reports}">Reports</a>
+</nav>
+
+<main>
+    <div id="loading" class="loading">Loading data...</div>
+    <table id="pnl-table" style="display:none;">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Revenue ($)</th>
+                <th>Expenses ($)</th>
+                <th>Profit ($)</th>
+            </tr>
+        </thead>
+        <tbody id="pnl-body">
+            <!-- Rows will be injected by JavaScript -->
+        </tbody>
+    </table>
+</main>
+
+<script>
+    const API_ENDPOINT = '/api/pnl'; // Adjust if needed
+    const REFRESH_INTERVAL_MS = 5000; // 5 seconds
+
+    function formatNumber(num) {
+        return Number(num).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function renderRow(entry) {
+        const tr = document.createElement('tr');
+
+        const dateTd = document.createElement('td');
+        dateTd.textContent = entry.date;
+        tr.appendChild(dateTd);
+
+        const revTd = document.createElement('td');
+        revTd.textContent = formatNumber(entry.revenue);
+        tr.appendChild(revTd);
+
+        const expTd = document.createElement('td');
+        expTd.textContent = formatNumber(entry.expenses);
+        tr.appendChild(expTd);
+
+        const profitTd = document.createElement('td');
+        profitTd.textContent = formatNumber(entry.profit);
+        profitTd.className = entry.profit >= 0 ? 'positive' : 'negative';
+        tr.appendChild(profitTd);
+
+        return tr;
+    }
+
+    async function fetchPnlData() {
+        try {
+            const response = await fetch(API_ENDPOINT, {cache: 'no-store'});
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json(); // Expect array of {date, revenue, expenses, profit}
+            const tbody = document.getElementById('pnl-body');
+            tbody.innerHTML = '';
+            data.forEach(entry => tbody.appendChild(renderRow(entry)));
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('pnl-table').style.display = 'table';
+        } catch (err) {
+            console.error('Failed to fetch P&L data:', err);
+            document.getElementById('loading').textContent = 'Error loading data.';
+        }
+    }
+
+    // Initial load
+    fetchPnlData();
+
+    // Real‑time refresh
+    setInterval(fetchPnlData, REFRESH_INTERVAL_MS);
+</script>
+</body>
+</html>
