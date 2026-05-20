@@ -1,15 +1,13 @@
-const winston = require('winston');
+const { createLogger, format, transports } = require('winston');
 
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
+const logger = createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: format.combine(
+    format.timestamp(),
+    format.errors({ stack: true }),
+    format.json()
   ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: '/var/log/axentx/surrogate-1/dependency-validator.log' })
-  ]
+  transports: [new transports.Console()],
 });
 
-module.exports = { logger };
+module.exports = logger;
