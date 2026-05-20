@@ -1,150 +1,122 @@
 openapi: 3.1.0
 info:
-  title: AxentX Cost‑Metrics API
+  title: Surrogate-1 API
   version: 1.0.0
-  description: |
-    Returns aggregated cost information for the whole platform, broken down
-    by cloud provider and by individual worker.  The endpoint is secured with
-    a Bearer token and supports pagination for large worker sets.
-
+  description: API for surrogate-1 pricing and dataset services.
 servers:
-  - url: https://api.axentx.com
+  - url: https://api.axentx.com/v1
     description: Production server
-
 paths:
-  /api/v1/costs:
-    get:
-      summary: Retrieve aggregated cost metrics
-      operationId: getCostMetrics
-      tags:
-        - Cost Metrics
+  /pricing/validate:
+    post:
+      summary: Get a price recommendation for a product.
+      description: |
+        Accepts product attributes and returns a recommended price,
+        confidence score, and revenue estimate.  The endpoint is protected
+        by the existing API authentication mechanisms (API key or JWT) and
+        is subject to rate limiting – a 429 response with a `Retry-After`
+        header is returned when the limit is exceeded.
+      operationId: validatePricing
       security:
-        - BearerAuth: []                     # JWT / OAuth2 access token
-      parameters:
-        - name: page
-          in: query
-          description: Page number (1‑based) for the workers list.
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: pageSize
-          in: query
-          description: Number of worker records per page (max 100).
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 50
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingRequest'
       responses:
         '200':
-          description: Successful response containing cost metrics.
+          description: Successful price recommendation.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CostMetricsResponse'
+                $ref: '#/components/schemas/PricingResponse'
+        '400':
+          description: Invalid request payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized – missing or invalid Bearer token.
+          description: Unauthorized – missing or invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           description: Too Many Requests – rate limit exceeded.
-        '5XX':
-          description: Unexpected server error.
-
+          headers:
+            Retry-After:
+              description: Number of seconds to wait before retrying.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
   schemas:
-    CostMetricsResponse:
+    PricingRequest:
       type: object
       required:
-        - totalSpend
-        - providers
-        - workers
-        - pagination
+        - product_id
+        - attributes
       properties:
-        totalSpend:
-          type: number
-          format: double
-          description: Total spend across all providers (USD).
-          example: 124567.89
-        providers:
-          type: array
-          description: Cost breakdown per cloud provider.
-          items:
-            $ref: '#/components/schemas/ProviderCost'
-        workers:
-          type: array
-          description: List of workers with their individual cost.  The list is
-            paginated – only the records for the requested page are returned.
-          items:
-            $ref: '#/components/schemas/WorkerCost'
-        pagination:
-          $ref: '#/components/schemas/Pagination'
-
-    ProviderCost:
-      type: object
-      required:
-        - name
-        - spend
-      properties:
-        name:
+        product_id:
           type: string
-          description: Human‑readable provider name (e.g., “AWS”, “GCP”, “Azure”).
-          example: AWS
-        spend:
-          type: number
-          format: double
-          description: Total spend for this provider (USD).
-          example: 84231.45
-
-    WorkerCost:
+          description: Unique identifier for the product.
+        attributes:
+          type: object
+          description: Key‑value map of product attributes (e.g., category, brand, specs).
+          additionalProperties:
+            type: string
+    PricingResponse:
       type: object
-      required:
-        - id
-        - cost
       properties:
-        id:
+        recommended_price:
+          type: number
+          format: float
+          description: Suggested price for the product.
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence level of the recommendation (0‑1).
+        revenue_estimate:
+          type: number
+          format: float
+          description: Projected revenue based on the recommended price.
+      required:
+        - recommended_price
+        - confidence
+        - revenue_estimate
+    ErrorResponse:
+      type: object
+      properties:
+        error:
           type: string
-          description: Unique identifier of the worker (could be UUID or internal ID).
-          example: worker‑1234abcd
-        cost:
-          type: number
-          format: double
-          description: Total cost incurred by this worker during the reporting period (USD).
-          example: 12.34
-
-    Pagination:
-      type: object
-      required:
-        - page
-        - pageSize
-        - totalPages
-        - totalRecords
-      properties:
-        page:
+          description: Human‑readable error message.
+        code:
           type: integer
-          description: Current page number.
-          example: 1
-        pageSize:
-          type: integer
-          description: Number of records per page (as requested).
-          example: 50
-        totalPages:
-          type: integer
-          description: Total number of pages available.
-          example: 20
-        totalRecords:
-          type: integer
-          description: Total number of worker records in the system.
-          example: 1000
-
-x-extension:
-  tokenExpiresInSeconds: 3600          # matches candidate‑2 “x‑oas‑tocken‑expires”
-  tokenHeader: Authorization           # matches candidate‑2 “x‑oas‑tocken‑header”
-  tokenType: access_token              # matches candidate‑2 “x‑oas‑tocken‑type”
+          description: HTTP status code.
+  x-rate-limit:
+    limit: 60
+    period: minute
