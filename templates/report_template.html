@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <section class="executive-summary">
+        <h2>Executive Summary</h2>
+        <p>This report summarizes the resource inventory, control mappings, and supporting evidence.</p>
+        <div class="summary-stats">
+            <div class="stat-box">
+                <div class="number">{{ resources|length }}</div>
+                <div class="label">Resources</div>
+            </div>
+            <div class="stat-box">
+                <div class="number">{{ controls|length }}</div>
+                <div class="label">Controls</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section inventory">
+        <h2>Inventory Table</h2>
+        <table class="inventory-table">
+            <thead>
+                <tr><th>Resource</th><th>Control</th></tr>
+            </thead>
+            <tbody>
+                {% for r in resources %}
+                <tr>
+                    <td>{{ r.name }}</td>
+                    <td>{{ r.control }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section mapping">
+        <h2>Control Mapping Matrix</h2>
+        <table class="control-matrix">
+            <thead>
+                <tr><th>Control</th><th>Resource</th></tr>
+            </thead>
+            <tbody>
+                {% for c in controls %}
+                <tr>
+                    <td>{{ c.name }}</td>
+                    <td>{{ c.resource }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section evidence">
+        <h2>Evidence</h2>
+        <p>{{ evidence }}</p>
+    </section>
+{% endblock %}

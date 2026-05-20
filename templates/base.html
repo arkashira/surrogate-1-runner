@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Compliance Report – {{ report_id }}</title>
+    <style>
+        {% include "style.css" %}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Compliance Report</h1>
+        <div class="report-id">Report ID: {{ report_id }}</div>
+        <div class="timestamp">Generated: {{ timestamp }}</div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <div class="footer">
+        Page <span class="page-number"></span> of <span class="total-pages"></span>
+    </div>
+</body>
+</html>
