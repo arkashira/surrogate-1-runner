@@ -1,0 +1,11 @@
+.validation-badge {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-left: 8px;
+}
+.validation-badge.valid {
+  color: green;
+}
+.validation-badge.invalid {
+  color: red;
+}
