@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Model Lineage and Data Provenance Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <header>
+        <h1>AI Model Lineage and Data Provenance Dashboard</h1>
+    </header>
+    <main>
+        <section id="model-lineage">
+            <h2>AI Model Lineage</h2>
+            <div id="lineage-data"></div>
+        </section>
+        <section id="data-provenance">
+            <h2>Data Provenance</h2>
+            <div id="provenance-data"></div>
+        </section>
+    </main>
+    <script>
+        // Mock data for demonstration purposes
+        const lineageData = [
+            { model: 'ModelA', version: '1.0', created: '2023-01-01', updated: '2023-02-01' },
+            { model: 'ModelB', version: '2.0', created: '2023-03-01', updated: '2023-04-01' }
+        ];
+
+        const provenanceData = [
+            { dataset: 'DatasetX', source: 'SourceA', date: '2023-01-01' },
+            { dataset: 'DatasetY', source: 'SourceB', date: '2023-02-01' }
+        ];
+
+        function displayLineage(data) {
+            const lineageDiv = document.getElementById('lineage-data');
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.innerHTML = `<strong>${item.model} v${item.version}</strong> - Created: ${item.created}, Updated: ${item.updated}`;
+                lineageDiv.appendChild(div);
+            });
+        }
+
+        function displayProvenance(data) {
+            const provenanceDiv = document.getElementById('provenance-data');
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.innerHTML = `<strong>${item.dataset}</strong> - Source: ${item.source}, Date: ${item.date}`;
+                provenanceDiv.appendChild(div);
+            });
+        }
+
+        displayLineage(lineageData);
+        displayProvenance(provenanceData);
+    </script>
+</body>
+</html>
