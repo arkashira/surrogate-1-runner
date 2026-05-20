@@ -1,126 +1,61 @@
 import os
 import json
-import requests
+import logging
 import smtplib
-from dataclasses import dataclass
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import List, Optional
 from datetime import datetime
+from typing import Dict, Any, Optional, List
 
-# Configuration constants with sensible defaults
-SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
-SMTP_HOST = os.environ.get("SMTP_SERVER", "smtp.example.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("EMAIL_SENDER")
-SMTP_PASSWORD = os.environ.get("EMAIL_PASSWORD")
-EMAIL_FROM = os.environ.get("EMAIL_FROM", "alerts@axentx.com")
-DEFAULT_EMAIL_TO = os.environ.get("EMAIL_RECIPIENTS", "").split(",")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@dataclass(frozen=True)
-class Recommendation:
-    """Represents a cost-optimization recommendation with all necessary details."""
-    resource_name: str
-    current_usage: str
-    suggested_action: str
-    estimated_savings: float
-    currency: str = "USD"
-    timestamp: datetime = datetime.now()
-
-def send_slack(message: str, channel: Optional[str] = None) -> bool:
-    """Send a message to Slack via webhook with comprehensive error handling."""
-    if not SLACK_WEBHOOK_URL:
-        print("SLACK_WEBHOOK_URL not configured, skipping Slack notification")
-        return False
-
-    payload = {
-        "text": message,
-        "username": "cost-optimizer-bot",
-        "icon_emoji": ":money_with_wings:"
-    }
-    if channel:
-        payload["channel"] = channel
-
-    try:
-        response = requests.post(
-            SLACK_WEBHOOK_URL,
-            json=payload,
-            timeout=10
-        )
-        response.raise_for_status()
-        return True
-    except requests.RequestException as e:
-        print(f"Failed to send Slack message: {e}")
-        return False
-
-def send_email(subject: str, body: str, recipients: List[str] = None, html: bool = False) -> bool:
-    """Send an email notification with configurable recipients and content type."""
-    if recipients is None:
-        recipients = DEFAULT_EMAIL_TO
-
-    if not SMTP_USER or not SMTP_PASSWORD or not recipients:
-        print("Email not configured, skipping email notification")
-        return False
-
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = EMAIL_FROM
-    msg['To'] = ", ".join(recipients)
-
-    mime_type = 'html' if html else 'plain'
-    msg.attach(MIMEText(body, mime_type))
-
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-        return False
-
-def format_recommendation(recommendation: Recommendation) -> str:
-    """Format a recommendation into a human-readable message."""
-    return (
-        f"*Cost Optimization Recommendation*\n"
-        f"*Resource*: {recommendation.resource_name}\n"
-        f"*Current Usage*: {recommendation.current_usage}\n"
-        f"*Suggested Action*: {recommendation.suggested_action}\n"
-        f"*Estimated Savings*: {recommendation.estimated_savings:.2f} {recommendation.currency}\n"
-        f"*Generated*: {recommendation.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
-    )
-
-def notify_recommendation(
-    recommendation: Recommendation,
-    slack_channel: Optional[str] = None,
-    email_recipients: Optional[List[str]] = None,
-    channels: List[str] = None
-) -> bool:
-    """
-    Send a cost optimization recommendation via configured channels.
-
-    Args:
-        recommendation: The recommendation to send
-        slack_channel: Optional Slack channel override
-        email_recipients: Optional list of email recipients
-        channels: List of channels to use ('slack', 'email'), defaults to both
-
-    Returns:
-        bool: True if at least one notification was sent successfully
-    """
-    if channels is None:
-        channels = ['slack', 'email']
-
-    message = format_recommendation(recommendation)
-    subject = f"Cost Optimization Recommendation for {recommendation.resource_name}"
-
-    success = False
-
-    if 'slack' in channels:
-        success = send_slack(message, slack_channel) or success
-
-    if 'email' in channels:
-        success = send_email(subject, message, email_recipients) or success
-
-    return success
+class NotificationManager:
+    def __init__(self):
+        self.config = self._load_config()
+        self.notification_channels = self._initialize_channels()
+        
+    def _load_config(self) -> Dict[str, Any]:
+        """Load notification configuration from environment variables."""
+        config = {
+            'email': {
+                'enabled': os.getenv('NOTIFICATIONS_EMAIL_ENABLED', 'false').lower() == 'true',
+                'smtp_server': os.getenv('NOTIFICATIONS_EMAIL_SMTP_SERVER', 'smtp.gmail.com'),
+                'smtp_port': int(os.getenv('NOTIFICATIONS_EMAIL_SMTP_PORT', '587')),
+                'username': os.getenv('NOTIFICATIONS_EMAIL_USERNAME', ''),
+                'password': os.getenv('NOTIFICATIONS_EMAIL_PASSWORD', ''),
+                'recipients': os.getenv('NOTIFICATIONS_EMAIL_RECIPIENTS', '').split(','),
+            },
+            'slack': {
+                'enabled': os.getenv('NOTIFICATIONS_SLACK_ENABLED', 'false').lower() == 'true',
+                'webhook_url': os.getenv('NOTIFICATIONS_SLACK_WEBHOOK_URL', ''),
+                'channel': os.getenv('NOTIFICATIONS_SLACK_CHANNEL', '#alerts'),
+            },
+            'log_level': os.getenv('NOTIFICATIONS_LOG_LEVEL', 'INFO'),
+        }
+        return config
+    
+    def _initialize_channels(self) -> Dict[str, Any]:
+        """Initialize notification channels based on configuration."""
+        channels = {}
+        
+        if self.config['email']['enabled']:
+            channels['email'] = EmailChannel(self.config['email'])
+            
+        if self.config['slack']['enabled']:
+            channels['slack'] = SlackChannel(self.config['slack'])
+            
+        return channels
+    
+    def send_notification(self, title: str, message: str, container_name: str, 
+                         error_details: Optional[str] = None, logs: Optional[str] = None) -> bool:
+        """Send notification through all enabled channels."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        full_message = f"**Container:** {container_name}\n"
+        full_message += f"**Timestamp:** {timestamp}\n\n"
+        full_message += f"**Message:** {message}\n\n"
+        
+        if error_details:
+            full_message += f"**Error Details:**\n
