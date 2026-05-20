@@ -1,57 +1,51 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/uuid"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth"
+	"github.com/go-chi/cors"
+	"github.com/go-chi/render"
+	"github.com/axentx/surrogate-1/internal/models"
+	"github.com/axentx/surrogate-1/internal/database"
 )
 
-// taskRequest represents the JSON payload for creating a new task.
-type taskRequest struct {
-	Task         string   `json:"task"`
-	Dependencies []string `json:"dependencies"`
-}
-
-// taskResponse represents the JSON response returned to the client.
-type taskResponse struct {
-	TaskID string `json:"task_id"`
-	Status string `json:"status"`
-}
-
-// taskHandler handles POST /tasks requests.
-// It accepts a JSON body with the task name and an optional list of dependency IDs,
-// creates a new task, and returns the task ID and initial status.
-func taskHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req taskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	if req.Task == "" {
-		http.Error(w, "task name required", http.StatusBadRequest)
-		return
-	}
-
-	// Generate a unique ID for the task
-	taskID := uuid.New().String()
-
-	// Create the task in the manager
-	task, err := taskManager.SubmitTask(taskID, req.Task, req.Dependencies)
-	if err != nil {
-		http.Error(w, "failed to submit task", http.StatusInternalServerError)
-		return
-	}
-
-	resp := taskResponse{
-		TaskID: task.ID,
-		Status: task.Status,
-	}
+// CreateTask handles creating a new task with optional dependencies
+func CreateTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var task models.Task
+	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	// Validate and store dependencies if provided
+	if len(task.Dependencies) > 0 {
+		// In a real implementation, validate dependencies exist in DB
+		// For this feature, we simply store the provided IDs
+	}
+
+	// Set timestamps and initial status
+	task.CreatedAt = time.Now()
+	task.UpdatedAt = time.Now()
+	task.Status = "pending"
+
+	// Save task to database
+	if err := database.SaveTask(task); err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, map[string]string{"error": "failed to save task"})
+		return
+	}
+
+	// Return success response with task ID and status
+	render.Status(r, http.StatusCreated)
+	render.JSON(w, r, map[string]interface{}{
+		"task_id": task.ID,
+		"status":  task.Status,
+	})
 }
