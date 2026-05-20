@@ -2,22 +2,15 @@ package main
 
 import (
 	"log"
-	"net/http"
-	"os"
 
-	"surrogate-1/internal/health"
+	"opt/axentx/surrogate-1/pkg/server"
 )
 
 func main() {
-	http.HandleFunc("/health", health.Handler())
+	// In production you would read the bind address from a flag or env var.
+	const bindAddr = ":8080"
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("Server starting on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
+	if err := server.Start(bindAddr); err != nil {
+		log.Fatalf("server stopped with error: %v", err)
 	}
 }
