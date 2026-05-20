@@ -1,0 +1,4 @@
+{
+  "logDir": "/var/log/axentx/surrogate-shell/",
+  "daysToKeep": 30
+}
