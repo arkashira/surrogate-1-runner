@@ -1,0 +1,15 @@
+
+name: Daily P&L Aggregation
+on:
+  schedule:
+    - cron: "0 0 * * *"
+jobs:
+  aggregator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run aggregator
+        run: python /opt/axentx/surrogate-1/processing/aggregator.py
