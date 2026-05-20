@@ -1,32 +1,46 @@
 package com.axentx.surrogate1;
 
 import com.axentx.surrogate1.analyzer.ConcurrentCollectionAnalyzer;
+import com.axentx.surrogate1.refactor.RefactoringSuggestionEngine;
+import java.util.List;
 
 public class Surrogate1 {
-    private ConcurrentCollectionAnalyzer analyzer;
+    private final ConcurrentCollectionAnalyzer analyzer;
+    private final RefactoringSuggestionEngine refactoringEngine;
 
     public Surrogate1() {
         this.analyzer = new ConcurrentCollectionAnalyzer();
+        this.refactoringEngine = new RefactoringSuggestionEngine();
     }
 
-    public void analyzeCodebase() {
-        // Assuming there's a method to get the current codebase state
-        String codebaseState = getCodebaseState();
+    public void analyzeAndSuggest(String sourceCode) {
+        // Analyze for concurrency issues
+        List<ConcurrentCollectionAnalyzer.ConcurrencyIssue> issues = analyzer.analyze(sourceCode);
 
-        // Analyze the codebase and get recommendations
-        String recommendations = analyzer.getRecommendations(codebaseState);
+        if (issues.isEmpty()) {
+            System.out.println("No concurrency issues detected in the provided code.");
+            return;
+        }
 
-        // Output the recommendations
-        System.out.println("Collection implementation recommendations: " + recommendations);
-    }
+        System.out.println("Detected " + issues.size() + " concurrency issues:");
+        System.out.println("--------------------------------------------");
 
-    private String getCodebaseState() {
-        // Placeholder for getting the current state of the codebase
-        return "Current codebase state";
+        // Generate and display refactoring suggestions for each issue
+        for (ConcurrentCollectionAnalyzer.ConcurrencyIssue issue : issues) {
+            System.out.println("\nIssue: " + issue.getDescription());
+            System.out.println("Recommendation: " + issue.getRecommendation());
+
+            List<String> suggestions = refactoringEngine.generateSuggestions(issue);
+            System.out.println("\nSuggested Refactorings:");
+            for (String suggestion : suggestions) {
+                System.out.println("- " + suggestion);
+            }
+        }
     }
 
     public static void main(String[] args) {
-        Surrogate1 surrogate1 = new Surrogate1();
-        surrogate1.analyzeCodebase();
+        Surrogate1 surrogate = new Surrogate1();
+        String sampleCode = "public class Test { private Map<String, String> map = new HashMap<>(); }";
+        surrogate.analyzeAndSuggest(sampleCode);
     }
 }
