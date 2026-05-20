@@ -1,5 +1,15 @@
-from fastapi import APIRouter
-from .policy_handler import router as policy_router
+"""
+FastAPI application exposing the knowledge‑search API.
+"""
 
-api_router = APIRouter()
-api_router.include_router(policy_router, prefix="/api/v1/policies", tags=["policies"])
+from fastapi import FastAPI
+from .search import router as search_router
+
+app = FastAPI(
+    title="Surrogate‑1 Knowledge API",
+    description="Search knowledge articles by comma‑separated tags.",
+    version="1.0.0",
+)
+
+# Mount the search router under /api
+app.include_router(search_router, prefix="/api")
