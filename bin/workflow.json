@@ -1,0 +1,71 @@
+{
+    "id": "wf-surrogate-1",
+    "name": "Surrogate-1 Workflow",
+    "description": "This workflow processes and enriches public datasets using a distributed architecture.",
+    "steps": [
+        {
+            "id": "step-1",
+            "name": "Fetch Dataset",
+            "description": "Fetches the public dataset list from the source.",
+            "parameters": [
+                {
+                    "name": "dataset_url",
+                    "type": "string",
+                    "required": true,
+                    "description": "The endpoint URL to fetch the dataset list from."
+                },
+                {
+                    "name": "shard_id",
+                    "type": "string",
+                    "required": false,
+                    "description": "Optional specific shard ID to filter the fetch."
+                }
+            ]
+        },
+        {
+            "id": "step-2",
+            "name": "Normalize Data",
+            "description": "Normalizes the fetched data per the internal schema.",
+            "parameters": [
+                {
+                    "name": "schema_path",
+                    "type": "string",
+                    "required": true,
+                    "description": "Path to the JSON schema file."
+                }
+            ]
+        },
+        {
+            "id": "step-3",
+            "name": "Deduplicate",
+            "description": "Deduplicates data using the central md5 hash store.",
+            "parameters": [
+                {
+                    "name": "hash_store_path",
+                    "type": "string",
+                    "required": true,
+                    "description": "Path to the persistent hash store."
+                }
+            ]
+        },
+        {
+            "id": "step-4",
+            "name": "Upload Data",
+            "description": "Uploads the processed data to the dataset repository.",
+            "parameters": [
+                {
+                    "name": "repo_url",
+                    "type": "string",
+                    "required": true,
+                    "description": "Target repository URL."
+                },
+                {
+                    "name": "upload_path",
+                    "type": "string",
+                    "required": true,
+                    "description": "Directory path for the upload."
+                }
+            ]
+        }
+    ]
+}
