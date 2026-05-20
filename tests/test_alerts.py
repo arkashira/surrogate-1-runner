@@ -1,27 +1,13 @@
-import os
 import unittest
 from unittest.mock import patch
-from config.alerts import AlertConfig
+from alerts import AlertManager
 
-class TestAlertConfig(unittest.TestCase):
-    def setUp(self):
-        self.alert_config = AlertConfig()
+class TestAlertManager(unittest.TestCase):
+    @patch('logging.info')
+    def test_send_alert(self, mock_info):
+        alert_manager = AlertManager(50)
+        alert_manager.send_alert()
+        mock_info.assert_called_once_with("Cost spike alert sent")
 
-    def test_load_config(self):
-        with patch.dict(os.environ, {'SILENCED_POLICIES': 'policy1, policy2'}):
-            self.alert_config.load_config()
-            self.assertTrue(self.alert_config.is_policy_silenced('policy1'))
-            self.assertTrue(self.alert_config.is_policy_silenced('policy2'))
-            self.assertFalse(self.alert_config.is_policy_silenced('policy3'))
-
-    def test_silence_policy(self):
-        self.alert_config.silence_policy('policy1')
-        self.assertTrue(self.alert_config.is_policy_silenced('policy1'))
-
-    def test_unsilence_policy(self):
-        self.alert_config.silence_policy('policy1')
-        self.alert_config.unsilence_policy('policy1')
-        self.assertFalse(self.alert_config.is_policy_silenced('policy1'))
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

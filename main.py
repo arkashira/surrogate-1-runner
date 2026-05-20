@@ -1,6 +1,15 @@
-from fastapi import FastAPI
-from .api.pipeline_status import router as pipeline_status_router
+import schedule
+import time
+from alerts import AlertManager
+from config import Config
 
-app = FastAPI()
+def main():
+    alert_manager = AlertManager(Config.ALERT_THRESHOLD)
+    schedule.every(1).minutes.do(job)
 
-app.include_router(pipeline_status_router)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
