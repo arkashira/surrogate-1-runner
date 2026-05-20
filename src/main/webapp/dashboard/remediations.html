@@ -1,0 +1,72 @@
+<div id="vulnerability-list">
+  <div class="vulnerability-card" v-for="(vuln, index) in vulnerabilities" :key="index">
+    <h3>{{ vuln.id }}</h3>
+    <p><strong>Severity:</strong> {{ vuln.severity }}</p>
+    
+    <div class="remediation-section">
+      <button @click="toggleRemediation(index)" class="expand-button">
+        {{ showRemediation[index] ? 'Hide' : 'Show' }} Remediation Steps
+      </button>
+      
+      <div v-show="showRemediation[index]" class="remediation-steps">
+        <h4>Remediation Steps:</h4>
+        <ol>
+          <li v-for="(step, stepIndex) in vuln.remediation.steps" :key="stepIndex">
+            {{ step.description }}
+            <div v-if="step.command" class="code-block">
+              <code>{{ step.command }}</code>
+            </div>
+          </li>
+        </ol>
+        
+        <div v-if="vuln.remediation.additional_info">
+          <h5>Additional Info:</h5>
+          <p>{{ vuln.remediation.additional_info }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Add to existing Vue instance methods
+methods: {
+  ...mapActions(['fetchRemediations']),
+  toggleRemediation(index) {
+    this.showRemediation[index] = !this.showRemediation[index];
+  }
+},
+mounted() {
+  this.fetchRemediations();
+}
+</script>
+
+<style>
+.remediation-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.code-block {
+  margin-top: 0.5rem;
+  background-color: #e9ecef;
+  padding: 0.5rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.expand-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.expand-button:hover {
+  background-color: #0056b3;
+}
+</style>
