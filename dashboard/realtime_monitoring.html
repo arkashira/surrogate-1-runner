@@ -1,0 +1,16 @@
+// JavaScript for WebSocket connection and data refresh
+let socket = new WebSocket('ws://your-backend-url');
+
+socket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    updateDashboard(data); // Update the dashboard with new data
+};
+
+function refreshData() {
+    socket.send('refresh'); // Send a refresh command to the server
+}
+
+function updateDashboard(data) {
+    // Logic to update the dashboard elements with new data
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+}
