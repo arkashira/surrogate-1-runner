@@ -1,38 +1,67 @@
-from typing import List, Dict, Any
-from pydantic import BaseModel, Field
-from llm_agent import LLMAgent, LLMAgentConfig
+import os
+import json
+from typing import List, Dict, Optional
+from src.task import Task
+from src.platform import Platform
 
-class WorkflowDefinition(BaseModel):
-    workflow_id: str = Field(..., description="Unique identifier for the workflow")
-    agents: List[LLMAgentConfig] = Field(..., description="List of LLM agents in the workflow")
-    connections: Dict[str, List[str]] = Field(..., description="Connections between LLM agents")
+class Workflow:
+    def __init__(self, name: str):
+        self.name = name
+        self.tasks: List[Task] = []
+        self.platforms: List[Platform] = []
 
-class WorkflowInstance:
-    def __init__(self, definition: WorkflowDefinition):
-        self.definition = definition
-        self.agents = [LLMAgent(config) for config in definition.agents]
+    def add_task(self, task: Task) -> None:
+        """Add a task to the workflow"""
+        self.tasks.append(task)
 
-    def validate(self) -> bool:
-        # Logic to validate the workflow definition
-        print(f"Validating workflow {self.definition.workflow_id}")
-        return True
+    def add_platform(self, platform: Platform) -> None:
+        """Add a platform to the workflow"""
+        self.platforms.append(platform)
 
-    def create_instance(self):
-        # Logic to create a workflow instance
-        print(f"Creating instance of workflow {self.definition.workflow_id}")
-        for agent in self.agents:
-            agent.connect()
+    def automate(self) -> None:
+        """Execute all tasks across all platforms"""
+        for task in self.tasks:
+            for platform in self.platforms:
+                platform.execute_task(task)
 
-    def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        # Logic to execute the workflow
-        print(f"Executing workflow {self.definition.workflow_id}")
-        results = {}
-        for agent in self.agents:
-            results[agent.config.agent_id] = agent.execute(input_data.get(agent.config.agent_id, ""))
-        return results
+    def to_dict(self) -> Dict:
+        """Convert workflow to dictionary for serialization"""
+        return {
+            'name': self.name,
+            'tasks': [task.to_dict() for task in self.tasks],
+            'platforms': [platform.to_dict() for platform in self.platforms]
+        }
 
-    def cleanup(self):
-        # Logic to cleanup the workflow instance
-        print(f"Cleaning up workflow {self.definition.workflow_id}")
-        for agent in self.agents:
-            agent.disconnect()
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'Workflow':
+        """Create workflow from dictionary"""
+        workflow = cls(data['name'])
+        workflow.tasks = [Task.from_dict(task_data) for task_data in data['tasks']]
+        workflow.platforms = [Platform.from_dict(platform_data) for platform_data in data['platforms']]
+        return workflow
+
+    def save_to_file(self, file_path: str) -> None:
+        """Save workflow to JSON file"""
+        with open(file_path, 'w') as file:
+            json.dump(self.to_dict(), file)
+
+    @classmethod
+    def load_from_file(cls, file_path: str) -> 'Workflow':
+        """Load workflow from JSON file"""
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+        return cls.from_dict(data)
+
+    def get_task_by_name(self, name: str) -> Optional[Task]:
+        """Get a task by its name"""
+        for task in self.tasks:
+            if task.name == name:
+                return task
+        return None
+
+    def get_platform_by_name(self, name: str) -> Optional[Platform]:
+        """Get a platform by its name"""
+        for platform in self.platforms:
+            if platform.name == name:
+                return platform
+        return None
