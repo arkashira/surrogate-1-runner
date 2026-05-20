@@ -1,47 +1,29 @@
-#!/usr/bin/env python3
 import argparse
-import json
 import sys
-from pathlib import Path
 from typing import List, Dict, Any
 
-from surrogate_1.engine import scan_solidity_files
+def parse_args(args: List[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description='surrogate-1 CLI')
+    parser.add_argument('--fail-on-severity', choices=['LOW', 'MEDIUM', 'HIGH'], default='HIGH',
+                       help='Treat findings of this severity and above as failures (default: HIGH)')
+    # Add other existing arguments here
+    return parser.parse_args(args)
 
-def main():
-    parser = argparse.ArgumentParser(description='Scan Solidity files for findings.')
-    parser.add_argument('path', type=str, help='Path to Solidity files or directory')
-    parser.add_argument('--format', choices=['table', 'json'], default='table', help='Output format')
-    args = parser.parse_args()
+def main(args: List[str]) -> int:
+    args = parse_args(args)
+    # Your existing main logic here
+    # Example of how to use the fail_on_severity argument
+    findings = get_findings()  # Replace with your actual findings retrieval logic
+    severity_levels = {'LOW': 1, 'MEDIUM': 2, 'HIGH': 3}
+    threshold = severity_levels[args.fail_on_severity]
 
-    path = Path(args.path)
-    if not path.exists():
-        print(f"Error: Path '{path}' does not exist.", file=sys.stderr)
-        sys.exit(1)
-
-    findings = scan_solidity_files(path)
-
-    if args.format == 'json':
-        print(json.dumps(findings, indent=2))
-    else:
-        print_findings_table(findings)
-
-    if any(finding['severity'] == 'HIGH' for finding in findings):
-        sys.exit(1)
-
-def print_findings_table(findings: List[Dict[str, Any]]):
-    if not findings:
-        print("No findings.")
-        return
-
-    print("{:<50} {:<10} {:<20} {:<10}".format("File", "Line", "Finding", "Severity"))
-    print("-" * 100)
     for finding in findings:
-        print("{:<50} {:<10} {:<20} {:<10}".format(
-            finding['file'],
-            finding['line'],
-            finding['finding'],
-            finding['severity']
-        ))
+        if severity_levels[finding['severity']] >= threshold:
+            print(f"Failure: {finding['message']}")
+            return 1
+
+    print("No failures found")
+    return 0
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main(sys.argv[1:]))
