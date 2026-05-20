@@ -1,0 +1,38 @@
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/your-username/surrogate-1.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Your build commands here
+            }
+        }
+
+        stage('Compliance Scan') {
+            steps {
+                // Your compliance scan commands here
+                script {
+                    if (!compliant) {
+                        error 'Build is non-compliant'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            whenConditions {
+                expression { return currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                // Your deploy commands here
+            }
+        }
+    }
+}
