@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Management</title>
+</head>
+<body>
+    <h1>Subscription Management</h1>
+    <form action="/update_subscription" method="post">
+        <label for="plan">Choose a plan:</label>
+        <select name="plan" id="plan">
+            <option value="basic">Basic</option>
+            <option value="premium">Premium</option>
+            <option value="enterprise">Enterprise</option>
+        </select>
+        <br><br>
+        <input type="submit" value="Upgrade/Downgrade">
+    </form>
+</body>
+</html>
