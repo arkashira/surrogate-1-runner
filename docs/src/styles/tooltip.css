@@ -1,0 +1,21 @@
+.tooltip {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 12px;
+  border-radius: 4px;
+  position: relative;
+  margin: 8px 0;
+}
+.tooltip-link {
+  color: #0066cc;
+  text-decoration: underline;
+}
+.tooltip-dismiss {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
