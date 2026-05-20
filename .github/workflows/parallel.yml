@@ -1,0 +1,48 @@
+name: Parallel‑Process
+on:
+  workflow_call:
+    inputs:
+      total_shards:
+        required: true
+        type: number
+      input_path:
+        required: true
+        type: string
+      output_path:
+        required: true
+        type: string
+      processor_script:
+        required: true
+        type: string
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard_index: ${{ fromJSON('[' + (range(0, inputs.total_shards) | join(',')) + ']') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download raw data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: raw-data
+          path: ${{ inputs.input_path }}
+
+      - name: Process shard ${{ matrix.shard_index }}
+        env:
+          SHARD_IDX: ${{ matrix.shard_index }}
+          TOTAL_SHARDS: ${{ inputs.total_shards }}
+        run: |
+          mkdir -p ${{ inputs.output_path }}/shard-${SHARD_IDX}
+          python ${{ inputs.processor_script }} \
+            --input ${{ inputs.input_path }} \
+            --output ${{ inputs.output_path }}/shard-${SHARD_IDX} \
+            --shard-index $SHARD_IDX \
+            --total-shards $TOTAL_SHARDS
+
+      - name: Upload shard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard_index }}
+          path: ${{ inputs.output_path }}/shard-${{ matrix.shard_index }}

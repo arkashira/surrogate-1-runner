@@ -1,24 +1,51 @@
-name: ingest
+name: Ingest
 on:
-  schedule:
-    - cron: "*/30 * * * *"
-  workflow_dispatch:
-
-env:
-  DATE: ${{ github.event.inputs.date || (github.event_name == 'schedule' && steps.date.outputs.today) || '' }}
-
+  workflow_call:
+    inputs:
+      source_url:
+        required: true
+        type: string
+      target_path:
+        required: true
+        type: string
+      schema:
+        required: false
+        type: string   # JSON‑Schema string (or path to file)
+      batch_size:
+        required: false
+        type: number
+        default: 1000
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -r requirements.txt
-      - run: python bin/dataset-enrich.py --shard ${{ matrix.shard }} --date ${{ env.DATE }}
+
+      - name: Install utilities
+        run: |
+          python -m pip install --quiet pandas jsonschema tqdm
+
+      - name: Download source
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SRC: ${{ inputs.source_url }}
+        run: |
+          mkdir -p ${{ inputs.target_path }}
+          curl -L "$SRC" -o raw_data.tmp
+          # If the source is a CSV/JSON stream we pipe through tqdm for progress
+          # (replace with your own downloader if needed)
+
+      - name: Validate & Normalize (optional)
+        if: inputs.schema != ''
+        run: |
+          python scripts/validate_schema.py \
+            --input raw_data.tmp \
+            --schema "${{ inputs.schema }}" \
+            --output ${{ inputs.target_path }}/normalized.parquet \
+            --batch-size ${{ inputs.batch_size }}
+
+      - name: Upload raw artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-data
+          path: ${{ inputs.target_path }}/
