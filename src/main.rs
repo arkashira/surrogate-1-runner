@@ -1,33 +1,31 @@
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::provider::{ProviderRegistry, ProviderType, Provider, register_provider};
-use crate::config::load_config;
+use axum::{
+    routing::get,
+    Router,
+    Extension,
+};
+use std::net::SocketAddr;
+use crate::middleware::LatencyLogger;
+use crate::metrics::REQUEST_LATENCY;
 
 #[tokio::main]
 async fn main() {
-    let provider_registry: ProviderRegistry = Arc::new(RwLock::new(HashMap::new()));
-    let config_path = "config.yaml";
-    let providers = load_config(config_path);
+    let app = Router::new()
+        .route("/", get(|| async { "Hello, World!" }))
+        .route("/metrics", get(metrics_handler))
+        .layer(Extension(LatencyLogger::new()))
+        .layer(axum::middleware::from_fn_with_state(
+            LatencyLogger::new(),
+            crate::middleware::log_latency,
+        ));
 
-    for (_, provider) in providers {
-        register_provider(&provider_registry, provider);
-    }
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    println!("Listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
 
-    // Example routing logic using provider type
-    let provider_type = "KnownProvider1";
-    if let Some(provider) = get_provider(&provider_registry, provider_type) {
-        match provider.provider_type {
-            ProviderType::KnownProvider1 => {
-                println!("Using KnownProvider1 client");
-                // Use KnownProvider1 client logic
-            },
-            ProviderType::KnownProvider2 => {
-                println!("Using KnownProvider2 client");
-                // Use KnownProvider2 client logic
-            },
-            ProviderType::Unknown(unknown_type) => {
-                eprintln!("Warning: Unknown provider type: {}", unknown_type);
-            },
-        }
-    }
+async fn metrics_handler() -> String {
+    prometheus::Encoder::encode_to_string(&prometheus::TextEncoder::new(), &REQUEST_LATENCY.collect()).unwrap()
 }
