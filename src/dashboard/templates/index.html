@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real‑Time Cloud Cost Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .filter { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Cloud Cost Dashboard</h1>
+
+    <div>
+        <label class="filter">
+            Resource Type:
+            <select id="resourceFilter">
+                <option value="">All</option>
+                {% for rt in resource_types %}
+                <option value="{{ rt }}">{{ rt }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="filter">
+            Location:
+            <select id="locationFilter">
+                <option value="">All</option>
+                {% for loc in locations %}
+                <option value="{{ loc }}">{{ loc }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <button id="applyFilters">Apply Filters</button>
+    </div>
+
+    <table id="costTable">
+        <thead>
+            <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Resource Type</th>
+                <th>Location</th>
+                <th>Cost (USD)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data rows will be injected here -->
+        </tbody>
+    </table>
+
+    <script>
+        const costTableBody = document.querySelector('#costTable tbody');
+        const resourceFilter = document.getElementById('resourceFilter');
+        const locationFilter = document.getElementById('locationFilter');
+        const applyBtn = document.getElementById('applyFilters');
+
+        async function fetchCosts() {
+            const params = new URLSearchParams();
+            if (resourceFilter.value) params.append('resource_type', resourceFilter.value);
+            if (locationFilter.value) params.append('location', locationFilter.value);
+
+            const resp = await fetch('/api/costs?' + params.toString());
+            const data = await resp.json();
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            costTableBody.innerHTML = '';
+            data.forEach(entry => {
+                const row = document.createElement('tr');
+
+                const tsCell = document.createElement('td');
+                tsCell.textContent = entry.timestamp;
+                row.appendChild(tsCell);
+
+                const typeCell = document.createElement('td');
+                typeCell.textContent = entry.resource_type;
+                row.appendChild(typeCell);
+
+                const locCell = document.createElement('td');
+                locCell.textContent = entry.location;
+                row.appendChild(locCell);
+
+                const costCell = document.createElement('td');
+                costCell.textContent = entry.cost.toFixed(2);
+                row.appendChild(costCell);
+
+                costTableBody.appendChild(row);
+            });
+        }
+
+        // Refresh every 5 seconds
+        setInterval(fetchCosts, 5000);
+        // Initial load
+        fetchCosts();
+
+        applyBtn.addEventListener('click', fetchCosts);
+    </script>
+</body>
+</html>
