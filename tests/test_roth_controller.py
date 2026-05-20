@@ -1,22 +1,18 @@
-import unittest
-from unittest.mock import patch
-from .api.roth_controller import roth_guide
-from .models.roth import get_roth_guide_steps
+import pytest
+import json
 
-class TestRothController(unittest.TestCase):
-
-    @patch('surrogate_1.models.roth.get_roth_guide_steps')
-    def test_roth_guide(self, mock_get_roth_guide_steps):
-        mock_get_roth_guide_steps.return_value = [
-            {
-                "title": "Step 1: Determine Eligibility",
-                "description": "Check if you qualify to contribute to a Roth IRA based on your income.",
-                "legal_reference": "https://www.irs.gov/publications/p590a"
-            }
-        ]
-        response = roth_guide()
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, mock_get_roth_guide_steps.return_value)
-
-if __name__ == '__main__':
-    unittest.main()
+def test_get_roth_guide_returns_valid_structure(client):
+    """Test guide endpoint returns ordered steps with required fields and valid references"""
+    response = client.get("/api/roth/guide")
+    assert response.status_code == 200
+    
+    data = response.json
+    assert isinstance(data, list), "Response should be an array of steps"
+    
+    for step in data:
+        assert "title" in step and isinstance(step["title"], str), "Each step must have a title string"
+        assert "description" in step and isinstance(step["description"], str), "Each step must have a description string"
+        assert "references" in step and isinstance(step["references"], list), "Each step must have a references array"
+        
+        for ref in step["references"]:
+            assert isinstance(ref, str) and "irs.gov" in ref, "References must be IRS publication URLs"
