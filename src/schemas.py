@@ -1,23 +1,18 @@
 from pydantic import BaseModel
-from datetime import datetime
 from typing import Optional
 
-class ComplianceFindingBase(BaseModel):
-    resource_id: str
-    resource_type: str
-    rule_id: str
-    rule_name: str
-    severity: str
-    description: str
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    bio: Optional[str] = None
+    # Add other fields that can be updated
 
-class ComplianceFindingCreate(ComplianceFindingBase):
-    pass
-
-class ComplianceFindingResponse(ComplianceFindingBase):
+class User(BaseModel):
     id: int
-    detected_at: datetime
-    status: str
-    resolved_at: Optional[datetime]
+    name: str
+    email: str
+    bio: Optional[str] = None
+    # Add other fields that are part of the User model
 
     class Config:
         orm_mode = True

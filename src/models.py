@@ -1,21 +1,11 @@
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, Integer, String, Text
+from .database import Base
 
-engine = create_engine('sqlite:///alerts.db')
-Base = declarative_base()
+class User(Base):
+    __tablename__ = "users"
 
-class Alert(Base):
-    __tablename__ = 'alerts'
-    id = Column(Integer, primary_key=True)
-    message = Column(String)
-
-    @classmethod
-    def get_latest(cls):
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        latest_alert = session.query(cls).order_by(cls.id.desc()).first()
-        session.close()
-        return latest_alert
-
-Base.metadata.create_all(engine)
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    email = Column(String, unique=True, index=True)
+    bio = Column(Text, nullable=True)
+    # Add other fields as needed

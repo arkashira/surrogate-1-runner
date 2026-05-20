@@ -1,21 +1,17 @@
-import hmac
-from functools import wraps
-from flask import request, jsonify
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+from .database import get_db
+from .models import User
 
-def token_required(f):
-    """Simple bearer‑token authentication decorator with timing-safe comparison."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.headers.get("Authorization", "")
-        parts = auth.split()
-        
-        if len(parts) != 2 or parts[0].lower() != "bearer":
-            return jsonify({"error": "Unauthorized"}), 401
-        
-        # Timing-safe comparison
-        from .config import API_TOKEN
-        if not hmac.compare_digest(parts[1], API_TOKEN):
-            return jsonify({"error": "Unauthorized"}), 401
-            
-        return f(*args, **kwargs)
-    return decorated
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == 1).first()  # Simplified for example
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
