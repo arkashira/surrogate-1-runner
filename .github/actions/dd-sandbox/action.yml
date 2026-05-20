@@ -1,0 +1,18 @@
+name: 'Datadog Sandbox Provisioner'
+description: 'Provisions a synthetic Datadog sandbox and streams data during a workflow.'
+inputs:
+  api_key:
+    description: 'Datadog API Key'
+    required: true
+  metric_config_path:
+    description: 'Path to the metric configuration file'
+    required: true
+  endpoint:
+    description: 'Optional endpoint URL for the sandbox API'
+    required: false
+outputs:
+  job_id:
+    description: 'The ID of the sandbox job'
+runs:
+  using: 'node16'
+  main: 'index.js'
