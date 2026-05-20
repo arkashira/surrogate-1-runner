@@ -1,0 +1,6 @@
+pre_test_steps:
+  - "echo Starting pre-test setup"
+post_test_steps:
+  - "echo Cleaning up after tests"
+test_runner: "pytest"
+coverage_reporter: "coverage"
