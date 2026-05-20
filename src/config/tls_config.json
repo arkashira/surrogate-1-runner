@@ -1,0 +1,7 @@
+{
+    "certfile": "/opt/axentx/surrogate-1/src/crypto/certs/server.crt",
+    "keyfile": "/opt/axentx/surrogate-1/src/crypto/certs/server.key",
+    "cafile": "/opt/axentx/surrogate-1/src/crypto/certs/ca.crt",
+    "ciphers": "HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP",
+    "options": "ZERO_RETURN"
+}
