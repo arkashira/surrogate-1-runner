@@ -1,0 +1,7 @@
+{
+    "shell_command": "/bin/bash",
+    "webrtc_server": "0.0.0.0",
+    "webrtc_port": 8765,
+    "max_connections": 100,
+    "heartbeat_interval": 30
+}
