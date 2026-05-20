@@ -12,5 +12,8 @@ of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
 normalizes per-schema, dedups via the central md5 hash store, and uploads
 its output to a unique path on the dataset repo:
 
-## Grafana Dashboard
-A Grafana dashboard template is provided in [docs/grafana/kafka_probe_dashboard.json](docs/grafana/kafka_probe_dashboard.json) for monitoring Kafka probe metrics.
+## GitHub Action Usage
+
+This repository provides a reusable GitHub Action `axentx/dependency-checker` that enforces dependency hygiene in CI.
+
+### Basic Usage
