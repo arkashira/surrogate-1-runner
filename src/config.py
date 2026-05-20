@@ -1,32 +1,26 @@
+"""Configuration for the Audit Impact Scoring API."""
+
 import os
-from dataclasses import dataclass, field
-from typing import Dict
+from dataclasses import dataclass
 
-@dataclass(frozen=True)
-class EmailConfig:
-    sender: str
-    recipient: str
-    smtp_server: str
-    smtp_port: int
-    username: str
-    password: str
 
-@dataclass(frozen=True)
-class AlertManagerConfig:
-    url: str  # e.g. http://alertmanager:9093/api/v2/alerts
+@dataclass
+class Config:
+    """Application configuration."""
+    
+    # Scoring weights (must sum to 10 for clean 0-100 scale)
+    SEVERITY_WEIGHT: int = 5   # 50%
+    RESOURCES_WEIGHT: int = 3  # 30%
+    BUSINESS_WEIGHT: int = 2   # 20%
+    
+    # Input bounds
+    MAX_INPUT_VALUE: int = 10
+    MIN_INPUT_VALUE: int = 0
+    
+    # Server settings
+    HOST: str = os.getenv("HOST", "0.0.0.0")
+    PORT: int = int(os.getenv("PORT", "8080"))
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
-@dataclass(frozen=True)
-class AppConfig:
-    metrics_port: int = field(default=8000)
-    dashboard_port: int = field(default=5000)
-    email: EmailConfig = field(default_factory=lambda: EmailConfig(
-        sender=os.getenv("EMAIL_FROM", "surrogate-1@example.com"),
-        recipient=os.getenv("EMAIL_TO", "admin@example.com"),
-        smtp_server=os.getenv("SMTP_SERVER", "smtp.example.com"),
-        smtp_port=int(os.getenv("SMTP_PORT", 587)),
-        username=os.getenv("SMTP_USER", "user@example.com"),
-        password=os.getenv("SMTP_PASS", "password"),
-    ))
-    alertmanager: AlertManagerConfig = field(default_factory=lambda: AlertManagerConfig(
-        url=os.getenv("ALERTMANAGER_URL", "http://alertmanager:9093/api/v2/alerts")
-    ))
+
+config = Config()
