@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Component Reviews</title>
+</head>
+<body>
+    <h2>Component Reviews</h2>
+    
+    <!-- Review submission form -->
+    <form th:action="@{/components/{id}/reviews(__${@request.method=='POST'?'submit':'update'}__)}" method="post">
+        <input type="hidden" th:name="componentId" th:value="${component.id}" />
+        
+        <div>
+            <label>Rating (1-5):</label>
+            <input type="number" name="rating" min="1" max="5" required />
+        </div>
+        
+        <div>
+            <label>Review:</label>
+            <textarea name="reviewText" required></textarea>
+        </div>
+        
+        <button type="submit">Submit Review</button>
+    </form>
+
+    <!-- Display existing reviews -->
+    <h3>Existing Reviews</h3>
+    <div th:if="${reviews.isEmpty()}">No reviews yet.</div>
+    
+    <ul>
+        <li th:each="review : ${reviews}">
+            <strong th:text="${review.user.username}">User</strong> 
+            <span th:text="'Rating: ' + ${review.rating}"></span><br/>
+            <p th:text="${review.reviewText}"></p>
+            <em th:text="${@date.format(review.createdAt, 'yyyy-MM-dd HH:mm')}"></em>
+            <hr/>
+        </li>
+    </ul>
+
+    <!-- Expert insights section -->
+    <h3>Expert Insights</h3>
+    <div th:if="${expertInsights.isEmpty()}">No expert insights available yet.</div>
+    
+    <ul>
+        <li th:each="insight : ${expertInsights}">
+            <strong th:text="'Expert: ' + ${insight.expert.name}'"></strong><br/>
+            <p th:text="${insight.insightText}"></p>
+            <em th:text="'Posted on ' + @date.format(insight.createdAt, 'yyyy-MM-dd')"></em>
+            <hr/>
+        </li>
+    </ul>
+</body>
+</html>
