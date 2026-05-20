@@ -1,16 +1,14 @@
-from sqlalchemy import Column, Integer, JSON, String, Float, TIMESTAMP
-from sqlalchemy.orm import declarative_base
+from . import db
+import datetime
 
-Base = declarative_base()
+class ComplianceAudit(db.Model):
+    """Represents a compliance audit with status tracking."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, complete, failed
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    config_filename = db.Column(db.String(255), nullable=True)
+    documentation = db.Column(db.Text, nullable=True)
 
-
-class PricingRawData(Base):
-    __tablename__ = "pricing_raw_data"
-
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(String, nullable=False, index=True)
-    market = Column(String, nullable=False, index=True)
-    price = Column(Float, nullable=False)
-    currency = Column(String, nullable=False)
-    timestamp = Column(TIMESTAMP(timezone=True), nullable=False)
-    raw_json = Column(JSON, nullable=False)
+    def __repr__(self):
+        return f'<Audit {self.name}>'
