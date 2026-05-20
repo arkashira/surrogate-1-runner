@@ -1,0 +1,53 @@
+{
+  "uid": "upgrade_decisions_dashboard",
+  "title": "Upgrade Decisions",
+  "rows": [
+    {
+      "title": "Monthly Upgrade Decisions",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Count of Distinct Decisions",
+          "type": "graph",
+          "span": 12,
+          "targets": [
+            {
+              "expr": "count(distinct(recommendation_id))",
+              "legendFormat": "{{ recommendation_id }}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "legend": {
+              "show": true
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "time_range",
+        "type": "interval",
+        "query": "1m",
+        "refresh": 1,
+        "options": [
+          {
+            "text": "1 month",
+            "value": "1m"
+          },
+          {
+            "text": "3 months",
+            "value": "3m"
+          },
+          {
+            "text": "6 months",
+            "value": "6m"
+          }
+        ]
+      }
+    ]
+  }
+}
