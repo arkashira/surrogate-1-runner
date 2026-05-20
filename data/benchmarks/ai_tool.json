@@ -1,0 +1,21 @@
+{
+  "category": "AI Tool",
+  "metrics": {
+    "revenue": {
+      "value": 20000000,
+      "unit": "USD"
+    },
+    "api_calls": {
+      "value": 1000000,
+      "unit": "calls"
+    },
+    "user_growth_rate": {
+      "value": 20,
+      "unit": "%"
+    },
+    "model_accuracy": {
+      "value": 95,
+      "unit": "%"
+    }
+  }
+}

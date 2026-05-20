@@ -1,0 +1,21 @@
+{
+  "category": "Financial Services",
+  "metrics": {
+    "revenue": {
+      "value": 150000000,
+      "unit": "USD"
+    },
+    "transaction_volume": {
+      "value": 200000,
+      "unit": "transactions"
+    },
+    "customer_satisfaction": {
+      "value": 85,
+      "unit": "%"
+    },
+    "fraud_detection_rate": {
+      "value": 90,
+      "unit": "%"
+    }
+  }
+}

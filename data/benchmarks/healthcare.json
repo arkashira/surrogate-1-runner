@@ -1,0 +1,21 @@
+{
+  "category": "Healthcare",
+  "metrics": {
+    "revenue": {
+      "value": 120000000,
+      "unit": "USD"
+    },
+    "patient_engagement": {
+      "value": 75,
+      "unit": "%"
+    },
+    "diagnosis_accuracy": {
+      "value": 92,
+      "unit": "%"
+    },
+    "treatment_success_rate": {
+      "value": 88,
+      "unit": "%"
+    }
+  }
+}

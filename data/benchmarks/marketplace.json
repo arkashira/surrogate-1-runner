@@ -1,0 +1,21 @@
+{
+  "category": "Marketplace",
+  "metrics": {
+    "revenue": {
+      "value": 50000000,
+      "unit": "USD"
+    },
+    "transaction_volume": {
+      "value": 100000,
+      "unit": "transactions"
+    },
+    "conversion_rate": {
+      "value": 3,
+      "unit": "%"
+    },
+    "average_order_value": {
+      "value": 50,
+      "unit": "USD"
+    }
+  }
+}

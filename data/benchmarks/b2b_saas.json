@@ -1,0 +1,21 @@
+{
+  "category": "B2B SaaS",
+  "metrics": {
+    "revenue": {
+      "value": 100000000,
+      "unit": "USD"
+    },
+    "customer_acquisition_cost": {
+      "value": 500,
+      "unit": "USD"
+    },
+    "churn_rate": {
+      "value": 15,
+      "unit": "%"
+    },
+    "customer_lifetime_value": {
+      "value": 10000,
+      "unit": "USD"
+    }
+  }
+}
