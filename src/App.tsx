@@ -1,11 +1,15 @@
 import React from 'react';
-import MapWithOverlay from './components/MapWithOverlay';
+import { Provider } from 'react-redux';
+import store from './store/store';
+import PasscodeInput from './components/PasscodeInput';
 
-const App: React.FC = () => {
+const App = () => {
   return (
-    <div className="App">
-      <MapWithOverlay />
-    </div>
+    <Provider store={store}>
+      <div className="App">
+        <PasscodeInput />
+      </div>
+    </Provider>
   );
 };
 
