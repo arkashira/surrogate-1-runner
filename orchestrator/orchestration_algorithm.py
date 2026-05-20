@@ -1,154 +1,101 @@
 """
-Deterministic orchestration algorithm for LLM agents.
+Orchestrator – a lightweight, generic async scheduler.
 
-The algorithm guarantees that for a given request identifier the same
-ordering of agents is used, and that all agents are invoked concurrently
-to meet sub‑200 ms latency requirements.
+The orchestrator is intentionally agnostic: it can schedule
+any async callable – whether it is an LLM agent, a dataset‑ingest
+worker, or any other coroutine.
 
 Key features
 ------------
-* Deterministic ordering: agents are sorted by their name and the
-  starting index is derived from a hash of the request identifier.
-* Concurrent execution: all agents are awaited in parallel using
-  asyncio.gather.
-* Timeout handling: the entire orchestration is bounded by a configurable
-  timeout (default 200 ms). If the timeout is exceeded, the function
-  returns partial results with a TimeoutError for the unfinished
-  agents.
-* Simple Agent interface: an agent must expose an async `run(request)`
-  coroutine that returns a string result.
-
-Usage
------
->>> from orchestrator.orchestration_algorithm import orchestrate, DummyAgent
->>> agents = [DummyAgent('A'), DummyAgent('B'), DummyAgent('C')]
->>> results = await orchestrate(agents, request_id='12345')
->>> print(results)
-{'A': 'A-12345', 'B': 'B-12345', 'C': 'C-12345'}
+* **Concurrency limiting** – `max_concurrent` workers run in parallel.
+* **Per‑agent timeout** – `agent_timeout` seconds; a timeout raises
+  `asyncio.TimeoutError` which is captured and returned in the results.
+* **Result collection** – `asyncio.gather(..., return_exceptions=True)`
+  ensures that a failure in one worker does not abort the whole batch.
 """
 
+from __future__ import annotations
+
 import asyncio
-import hashlib
-import time
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from dataclasses import dataclass
+from typing import Awaitable, Callable, Iterable, List, Sequence, Union
 
-# --------------------------------------------------------------------------- #
-# Agent interface
-# --------------------------------------------------------------------------- #
-class Agent:
+# A worker can be a coroutine function or an async callable instance.
+Worker = Union[Callable[[], Awaitable], Callable[[], Awaitable]]
+
+
+@dataclass
+class OrchestratorConfig:
+    """Configuration for the orchestrator."""
+    max_concurrent: int = 5          # Max workers running in parallel
+    agent_timeout: float = 0.2      # Seconds before a worker is timed out
+
+
+class Orchestrator:
     """
-    Base class for LLM agents.
-
-    Subclasses must implement the async `run(request: Any) -> str` method.
+    Orchestrator runs a collection of async workers with a concurrency limit
+    and per‑worker timeout.
     """
-    name: str
 
-    async def run(self, request: Any) -> str:
-        raise NotImplementedError
+    def __init__(self, workers: Sequence[Worker], config: OrchestratorConfig | None = None):
+        self.workers: List[Worker] = list(workers)
+        self.config = config or OrchestratorConfig()
+
+    async def _run_worker(self, worker: Worker) -> Union[object, Exception]:
+        """
+        Execute a single worker with timeout.  Any exception (including
+        asyncio.TimeoutError) is returned instead of raised.
+        """
+        try:
+            return await asyncio.wait_for(worker(), timeout=self.config.agent_timeout)
+        except Exception as exc:          # noqa: BLE001
+            return exc
+
+    async def orchestrate(self) -> List[Union[object, Exception]]:
+        """
+        Run all workers respecting the concurrency limit and return a list
+        of results (or exceptions) in the same order as the input workers.
+        """
+        semaphore = asyncio.Semaphore(self.config.max_concurrent)
+
+        async def sem_task(worker: Worker):
+            async with semaphore:
+                return await self._run_worker(worker)
+
+        tasks = [asyncio.create_task(sem_task(w)) for w in self.workers]
+        return await asyncio.gather(*tasks, return_exceptions=True)
 
 
-# --------------------------------------------------------------------------- #
-# Orchestration logic
-# --------------------------------------------------------------------------- #
-def _hash_request(request_id: str) -> int:
-    """Return a deterministic integer hash for the request identifier."""
-    return int(hashlib.sha256(request_id.encode()).hexdigest(), 16)
-
-
-def _deterministic_order(
-    agents: Sequence[Agent], request_id: str
-) -> List[Agent]:
+def run_orchestration(
+    workers: Sequence[Worker],
+    *,
+    max_concurrent: int | None = None,
+    agent_timeout: float | None = None,
+) -> List[Union[object, Exception]]:
     """
-    Return a deterministic ordering of agents based on the request_id.
-
-    The ordering is a rotation of the agents sorted by name, starting at
-    an index derived from the request_id hash.
-    """
-    sorted_agents = sorted(agents, key=lambda a: a.name)
-    start_index = _hash_request(request_id) % len(sorted_agents)
-    return sorted_agents[start_index:] + sorted_agents[:start_index]
-
-
-async def orchestrate(
-    agents: Iterable[Agent],
-    request_id: str,
-    timeout: float = 0.2,
-) -> Dict[str, str]:
-    """
-    Orchestrate the given agents for the specified request.
+    Convenience wrapper that can be called from synchronous code.
+    It creates an event loop (or re‑uses the current one) and returns
+    the list of results.
 
     Parameters
     ----------
-    agents : Iterable[Agent]
-        The LLM agents to invoke.
-    request_id : str
-        Identifier for the request; used to deterministically order agents.
-    timeout : float, optional
-        Maximum allowed time in seconds for the entire orchestration.
-        Defaults to 0.2 (200 ms).
+    workers : Sequence[Worker]
+        Iterable of async callables.
+    max_concurrent : int, optional
+        Override the default concurrency limit.
+    agent_timeout : float, optional
+        Override the default per‑worker timeout.
 
     Returns
     -------
-    Dict[str, str]
-        Mapping from agent name to its result. If an agent fails or times
-        out, its entry will be the exception string.
+    List[Union[object, Exception]]
+        Results or exceptions in the same order as `workers`.
     """
-    ordered_agents = _deterministic_order(list(agents), request_id)
+    config = OrchestratorConfig(
+        max_concurrent=max_concurrent or OrchestratorConfig().max_concurrent,
+        agent_timeout=agent_timeout or OrchestratorConfig().agent_timeout,
+    )
+    orchestrator = Orchestrator(workers, config)
 
-    async def _run_agent(agent: Agent) -> Tuple[str, Any]:
-        try:
-            result = await agent.run(request_id)
-            return agent.name, result
-        except Exception as exc:
-            return agent.name, f"Error: {exc}"
-
-    # Start all agents concurrently
-    tasks = [_run_agent(a) for a in ordered_agents]
-    try:
-        results = await asyncio.wait_for(
-            asyncio.gather(*tasks), timeout=timeout
-        )
-    except asyncio.TimeoutError:
-        # If timeout occurs, gather partial results
-        results = []
-        for task in tasks:
-            if task.done():
-                results.append(task.result())
-            else:
-                task.cancel()
-                results.append((task.get_coro().cr_frame.f_locals['agent'].name, "Timeout"))
-
-    return dict(results)
-
-
-# --------------------------------------------------------------------------- #
-# Dummy agent for testing and demonstration
-# --------------------------------------------------------------------------- #
-class DummyAgent(Agent):
-    """
-    Simple agent that returns its name appended with the request_id after a
-    short sleep. Useful for unit tests and demonstrations.
-    """
-
-    def __init__(self, name: str, sleep_ms: int = 50):
-        self.name = name
-        self.sleep_ms = sleep_ms
-
-    async def run(self, request: Any) -> str:
-        await asyncio.sleep(self.sleep_ms / 1000.0)
-        return f"{self.name}-{request}"
-
-
-# --------------------------------------------------------------------------- #
-# If run as a script, demonstrate usage
-# --------------------------------------------------------------------------- #
-if __name__ == "__main__":
-    async def demo():
-        agents = [DummyAgent("A"), DummyAgent("B"), DummyAgent("C")]
-        start = time.perf_counter()
-        results = await orchestrate(agents, request_id="demo-123")
-        elapsed = (time.perf_counter() - start) * 1000
-        print(f"Results: {results}")
-        print(f"Elapsed: {elapsed:.2f} ms")
-
-    asyncio.run(demo())
+    # `asyncio.run` creates a fresh event loop and is safe to call from scripts.
+    return asyncio.run(orchestrator.orchestrate())
