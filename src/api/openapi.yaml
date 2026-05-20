@@ -1,0 +1,71 @@
+openapi: 3.0.2
+info:
+  title: Axentx Surrogate API
+  description: API for offloading network handling
+  version: 1.0.0
+paths:
+  /download:
+    post:
+      summary: Download a YouTube video
+      description: Returns a ready-to-download link for a given YouTube URL
+      parameters:
+        - in: header
+          name: api-key
+          schema:
+            type: string
+          required: true
+          description: API key for authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: YouTube video URL
+      responses:
+        '200':
+          description: Ready-to-download link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    default: ready
+                  download_url:
+                    type: string
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    default: Unauthorized
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    default: Too Many Requests
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    default: Internal Server Error
