@@ -1,37 +1,27 @@
-# Dockerfile
-# -------------------------------------------------------------
-# Build image for the surrogate‑1 English module
-# -------------------------------------------------------------
-FROM python:3.11-slim
+name: CI
 
-# Avoid creating .pyc files and keep logs to stdout
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+on: [push, pull_request]
 
-# Install system deps needed for building wheels
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Poetry (pin to a stable version)
-RUN pip install --no-cache-dir poetry==1.8.3
-
-# Work‑dir
-WORKDIR /app
-
-# Copy Poetry lockfiles first – Docker cache hit if deps unchanged
-COPY pyproject.toml poetry.lock ./
-
-# Install Python deps (no‑dev for production image)
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-dev
-
-# Copy the rest of the code
-COPY . .
-
-# Expose the default port (adjust if your app uses a different one)
-EXPOSE 8000
-
-# Default command – change to your entry‑point
-CMD ["python", "-m", "surrogate1.runner"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source $HOME/.cargo/env
+    - name: Build
+      run: |
+        source $HOME/.cargo/env
+        cargo build --release
+    - name: Test
+      run: |
+        source $HOME/.cargo/env
+        cargo test
+    - name: Verify Java Removal
+      run: |
+        if command -v java &> /dev/null; then
+          echo "Error: Java is still installed. Please remove it to ensure optimal performance."
+          exit 1
+        fi
