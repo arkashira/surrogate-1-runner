@@ -1,0 +1,22 @@
+{
+  "kubernetes": {
+    "tooltip": "Kubernetes is an open-source system for automating deployment, scaling, and management of containerized applications.",
+    "explanation": "Why this step? Kubernetes abstracts the underlying infrastructure, allowing you to focus on application logic.",
+    "video": "https://www.youtube.com/watch?v=xxxx"
+  },
+  "pod": {
+    "tooltip": "A pod is the smallest deployable unit in Kubernetes, consisting of one or more containers.",
+    "explanation": "Why this step? Pods provide a shared context for containers, enabling efficient resource sharing.",
+    "video": "https://www.youtube.com/watch?v=yyyy"
+  },
+  "service": {
+    "tooltip": "A Service in Kubernetes is an abstraction that defines a logical set of Pods and a policy to access them.",
+    "explanation": "Why this step? Services enable stable networking and load balancing across dynamic sets of Pods.",
+    "video": "https://www.youtube.com/watch?v=zzzz"
+  },
+  "deployment": {
+    "tooltip": "A Deployment ensures that a specified number of pod replicas are running at any given time.",
+    "explanation": "Why this step? Deployments provide declarative updates for Pods and ReplicaSets.",
+    "video": "https://www.youtube.com/watch?v=aaaa"
+  }
+}
