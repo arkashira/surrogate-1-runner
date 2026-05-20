@@ -1,6 +1,22 @@
-pre_test_steps:
-  - "echo Starting pre-test setup"
-post_test_steps:
-  - "echo Cleaning up after tests"
-test_runner: "pytest"
-coverage_reporter: "coverage"
+# YAML schema for surrogate-1 configuration.
+# The ``github_action`` section is optional; when omitted the integration
+# is considered disabled.
+
+github_action:
+  # Enable or disable the GitHub Actions integration.
+  enabled: false
+
+  # List of shell commands to run before the test command.
+  pre_steps:
+    - string
+
+  # Shell command used to run the test suite.
+  test_command: string
+
+  # Shell command used to generate coverage.  It is expected to
+  # produce a coverage report on stdout.
+  coverage_command: string
+
+  # List of shell commands to run after coverage has been generated.
+  post_steps:
+    - string
