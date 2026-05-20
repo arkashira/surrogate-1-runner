@@ -1,0 +1,5 @@
+{
+  "base_url": "https://api.native-speaker.example.com/v1",
+  "api_key": "YOUR_API_KEY_HERE",
+  "timeout_seconds": 30
+}
