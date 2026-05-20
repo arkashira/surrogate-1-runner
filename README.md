@@ -1,3 +1,4 @@
+
 # surrogate-1-runner
 
 Parallel public-dataset ingest workers for the
@@ -13,7 +14,5 @@ normalizes per-schema, dedups via the central md5 hash store, and uploads
 its output to a unique path on the dataset repo:
 
 ## Installation
-
-To install the necessary dependencies and set up the environment, follow these steps:
 
 1. Clone the repository:
