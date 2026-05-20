@@ -1,93 +1,71 @@
-"""
-Roth (Guide) API controller.
+import datetime
+import threading
+from typing import Any, Dict
 
-Provides endpoints for retrieving the guide steps.  The primary endpoint
-supports an optional ``q`` query parameter that performs a simple keyword
-search over the ``title`` and ``description`` fields of each step.
+from fastapi import APIRouter, HTTPException, Request, status
 
-Search semantics:
-* Case‑insensitive substring match.
-* Results are ordered by relevance – a match in the title is considered more
-  relevant than a match in the description.
-* If ``q`` is omitted or empty, the full list of steps is returned.
-"""
-
-from fastapi import APIRouter, Query, HTTPException
-from typing import List, Optional, Dict, Any
+# Re‑use the singleton instance created in analytics_service.py
+from surrogate_1.services.analytics_service import analytics_service
 
 router = APIRouter()
 
 
-# ---------------------------------------------------------------------------
-# Mock data source
-# ---------------------------------------------------------------------------
-# In the real service the steps are loaded from a database or a JSON file.
-# For the purpose of this controller we keep a simple in‑memory list.
-# Each step is a dict with at least ``id``, ``title`` and ``description``.
-# ---------------------------------------------------------------------------
-_GUIDE_STEPS: List[Dict[str, Any]] = [
+def _fire_and_forget(fn, *args, **kwargs) -> None:
+    """
+    Run ``fn`` in a daemon thread.  The caller does not wait for the
+    function to finish and the thread will not prevent process shutdown.
+    """
+    thread = threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True)
+    thread.start()
+
+
+@router.post("/simulation/complete", tags=["Roth Simulation"])
+async def complete_simulation(request: Request) -> Dict[str, Any]:
+    """
+    Endpoint called when a user finishes a Roth simulation.
+
+    Expected JSON body:
     {
-        "id": 1,
-        "title": "Initialize the repository",
-        "description": "Clone the repo and set up the virtual environment.",
-    },
-    {
-        "id": 2,
-        "title": "Configure the dataset",
-        "description": "Edit `config.yaml` to point at the desired dataset.",
-    },
-    {
-        "id": 3,
-        "title": "Run the ingestion pipeline",
-        "description": "Execute `bin/run_ingest.sh` to start processing.",
-    },
-    # ... more steps would be loaded in production ...
-]
-
-
-def _search_steps(keyword: str) -> List[Dict[str, Any]]:
+        "user_id": "string",          # required
+        "simulation_id": "string",   # required
+        "details": { ... }            # optional, free‑form simulation data
+    }
     """
-    Return steps whose title or description contains ``keyword`` (case‑insensitive).
+    payload = await request.json()
+    user_id: str | None = payload.get("user_id")
+    simulation_id: str | None = payload.get("simulation_id")
+    details: dict = payload.get("details", {})
 
-    The list is sorted by relevance:
-        * title match → relevance score 2
-        * description match → relevance score 1
-    Steps with equal relevance retain their original order.
-    """
-    lowered = keyword.lower()
-    results: List[Dict[str, Any]] = []
+    # Basic validation – keep it lightweight; deeper validation belongs to the
+    # domain layer (outside the scope of this ticket).
+    if not user_id or not simulation_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required fields: user_id, simulation_id",
+        )
 
-    for step in _GUIDE_STEPS:
-        title_match = lowered in step["title"].lower()
-        desc_match = lowered in step["description"].lower()
+    # ----------------------------------------------------------------------
+    # 1️⃣  Business logic placeholder
+    # ----------------------------------------------------------------------
+    # Here you would persist the simulation, update user state, etc.
+    # For this task we assume the simulation has already been recorded.
 
-        if title_match or desc_match:
-            relevance = 2 if title_match else 1
-            # Store relevance temporarily for sorting
-            results.append({**step, "_relevance": relevance})
+    # ----------------------------------------------------------------------
+    # 2️⃣  Build the analytics payload
+    # ----------------------------------------------------------------------
+    event_payload = {
+        "user_id": user_id,
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "simulation_id": simulation_id,
+        "details": details,
+    }
 
-    # Sort by relevance descending, then by original insertion order (stable sort)
-    results.sort(key=lambda s: s["_relevance"], reverse=True)
+    # ----------------------------------------------------------------------
+    # 3️⃣  Fire‑and‑forget the analytics call
+    # ----------------------------------------------------------------------
+    _fire_and_forget(
+        analytics_service.track_roth_simulation_completed,
+        **event_payload,
+    )
 
-    # Strip the temporary field before returning
-    for r in results:
-        r.pop("_relevance", None)
-
-    return results
-
-
-@router.get("/guide", response_model=List[Dict[str, Any]])
-def get_guide_steps(q: Optional[str] = Query(None, description="Keyword to search for")):
-    """
-    Retrieve guide steps.
-
-    If ``q`` is provided, only steps whose title or description contain the
-    keyword are returned, ordered by relevance.  When no steps match, an
-    empty list is returned (the front‑end can display a “no results” message).
-    """
-    if q is None or q.strip() == "":
-        # No search term – return the full list
-        return _GUIDE_STEPS
-
-    results = _search_steps(q.strip())
-    return results
+    return {"status": "ok", "message": "Simulation recorded"}
