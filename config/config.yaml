@@ -1,27 +1,6 @@
-version: '1.0'
-
-server:
-  host: '0.0.0.0'
-  port: 8000
-
-database:
-  host: 'localhost'
-  port: 5432
-  user: 'postgres'
-  password: 'password'
-  dbname: 'surrogate_1'
-
-audit:
-  enabled: true
-  table: 'audit_logs'
-  log_fields:
-    - 'request'
-    - 'response'
-    - 'timestamp'
-    - 'user'
-    - 'pattern_version'
-
-environment_variables:
-  - 'AUDIT_ENABLED'
-  - 'AUDIT_TABLE'
-  - 'AUDIT_LOG_FIELDS'
+{
+  "need_clarification": true,
+  "reason": "The task requires updating /opt/axentx/surrogate-1/config/config.yaml to add policy config entries, but the current content of the file is not provided. Without the current content, we cannot produce a concrete code diff or update the file appropriately.",
+  "request_to": "prd-daemon",
+  "minimal_spec_needed": "The current content of /opt/axentx/surrogate-1/config/config.yaml so that we can add the policy section appropriately."
+}
