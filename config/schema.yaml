@@ -1,22 +1,15 @@
-# YAML schema for surrogate-1 configuration.
-# The ``github_action`` section is optional; when omitted the integration
-# is considered disabled.
-
-github_action:
-  # Enable or disable the GitHub Actions integration.
+version: 1
+services:
+  ai:
+    - name: "service1"
+      enabled: false
+    - name: "service2"
+      enabled: false
+    - name: "service3"
+      enabled: false
+freedom_link:
   enabled: false
-
-  # List of shell commands to run before the test command.
-  pre_steps:
-    - string
-
-  # Shell command used to run the test suite.
-  test_command: string
-
-  # Shell command used to generate coverage.  It is expected to
-  # produce a coverage report on stdout.
-  coverage_command: string
-
-  # List of shell commands to run after coverage has been generated.
-  post_steps:
-    - string
+  ai_services:
+    - "service1"
+    - "service2"
+    - "service3"
