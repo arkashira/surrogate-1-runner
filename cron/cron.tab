@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "No script file path provided for the MASE reporting logic; cannot infer correct location or name. Also, Slack webhook configuration method and log file path (`usage.log`) location are unspecified.",
+  "request_to": "prd-daemon",
+  "minimal_spec_needed": "Specify: (1) path to the MASE reporting script, (2) expected location of usage.log, (3) how Slack webhook URL is configured (env var? config file?)"
+}
