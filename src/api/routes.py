@@ -1,18 +1,61 @@
-from flask import request, jsonify
-from flask_restful import Resource
-from flask_jwt_extended import get_current_user, jwt_required
-from models import User, Term, db
+from flask import Blueprint, jsonify, request, send_file
+import csv
+import io
+from datetime import datetime
+from ..services.progress_service import get_user_progress
 
-class TermsResource(Resource):
-    @jwt_required()
-    def post(self, term_id):
-        """Mark a term as learned by the current user"""
-        current_user = get_current_user()
-        term = Term.query.get_or_404(term_id)
-        
-        if term in current_user.learned_terms:
-            return jsonify({"msg": "Term already marked as learned", "term_id": term_id}), 200
+api_bp = Blueprint('api', __name__)
 
-        current_user.learned_terms.append(term)
-        db.session.commit()
-        return jsonify({"msg": "Term marked as learned", "term_id": term_id}), 201
+@api_bp.route('/dashboard', methods=['GET'])
+def dashboard():
+    """Return user's dashboard data including session count, learned terms percentage, and streak."""
+    # This would typically fetch from a database or cache
+    progress_data = get_user_progress()
+    
+    return jsonify({
+        'total_sessions': progress_data['total_sessions'],
+        'terms_learned_percentage': progress_data['terms_learned_percentage'],
+        'current_streak': progress_data['current_streak']
+    })
+
+@api_bp.route('/export-progress', methods=['GET'])
+def export_progress():
+    """Export user's progress data as CSV."""
+    progress_data = get_user_progress()
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'metric',
+        'value',
+        'timestamp'
+    ])
+    
+    # Write data rows
+    writer.writerow([
+        'total_sessions',
+        progress_data['total_sessions'],
+        datetime.now().isoformat()
+    ])
+    writer.writerow([
+        'terms_learned_percentage',
+        progress_data['terms_learned_percentage'],
+        datetime.now().isoformat()
+    ])
+    writer.writerow([
+        'current_streak',
+        progress_data['current_streak'],
+        datetime.now().isoformat()
+    ])
+    
+    # Prepare response
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode()),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='progress_export.csv'
+    )
