@@ -1,22 +1,21 @@
-from decimal import Decimal
-from django.db import models
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field, validator
 
+class Rule(BaseModel):
+    id: str
+    action: str = Field(..., regex="^(allow|deny|audit)$")
+    condition: Dict[str, Any]
+    description: str | None = None
 
-class Cost(models.Model):
-    """
-    One row = the amount a *worker* spent on a *provider*.
-    """
-    worker_id = models.CharField(max_length=64)          # e.g. “worker‑42”
-    provider   = models.CharField(max_length=64)        # e.g. “aws”, “gcp”
-    amount     = models.DecimalField(max_digits=20,
-                                     decimal_places=2,
-                                     default=Decimal("0.00"))
+class Policy(BaseModel):
+    name: str
+    version: str
+    description: str | None = None
+    rules: List[Rule]
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["worker_id"]),
-            models.Index(fields=["provider"]),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.worker_id} – {self.provider}: {self.amount}"
+    @validator("version")
+    def semver(cls, v):
+        # Very light check – replace with a proper semver lib if needed
+        if not v.count(".") == 2:
+            raise ValueError("version must be semver (e.g. 1.0.0)")
+        return v
