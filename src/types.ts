@@ -1,20 +1,14 @@
-
-export interface Instance {
+export interface CostAnomaly {
   id: string;
-  instanceType: string;
-  utilization: number; // e.g., percentage
-  cost: number;
-  performance: number;
+  severity: string;
+  type: string;
+  timestamp: string;
+  description: string;
+  remediation: string;
 }
 
-export interface AlternativeInstance {
-  id: string;
-  instanceType: string;
-  cost: number;
-  performance: number;
-  tradeoff: string; // Description of pros/cons
-}
-
-export interface UtilizationMap {
-  [instanceId: string]: Instance;
+export interface CostAnomalyFilter {
+  severity?: string;
+  type?: string;
+  timeRange?: string;
 }
