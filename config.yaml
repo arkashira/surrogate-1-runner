@@ -1,4 +1,32 @@
-dataset_path: "/path/to/dataset"
-output_path: "/path/to/output"
-shard_count: 16
-interval_minutes: 30
+# Configuration for surrogate-1 dataset ingestion pipeline
+
+# Dataset configuration
+dataset:
+  name: "axentx/surrogate-1-training-pairs"
+  repo_url: "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs"
+  repo_type: "dataset"
+
+# Ingestion settings
+ingestion:
+  workers: 16
+  interval_minutes: 30
+  retry_attempts: 3
+  timeout_seconds: 300
+
+# Storage settings
+storage:
+  output_dir: "data/output"
+  temp_dir: "data/temp"
+  cache_dir: "data/cache"
+
+# Schema validation settings
+validation:
+  enabled: true
+  schema_path: "/opt/axentx/surrogate-1/schema.json"
+  strict_mode: true
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "json"
+  output: "logs/ingestion.log"
