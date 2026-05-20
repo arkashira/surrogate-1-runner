@@ -1,0 +1,13 @@
+{
+  "auditLogDir": "/var/log/webshell/audit",
+  "reportDir": "/opt/axentx/surrogate-1/webshell/reports",
+  "port": 3000,
+  "auth": {
+    "jwtSecret": "REPLACE_WITH_SECURE_SECRET",
+    "tokenExpiry": "1h"
+  },
+  "rateLimit": {
+    "windowMs": 60000,
+    "maxRequests": 60
+  }
+}
