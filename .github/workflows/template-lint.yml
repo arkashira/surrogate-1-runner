@@ -1,0 +1,27 @@
+
+name: Template Lint
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_file:
+        description: "Path to the YAML template file"
+        required: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Lint template
+      run: |
+        yamllint ${{ inputs.template_file }}
+
+    - name: Exit with failure if linting failed
+      run: |
+        if [ $? -ne 0 ]; then
+          echo "Template linting failed."
+          exit 1
+        fi
