@@ -1,0 +1,13 @@
+{
+  "model_type": "transformer",
+  "model_name": "surrogate-1-ai-assistant",
+  "version": "1.0.0",
+  "description": "AI assistant for code suggestions and completions",
+  "parameters": {
+    "max_tokens": 2048,
+    "temperature": 0.7,
+    "top_p": 0.9
+  },
+  "supported_languages": ["python", "javascript", "typescript", "java", "cpp"],
+  "context_window_size": 4096
+}
