@@ -1,20 +1,29 @@
-use serde::Deserialize;
-use config::{Config, ConfigError, Environment, File};
+use std::fs;
+use serde_yaml::{self, Value};
+use crate::provider::{ProviderType, Provider};
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct Settings {
-    pub database_url: String,
-    pub email_from: String,
-    pub max_emails_per_min: u32,
-    pub alert_cron: String, // e.g. "0 * * * *" – every hour
-}
+pub fn load_config(path: &str) -> HashMap<String, Provider> {
+    let contents = fs::read_to_string(path).expect("Failed to read config file");
+    let yaml: Value = serde_yaml::from_str(&contents).expect("Failed to parse YAML");
 
-impl Settings {
-    pub fn from_env() -> Result<Self, ConfigError> {
-        Config::builder()
-            .add_source(File::with_name("Settings").required(false))
-            .add_source(Environment::default().separator("_"))
-            .build()?
-            .try_deserialize()
+    let mut providers = HashMap::new();
+
+    if let Some(yaml_providers) = yaml.get("providers") {
+        if let Some(yaml_providers_array) = yaml_providers.as_sequence() {
+            for provider_yaml in yaml_providers_array {
+                if let Some(provider_type) = provider_yaml.get("type").and_then(|v| v.as_str()) {
+                    let provider_type_enum: ProviderType = provider_type.into();
+                    let provider = Provider {
+                        provider_type: provider_type_enum,
+                        // Initialize other fields based on the YAML configuration
+                    };
+                    providers.insert(provider_type.to_string(), provider);
+                } else {
+                    eprintln!("Warning: Unknown provider type found in config.");
+                }
+            }
+        }
     }
+
+    providers
 }
