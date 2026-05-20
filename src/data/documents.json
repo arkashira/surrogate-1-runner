@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "title": "Data Ingestion Workflow",
+    "content": "Parallel public‑dataset ingest workers for surrogate‑1‑training‑pairs dataset",
+    "workflowName": "Data Ingestion",
+    "workflowLink": "/workflows/data-ingestion"
+  },
+  {
+    "id": 2,
+    "title": "Normalization Schema",
+    "content": "Schema definitions for dataset normalization and deduplication",
+    "workflowName": "Data Processing",
+    "workflowLink": "/workflows/data-processing"
+  },
+  {
+    "id": 3,
+    "title": "GitHub Actions Configuration",
+    "content": "Workflow dispatch and scheduling configuration for surrogate runners",
+    "workflowName": "CI/CD",
+    "workflowLink": "/workflows/ci-cd"
+  }
+]
