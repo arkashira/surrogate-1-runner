@@ -1,0 +1,19 @@
+name: surrogate1
+description: Integration for surrogate-1 metrics
+metrics:
+  - name: successful_downloads_total
+    type: counter
+    help: Total number of successful downloads
+    labels:
+      - name: shard_id
+        value: "{{ .Labels.shard_id }}"
+  - name: blocked_requests_total
+    type: counter
+    help: Total number of blocked requests
+    labels:
+      - name: shard_id
+        value: "{{ .Labels.shard_id }}"
+scrape_configs:
+  - job_name: 'surrogate1'
+    static_configs:
+      - targets: ['localhost:9090']
