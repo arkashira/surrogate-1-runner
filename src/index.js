@@ -1,14 +1,10 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const auditRouter = require('./api/audit');
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Dashboard from './components/Dashboard';
 
-const app = express();
-app.use(bodyParser.json());
-
-// Mount audit routes
-app.use('/audit', auditRouter);
-
-// Optional: health‑check
-app.get('/health', (req, res) => res.send('OK'));
-
-module.exports = app;
+ReactDOM.render(
+  <React.StrictMode>
+    <Dashboard />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
