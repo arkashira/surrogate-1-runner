@@ -1,0 +1,23 @@
+version: '3'
+services:
+  documentation:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./docs:/usr/share/nginx/html
+    restart: always
+  search:
+    image: elasticsearch:8.11.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - cluster.name=axentx-docs-search
+      - node.name=axentx-docs-search-node
+    restart: always
+  versioning:
+    image: git:latest
+    volumes:
+      - ./versions:/versions
+    restart: always

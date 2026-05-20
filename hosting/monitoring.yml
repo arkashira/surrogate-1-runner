@@ -1,0 +1,21 @@
+monitoring:
+  enabled: true
+  metrics:
+    - search_queries_per_second
+    - search_latency_p99
+    - documentation_build_duration
+    - storage_usage
+    - version_count
+  alerts:
+    - name: search_latency_high
+      threshold: 5000  # ms
+      window: 5m
+      severity: warning
+    - name: build_failure
+      threshold: 1
+      window: 1h
+      severity: critical
+    - name: storage_critical
+      threshold: 90
+      window: 1h
+      severity: warning

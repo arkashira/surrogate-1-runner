@@ -1,0 +1,24 @@
+pipeline:
+  trigger:
+    - push:
+        branches:
+          - main
+          - release/*
+    - schedule:
+        cron: "0 */6 * * *"  # Every 6 hours
+  stages:
+    - name: validate
+      actions:
+        - validate_yaml
+        - check_links
+        - validate_kotlin_docs
+    - name: build
+      actions:
+        - generate_index
+        - build_search_index
+        - upload_to_s3
+    - name: deploy
+      actions:
+        - deploy_to_cdn
+        - update_search_endpoint
+        - notify_webhook

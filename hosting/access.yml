@@ -1,0 +1,17 @@
+access:
+  public:
+    enabled: true
+    rate_limit: 1000  # requests per minute
+  authenticated:
+    enabled: true
+    provider: github
+    scopes:
+      - read:docs
+      - write:docs
+  private:
+    enabled: true
+    provider: iam
+    roles:
+      - documentation_writer
+      - documentation_reviewer
+      - documentation_admin

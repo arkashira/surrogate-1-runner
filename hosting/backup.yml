@@ -1,0 +1,11 @@
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention:
+    daily: 7
+    weekly: 4
+    monthly: 12
+  destination:
+    provider: s3
+    bucket: axentx-surrogate-1-docs-backup
+    encryption: aws_kms
