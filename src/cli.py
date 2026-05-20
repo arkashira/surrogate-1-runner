@@ -1,78 +1,97 @@
+#!/usr/bin/env python3
+"""CLI for surrogate-1 dataset management."""
+
 import argparse
 import sys
-from .detector import detect_latest
-from .dataset.enrich import enrich_dataset
+import yaml
+import requests
+from pathlib import Path
 
-def _cmd_detect(_args: argparse.Namespace) -> int:
-    """
-    Detect breaking changes against the latest deployment.
 
-    Returns:
-        int: 0 → no breaking changes, 1 → breaking changes found
-    """
-    changes = detect_latest()
-    if changes:
-        for line in changes:
-            print(line)
+def load_config(config_path: str = "/opt/axentx/surrogate-1/config.yaml") -> dict:
+    """Load configuration from YAML file."""
+    path = Path(config_path)
+    if not path.exists():
+        return {"sources": []}
+    with open(path, "r") as f:
+        return yaml.safe_load(f) or {"sources": []}
+
+
+def save_config(config: dict, config_path: str = "/opt/axentx/surrogate-1/config.yaml") -> None:
+    """Save configuration to YAML file."""
+    with open(config_path, "w") as f:
+        yaml.dump(config, f, default_flow_style=False)
+
+
+def validate_url(url: str) -> bool:
+    """Validate that a URL is reachable."""
+    try:
+        response = requests.head(url, timeout=10, allow_redirects=True)
+        return response.status_code < 400
+    except requests.RequestException:
+        return False
+
+
+def add_source(url: str, config_path: str = "/opt/axentx/surrogate-1/config.yaml") -> int:
+    """Add a new dataset source to the configuration."""
+    # Validate URL is reachable
+    print(f"Validating URL: {url}")
+    if not validate_url(url):
+        print(f"Error: URL {url} is not reachable", file=sys.stderr)
         return 1
-    print("No breaking changes.")
+    
+    # Load existing config
+    config = load_config(config_path)
+    
+    # Initialize sources list if not present
+    if "sources" not in config:
+        config["sources"] = []
+    
+    # Check for duplicate
+    if url in config["sources"]:
+        print(f"Source {url} already exists in config")
+        return 0
+    
+    # Add the new source
+    config["sources"].append(url)
+    
+    # Save config
+    save_config(config, config_path)
+    print(f"Added source: {url}")
     return 0
 
 
-def _cmd_enrich(args: argparse.Namespace) -> int:
-    """
-    Enrich a deterministic shard of the public dataset list.
-
-    Returns:
-        int: 0 on success, non‑zero on failure.
-    """
-    try:
-        enrich_dataset(shard_id=args.shard, output_dir=args.output)
-        return 0
-    except Exception as exc:          # pragma: no cover – defensive
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 2
-
-
-def build_parser() -> argparse.ArgumentParser:
+def main():
+    """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        prog="s1",
-        description="Surrogate‑1 CLI – contract stability detection and utilities."
+        prog="surrogate-1",
+        description="CLI for surrogate-1 dataset management"
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # ---- s1 detect -------------------------------------------------
-    detect = subparsers.add_parser(
-        "detect",
-        help="Detect breaking changes against the latest deployment."
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # add-source command
+    add_parser = subparsers.add_parser(
+        "add-source",
+        help="Add a new dataset source"
     )
-    detect.set_defaults(func=_cmd_detect)
-
-    # ---- s1 enrich -------------------------------------------------
-    enrich = subparsers.add_parser(
-        "enrich",
-        help="Enrich a deterministic 1/16 shard of the public dataset list."
+    add_parser.add_argument(
+        "url",
+        help="URL of the dataset source to add"
     )
-    enrich.add_argument(
-        "--shard",
-        type=int,
-        required=True,
-        help="Shard index (0‑15)."
+    add_parser.add_argument(
+        "--config",
+        default="/opt/axentx/surrogate-1/config.yaml",
+        help="Path to config file (default: /opt/axentx/surrogate-1/config.yaml)"
     )
-    enrich.add_argument(
-        "--output",
-        default="output",
-        help="Directory where processed datasets will be written."
-    )
-    enrich.set_defaults(func=_cmd_enrich)
-
-    return parser
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
+    
+    args = parser.parse_args()
+    
+    if args.command == "add-source":
+        return add_source(args.url, args.config)
+    else:
+        parser.print_help()
+        return 1
 
 
 if __name__ == "__main__":
