@@ -1,0 +1,64 @@
+# One source of truth for remediation guidance.
+alerts:
+  IAMUser:
+    description: "IAM user has excessive or risky permissions."
+    immediate_action: |
+      1. Review the IAM user's attached policies.
+      2. Remove any unnecessary or overly‑permissive permissions.
+      3. Enable MFA for the user (see iam_user_without_mfa below).
+      4. Apply the principle of least privilege.
+    documentation: "https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html"
+
+  iam_user_without_mfa:
+    description: "IAM user does not have MFA enabled."
+    immediate_action: |
+      1. Open the IAM console.
+      2. Select the user mentioned in the alert.
+      3. Under “Security credentials”, click “Assign MFA device”.
+      4. Follow the wizard to enable a virtual or hardware MFA device.
+    documentation: "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_virtual.html"
+
+  S3Bucket:
+    description: "S3 bucket is publicly accessible."
+    immediate_action: |
+      1. Open the S3 console.
+      2. Navigate to the bucket listed in the alert.
+      3. Click “Permissions → Block public access” and enable all settings.
+      4. Save changes; enable versioning and server‑side encryption if not already.
+    documentation: "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+
+  EC2Instance:
+    description: "EC2 instance has insecure configuration."
+    immediate_action: |
+      1. Review the instance’s security groups; restrict inbound ports to the minimum.
+      2. Ensure the instance is not assigned a public IP unless required.
+      3. Patch the OS and installed packages regularly.
+    documentation: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html"
+
+  ec2_unencrypted_volumes:
+    description: "EC2 instance has unencrypted EBS volumes."
+    immediate_action: |
+      1. Stop the affected EC2 instance.
+      2. Snapshot the unencrypted volumes.
+      3. Create new encrypted volumes from those snapshots.
+      4. Detach the old volumes, attach the encrypted ones.
+      5. Restart the instance.
+    documentation: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html"
+
+  RDSPubliclyAccessible:
+    description: "RDS instance is publicly accessible."
+    immediate_action: |
+      1. Open the RDS console.
+      2. Select the instance referenced in the alert.
+      3. Modify the instance and set “Publicly Accessible” to “No”.
+      4. Apply changes (preferably during the next maintenance window).
+    documentation: "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSInstances.html#RDSInstances.Modify"
+
+  SecurityGroupOpenIngress:
+    description: "Security group allows unrestricted inbound traffic."
+    immediate_action: |
+      1. Open the EC2 console → “Security Groups”.
+      2. Locate the offending group.
+      3. Remove 0.0.0.0/0 (or ::/0) from any inbound rule that is not required.
+      4. Add more restrictive CIDR ranges or use security‑group references.
+    documentation: "https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html#SecurityGroupRules"
