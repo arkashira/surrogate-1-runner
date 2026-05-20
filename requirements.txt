@@ -1,5 +1,9 @@
-datasets
-huggingface_hub
-pyarrow
-numpy
-requests
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.8.2
+sqlalchemy==2.0.30
+alembic==1.13.1
+python-multipart==0.0.9
+pyyaml==6.0.1
+python-terraform==0.10.1
+jinja2==3.1.4
