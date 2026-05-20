@@ -1,19 +1,23 @@
-package com.example.cloudopt;
+package com.axentx.surrogate1.analysis;
 
 public final class Recommendation {
-    private final String title;
-    private final String description;
-    private final Runnable action;   // side‑effectful, but isolated
+    private final String resourceId;
+    private final String action;
+    private final double potentialSavings;
 
-    public Recommendation(String title, String description, Runnable action) {
-        this.title = title;
-        this.description = description;
+    public Recommendation(String resourceId, String action, double potentialSavings) {
+        this.resourceId = resourceId;
         this.action = action;
+        this.potentialSavings = potentialSavings;
     }
 
-    public String getTitle()      { return title; }
-    public String getDescription(){ return description; }
+    public String getResourceId() { return resourceId; }
+    public String getAction() { return action; }
+    public double getPotentialSavings() { return potentialSavings; }
 
-    /** Execute the recommendation.  In production this would call the cloud API. */
-    public void apply() { action.run(); }
+    @Override
+    public String toString() {
+        return String.format("Resource: %s | Action: %s | Potential Savings: $%.2f",
+                resourceId, action, potentialSavings);
+    }
 }
