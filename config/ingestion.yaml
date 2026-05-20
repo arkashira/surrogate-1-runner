@@ -1,0 +1,79 @@
+---
+version: "1.0"
+
+aws:
+  region: "us-east-1"
+  cost_explorer:
+    granularity: "DAILY"
+    metrics:
+      - "UnblendedCost"
+      - "BlendedCost"
+      - "AmortizedCost"
+      - "NetAmortizedCost"
+    group_by:
+      - dimension: "SERVICE"
+      - dimension: "LINKED_ACCOUNT"
+    date_range:
+      type: "LAST_7_DAYS"
+
+database:
+  host: "${POSTGRES_HOST:localhost}"
+  port: "${POSTGRES_PORT:5432}"
+  database: "${POSTGRES_DB:surrogate1}"
+  username: "${POSTGRES_USER:surrogate1}"
+  password: "${POSTGRES_PASSWORD:}"
+  schema: "aws_cost"
+  tables:
+    cost_data:
+      name: "cost_data"
+      primary_key:
+        - "line_item_id"
+      indexes:
+        - columns: ["usage_start_date", "service"]
+          name: "idx_cost_date_service"
+        - columns: ["linked_account_id"]
+          name: "idx_cost_account"
+        - columns: ["usage_start_date"]
+          name: "idx_cost_date"
+  pool:
+    min_connections: 2
+    max_connections: 10
+    connection_timeout: 30
+
+schedule:
+  cron: "0 0 * * *"
+  timezone: "UTC"
+  retry:
+    max_attempts: 3
+    backoff_seconds: 60
+    exponential_backoff: true
+
+logging:
+  file: "/var/log/surrogate-1/ingest_cost.log"
+  level: "INFO"
+  rotation:
+    max_bytes: 10485760
+    backup_count: 7
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+processing:
+  batch_size: 1000
+  validate_data: true
+  currency:
+    default: "USD"
+    convert_to: null
+  enrich:
+    add_metadata: true
+    add_resource_tags: false
+
+monitoring:
+  metrics_enabled: true
+  metrics_endpoint: null
+  alert_on_failure: true
+  alert_webhook: null
+
+features:
+  dry_run: false
+  debug: false
+  deduplicate: true
