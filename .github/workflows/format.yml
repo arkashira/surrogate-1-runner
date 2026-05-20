@@ -1,0 +1,48 @@
+
+name: Format and validate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: 14
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Format and validate
+      id: format
+      run: |
+        npm run format
+        if [ $? -ne 0 ]; then
+          echo "Formatting failed. Aborting."
+          exit 1
+        fi
+        echo "Files formatted:"
+        git diff --name-only --diff-filter=AM --ignore-space-at-eol | grep '\.js$' | sort
+        echo "::set-output name=formatted_files::$(git diff --name-only --diff-filter=AM --ignore-space-at-eol | grep '\.js$' | sort)"
+
+    - name: Fail the job if any files changed
+      if: ${{ steps.format.outputs.formatted_files == '' }}
+      run: echo "Formatting did not change any files. Job succeeded."
+      continue-on-error: true
+
+    - name: Fail the job if any files changed
+      if: ${{ steps.format.outputs.formatted_files != '' }}
+      run: echo "Formatting changed some files. Job failed."
+      fail-on-error: true
+
+## Summary
+- Added GitHub Action for formatting and validating JavaScript files
+- The action installs surrogate-1, runs `surrogate format`, and fails the job if any files changed
+- The action outputs a summary comment with the list of formatted files
