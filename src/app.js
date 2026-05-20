@@ -1,38 +1,19 @@
 const express = require('express');
-const path = require('path');
-const apiRoutes = require('./api/routes');
+const integrationRouter = require('./api/integration-api');
 
 const app = express();
 
-// Middleware
-app.use(express.json());
+// Mount integration API under /api/integration
+app.use('/api/integration', integrationRouter);
 
-// API routes
-app.use('/api', apiRoutes);
+// Export for serverless or direct start
+module.exports = app;
 
-// Static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Redirects for better UX
-app.get('/credits', (req, res) => {
-  res.redirect('/credits-dashboard.html');
-});
-
-app.get('/credits/history', (req, res) => {
-  res.redirect('/credits-history.html');
-});
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Start server
-const PORT = process.env.PORT || 3000;
+// If executed directly, start an HTTP server (useful for local testing)
 if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`Credit Balance API running on port ${PORT}`);
+    // eslint-disable-next-line no-console
+    console.log(`Surrogate‑1 API listening on port ${PORT}`);
   });
 }
-
-module.exports = app;
