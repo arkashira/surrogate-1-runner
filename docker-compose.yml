@@ -1,45 +1,24 @@
-version: '3.8'
+# Simple compose file to run the surrogate image in CI/CD environments.
+# It builds the image from the Dockerfile in the current directory,
+# passes any environment variables defined in the runner, and mounts
+# the source directory for debugging or local overrides.
+
+version: "3.8"
 
 services:
-  app:
+  surrogate:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
+    # Environment variables can be set in the CI runner or via an
+    # env_file.  The surrogate CLI will read these to configure
+    # synthetic data generation.
     environment:
-      - PORT=8080
-      - DATABASE_URL=postgres://user:password@db:5432/surrogate
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: surrogate
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d surrogate"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - SURROGATE_CONFIG=/app/config.yaml
+      - SURROGATE_LOG_LEVEL=INFO
+    # Mount the source tree for local debugging; remove in production.
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
+      - .:/app
+    # Override the default command if needed; otherwise the Dockerfile
+    # entrypoint will run the surrogate module.
+    command: ["--config", "/app/config.yaml"]
