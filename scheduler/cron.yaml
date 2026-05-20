@@ -1,0 +1,69 @@
+---
+version: "1.0"
+
+schedules:
+  # ----------------------------------------------------------------------
+  # 1️⃣ Daily AWS Cost Explorer pull – runs after the 02:00 UTC roll‑up
+  # ----------------------------------------------------------------------
+  - name: aws-cost-daily-pull
+    description: "Daily AWS Cost Explorer data pull – runs at 02:30 UTC"
+    cron: "30 2 * * *"                     # 02:30 UTC every day
+    timezone: "UTC"
+    enabled: true
+
+    job:
+      type: http
+      method: POST
+      # The host is injected from the runtime environment (e.g. Docker/K8s secret)
+      url: "https://{{ .Env.APP_HOST }}/api/v1/cost/aws/pull"
+      timeout: 300                         # 5 minutes – generous for large accounts
+      headers:
+        - key: "Content-Type"
+          value: "application/json"
+
+    retry:
+      enabled: true
+      max_attempts: 3
+      backoff_seconds: 60                  # 1 minute exponential back‑off
+
+    alerting:
+      on_failure:
+        - type: slack
+          channel: "{{ .Env.SLACK_COST_ALERT_CHANNEL }}"
+          message: |
+            :warning: *AWS Cost Explorer pull failed*  
+            Schedule: {{ .Schedule.name }}  
+            Error: {{ .Error }}
+        - type: log
+          level: "error"
+          message: "AWS cost pull failed – {{ .Error }}"
+
+    storage:
+      table: "cost_raw"
+      format: "json"
+
+  # ----------------------------------------------------------------------
+  # 2️⃣ Health‑check – verifies that the pull succeeded within the last 4 h
+  # ----------------------------------------------------------------------
+  - name: aws-cost-health-check
+    description: "Verify that a successful cost pull arrived in the last 4 h"
+    cron: "0 6 * * *"                      # 06:00 UTC every day
+    timezone: "UTC"
+    enabled: true
+
+    job:
+      type: health-check
+      depends_on: "aws-cost-daily-pull"
+      max_age_minutes: 240                 # Fail if last successful run > 4 h ago
+
+    alerting:
+      on_failure:
+        - type: slack
+          channel: "{{ .Env.SLACK_COST_ALERT_CHANNEL }}"
+          message: |
+            :red_circle: *AWS Cost data missing*  
+            Health‑check for `aws-cost-daily-pull` failed.  
+            No successful run in the past 4 h.
+        - type: log
+          level: "error"
+          message: "AWS Cost health‑check failed – no recent data"
