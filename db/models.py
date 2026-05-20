@@ -1,55 +1,42 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from datetime import datetime
-import enum
+from django.db import models
+from django.core.validators import MinLengthValidator
+from cryptography.fernet import Fernet
+import base64
+import os
 
-Base = declarative_base()
+class Session(models.Model):
+    session_id = models.CharField(max_length=255, unique=True)
+    user_id = models.CharField(max_length=255)
+    data = models.BinaryField()
+    encrypted = models.BooleanField(default=False)
+    encryption_key = models.BinaryField(blank=True, null=True)
+    security_measures = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-class SubscriptionPlan(enum.Enum):
-    BASIC = "basic"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+    def encrypt_data(self):
+        if not self.encrypted:
+            key = Fernet.generate_key()
+            cipher_suite = Fernet(key)
+            encrypted_data = cipher_suite.encrypt(self.data)
+            self.data = encrypted_data
+            self.encrypted = True
+            self.encryption_key = key
+            self.save()
 
-class SubscriptionStatus(enum.Enum):
-    ACTIVE = "active"
-    PAST_DUE = "past_due"
-    CANCELLED = "cancelled"
+    def decrypt_data(self):
+        if self.encrypted:
+            cipher_suite = Fernet(self.encryption_key)
+            decrypted_data = cipher_suite.decrypt(self.data)
+            self.data = decrypted_data
+            self.encrypted = False
+            self.save()
 
-class Subscription(Base):
-    __tablename__ = 'subscriptions'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    stripe_subscription_id = Column(String, unique=True, nullable=True)
-    plan = Column(Enum(SubscriptionPlan), nullable=False)
-    max_concurrent_streams = Column(Integer, nullable=False)
-    status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    ends_at = Column(DateTime, nullable=True)
-    
-    # Relationships
-    user = relationship("User", back_populates="subscriptions")
-    
-    def __repr__(self):
-        return f"<Subscription(id={self.id}, user_id={self.user_id}, plan={self.plan})>"
+    def enable_security_measures(self, measures):
+        self.security_measures.update(measures)
+        self.save()
 
-class ApiKey(Base):
-    __tablename__ = 'api_keys'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    key_hash = Column(String, unique=True, nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    subscription_id = Column(Integer, ForeignKey('subscriptions.id'), nullable=True)
-    name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime, nullable=True)
-    is_active = Column(Boolean, default=True)
-    
-    # Relationships
-    user = relationship("User", back_populates="api_keys")
-    subscription = relationship("Subscription", back_populates="api_keys")
-    
-    def __repr__(self):
-        return f"<ApiKey(id={self.id}, name={self.name}, is_active={self.is_active})>"
+    def enforce_security_measures(self):
+        if self.security_measures.get('require_encryption', False) and not self.encrypted:
+            raise ValueError("Encryption is required for this session")
+        # Add more security measure enforcements as needed
