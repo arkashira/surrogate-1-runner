@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keep.fullname" . }}
+  labels:
+    {{- include "keep.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "keep.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "keep.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: keep
+          image: "{{ .Values.image.repository | default \"ghcr.io/axentx/keep\" }}:{{ .Values.image.tag | default \"latest\" }}"
+          ports:
+            - containerPort: 443
+              protocol: TCP
+            - containerPort: 40000
+              protocol: UDP
+          volumeMounts:
+            - name: keep-config
+              mountPath: /etc/keep
+              subPath: keep.yaml
+      volumes:
+        - name: keep-config
+          configMap:
+            name: {{ .Values.configMap.name | default "keep-config" }}
