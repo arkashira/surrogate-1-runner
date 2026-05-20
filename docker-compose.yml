@@ -1,3 +1,26 @@
-   # Example
-   requests==2.31.0
-   structlog==22.3.0
+version: "3.9"
+
+services:
+  surrogate-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: axentx/surrogate-1:latest          # optional – useful for CI/registry pushes
+    container_name: surrogate-1               # friendly name for docker ps / logs
+    ports:
+      - "8080:8080"                            # host:container – change left side if 8080 is taken
+    environment:
+      - SHARD_ID=${SHARD_ID:-0}                # can be overridden per replica (e.g. SHARD_ID=1)
+      - PYTHONUNBUFFERED=1                     # ensures real‑time stdout in logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    # Optional: add a logging driver or resource limits here if needed
+    # resources:
+    #   limits:
+    #     cpus: '1.0'
+    #     memory: 1G
