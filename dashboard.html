@@ -1,9 +1,111 @@
-   @app.route('/dashboard')
-   def dashboard():
-       stage = request.args.get('stage', '')
-       matches = Match.query.filter_by(stage=stage).all() if stage else Match.query.all()
-       stages = sorted(set(m.stage for m in Match.query.all()))
-       return render_template('dashboard.html',
-                              matches=matches,
-                              stages=stages,
-                              selected_stage=stage)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LLM Call Performance Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 20px;
+      text-align: center;
+    }
+    .value {
+      font-size: 2.2rem;
+      margin-top: 10px;
+      color: #333;
+    }
+    .label {
+      font-size: 1rem;
+      color: #777;
+    }
+    .error {
+      color: #d9534f;
+    }
+    .loading {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>LLM Call Performance Dashboard</h1>
+  <div class="grid">
+    <div class="card" id="latency-card">
+      <div class="label">Average Latency (ms)</div>
+      <div class="value loading" id="latency-value">—</div>
+    </div>
+    <div class="card" id="cost-card">
+      <div class="label">Cost (USD)</div>
+      <div class="value loading" id="cost-value">—</div>
+    </div>
+    <div class="card" id="error-card">
+      <div class="label">Error Rate (%)</div>
+      <div class="value loading" id="error-value">—</div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration – adjust endpoint or polling interval as needed
+    const METRICS_ENDPOINT = '/metrics'; // Expected to return JSON
+    const POLL_INTERVAL_MS = 5000; // 5 seconds
+
+    async function fetchMetrics() {
+      try {
+        const resp = await fetch(METRICS_ENDPOINT, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        // Expected shape:
+        // { latency_ms: number, cost_usd: number, error_rate: number }
+        updateCard('latency', data.latency_ms?.toFixed(2) ?? '—');
+        updateCard('cost', data.cost_usd?.toFixed(4) ?? '—');
+        updateCard('error', data.error_rate?.toFixed(2) ?? '—');
+      } catch (e) {
+        console.error('Failed to fetch metrics:', e);
+        // Show error state
+        setErrorState('latency');
+        setErrorState('cost');
+        setErrorState('error');
+      }
+    }
+
+    function updateCard(key, value) {
+      const valueEl = document.getElementById(`${key}-value`);
+      if (valueEl) {
+        valueEl.textContent = value;
+        valueEl.classList.remove('loading', 'error');
+      }
+    }
+
+    function setErrorState(key) {
+      const valueEl = document.getElementById(`${key}-value`);
+      if (valueEl) {
+        valueEl.textContent = 'ERR';
+        valueEl.classList.add('error');
+        valueEl.classList.remove('loading');
+      }
+    }
+
+    // Initial fetch + periodic polling
+    fetchMetrics();
+    setInterval(fetchMetrics, POLL_INTERVAL_MS);
+  </script>
+</body>
+</html>
