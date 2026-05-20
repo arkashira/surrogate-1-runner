@@ -1,0 +1,34 @@
+name: Compliance Guardian Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  compliance-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Compliance Guardian
+        id: compliance_scan
+        run: |
+          python -m compliance_guardian.scan --config-file .compliance-guardian.yaml
+
+      - name: Check compliance status
+        if: failure()
+        run: |
+          echo "Compliance scan failed. Build blocked."
+          exit 1
