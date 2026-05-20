@@ -1,13 +1,11 @@
-import { createStore, applyMiddleware, combineReducers } from 'redux';
-import thunk from 'redux-thunk';
-import invoiceReducer from '../reducers/invoiceReducer';
+import { configureStore } from '@reduxjs/toolkit';
+import costAlertReducer from './costAlertSlice';
 
-const rootReducer = combineReducers({
-  invoice: invoiceReducer,
+export const store = configureStore({
+  reducer: {
+    costAlert: costAlertReducer,
+  },
 });
 
-export type RootState = ReturnType<typeof rootReducer>;
-
-const store = createStore(rootReducer, applyMiddleware(thunk));
-
-export default store;
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
