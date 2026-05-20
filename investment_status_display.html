@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Investment Status Dashboard</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  h1 { color: #2c3e50; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+  th { background-color: #f4f4f4; }
+  .status-in-progress { color: #f39c12; }
+  .status-completed { color: #27ae60; }
+  .status-flagged { color: #c0392b; }
+  .message { margin-top: 30px; }
+  .message textarea { width: 100%; height: 80px; }
+  .message button { margin-top: 10px; }
+  .error { color: #c0392b; }
+</style>
+</head>
+<body>
+<h1>Investment Status Dashboard</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Investment ID</th>
+      <th>Investor</th>
+      <th>Amount</th>
+      <th>Status</th>
+      <th>Last Updated</th>
+    </tr>
+  </thead>
+  <tbody id="investment-table-body">
+    <!-- Rows will be injected by JavaScript -->
+  </tbody>
+</table>
+
+<div class="message">
+  <h2>Send Message to Investor</h2>
+  <label for="investor-id">Investor ID:</label>
+  <input type="text" id="investor-id" placeholder="e.g., inv_12345"><br><br>
+  <label for="message-text">Message:</label><br>
+  <textarea id="message-text" placeholder="Type your message here..."></textarea><br>
+  <button id="send-message">Send Message</button>
+  <p id="msg-status" class="error"></p>
+</div>
+
+<script>
+  const API_BASE = '/api';
+
+  async function fetchInvestments() {
+    try {
+      const res = await fetch(`${API_BASE}/investments`);
+      if (!res.ok) throw new Error('Network response was not ok');
+      return await res.json();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to load investments. Check console for details.');
+      return [];
+    }
+  }
+
+  function renderTable(investments) {
+    const tbody = document.getElementById('investment-table-body');
+    tbody.innerHTML = '';
+    investments.forEach(inv => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${inv.id}</td>
+        <td>${inv.investor_name}</td>
+        <td>$${inv.amount.toLocaleString()}</td>
+        <td class="status-${inv.status.toLowerCase().replace(' ', '-') }">${inv.status}</td>
+        <td>${new Date(inv.last_updated).toLocaleString()}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function sendMessage() {
+    const investorId = document.getElementById('investor-id').value.trim();
+    const message = document.getElementById('message-text').value.trim();
+    const statusEl = document.getElementById('msg-status');
+    statusEl.textContent = '';
+
+    if (!investorId || !message) {
+      statusEl.textContent = 'Please provide both Investor ID and message.';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ investor_id: investorId, message })
+      });
+      if (!res.ok) throw new Error('Failed to send message');
+      const data = await res.json();
+      if (data.status === 'sent') {
+        alert(`Message sent to ${investorId}`);
+        document.getElementById('message-text').value = '';
+      } else {
+        statusEl.textContent = 'Unexpected response from server.';
+      }
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = 'Error sending message. Check console.';
+    }
+  }
+
+  document.getElementById('send-message').addEventListener('click', sendMessage);
+
+  // Initial load
+  fetchInvestments().then(renderTable);
+</script>
+</body>
+</html>
