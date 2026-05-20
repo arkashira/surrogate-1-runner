@@ -1,0 +1,17 @@
+oidc:
+  client-id: "surrogate-1-client"
+  client-secret: "secret-key"
+  issuer-url: "https://idp.example.com"
+  redirect-uri: "https://surrogate-1.example.com/auth/callback"
+  scopes:
+    - "openid"
+    - "profile"
+    - "email"
+  role-mapping:
+    admin: ["admin", "administrator"]
+    developer: ["developer", "engineering"]
+    viewer: ["viewer", "readonly"]
+  session:
+    timeout: 3600
+audit:
+  enabled: true
