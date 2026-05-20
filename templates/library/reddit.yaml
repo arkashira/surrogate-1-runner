@@ -1,0 +1,22 @@
+version: 1
+name: Reddit Data Ingestion
+description: Template for ingesting data from Reddit.
+schedule:
+  interval: "*/30 * * * *"
+source:
+  type: reddit
+  subreddit: "all"
+  limit: 100
+  sort: "hot"
+  time_filter: "week"
+transform:
+  - type: "filter"
+    field: "score"
+    operator: ">"
+    value: 100
+  - type: "extract"
+    fields: ["title", "author", "created_utc", "score", "url"]
+sink:
+  type: "s3"
+  bucket: "reddit-data-bucket"
+  path: "reddit-data"

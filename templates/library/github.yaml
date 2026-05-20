@@ -1,0 +1,17 @@
+version: 1
+name: GitHub Data Ingestion
+description: Template for ingesting data from GitHub.
+schedule:
+  interval: "0 * * * *"
+source:
+  type: github
+  repository: "octocat/Hello-World"
+  branch: "main"
+  file_pattern: "*.md"
+transform:
+  - type: "extract"
+    fields: ["name", "path", "sha", "size", "url"]
+sink:
+  type: "s3"
+  bucket: "github-data-bucket"
+  path: "github-data"

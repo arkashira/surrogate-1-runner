@@ -1,0 +1,15 @@
+version: 1
+name: CSV Data Ingestion
+description: Template for ingesting data from a CSV file.
+schedule:
+  interval: "0 0 * * *"
+source:
+  type: "file"
+  path: "/path/to/data.csv"
+transform:
+  - type: "extract"
+    fields: ["column1", "column2", "column3"]
+sink:
+  type: "s3"
+  bucket: "csv-data-bucket"
+  path: "csv-data"

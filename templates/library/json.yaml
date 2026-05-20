@@ -1,0 +1,15 @@
+version: 1
+name: JSON Data Ingestion
+description: Template for ingesting data from a JSON file.
+schedule:
+  interval: "0 0 * * *"
+source:
+  type: "file"
+  path: "/path/to/data.json"
+transform:
+  - type: "extract"
+    fields: ["field1", "field2", "field3"]
+sink:
+  type: "s3"
+  bucket: "json-data-bucket"
+  path: "json-data"
