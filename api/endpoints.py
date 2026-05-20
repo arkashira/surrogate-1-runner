@@ -1,50 +1,54 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
-import json
+
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from typing import Optional
 
 app = FastAPI()
 
-class Tool(BaseModel):
-    name: str
-    url: str
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-class Workflow(BaseModel):
-    name: str
-    steps: List[str]
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-tools = []
-workflows = []
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-@app.post("/tools/")
-def create_tool(tool: Tool):
-    tools.append(tool)
-    return {"message": "Tool created successfully"}
+def authenticate_user(fake_users_db, username: str, password: str):
+    user = next((user for user in fake_users_db if user["username"] == username), None)
+    if not user:
+        return False
+    if not verify_password(password, user["password"]):
+        return False
+    return user
 
-@app.get("/tools/")
-def read_tools():
-    return tools
+@app.post("/token")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect username or password",
+        )
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(data={"sub": user["username"]}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/workflows/")
-def create_workflow(workflow: Workflow):
-    workflows.append(workflow)
-    return {"message": "Workflow created successfully"}
-
-@app.get("/workflows/")
-def read_workflows():
-    return workflows
-
-@app.post("/workflows/{workflow_id}/steps/")
-def add_step(workflow_id: int, step: str):
-    if workflow_id < len(workflows):
-        workflows[workflow_id].steps.append(step)
-        return {"message": "Step added successfully"}
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
     else:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-@app.get("/workflows/{workflow_id}/steps/")
-def read_steps(workflow_id: int):
-    if workflow_id < len(workflows):
-        return workflows[workflow_id].steps
-    else:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+fake_users_db = [
+    {"username": "testuser", "password": get_password_hash("testuser")},
+]

@@ -1,22 +1,13 @@
-from datetime import datetime
-from enum import Enum
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel
+from typing import Optional
 
-class Severity(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
+class TokenData(BaseModel):
+    sub: Optional[str] = None
 
-class Violation(BaseModel):
-    """Read‑only representation of a violation."""
-    id: str = Field(..., description="Unique identifier of the violation")
-    account_id: str = Field(..., description="Account that owns the resource")
-    resource_id: str = Field(..., description="Affected resource")
-    rule_id: str = Field(..., description="Rule that was violated")
-    severity: Severity = Field(..., description="Severity level")
-    timestamp: datetime = Field(..., description="When the violation was detected")
-
-    model_config = {"use_enum_values": True}
+class User(BaseModel):
+    username: str
