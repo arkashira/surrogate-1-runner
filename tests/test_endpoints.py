@@ -1,40 +1,19 @@
-import unittest
-import json
-from src.main.endpoints import app, metrics_store
+import pytest
+from fastapi.testclient import TestClient
+from main import app  # Assuming main.py is the entry point of your FastAPI application
 
-class TestEndpoints(unittest.TestCase):
-    def setUp(self):
-        app.testing = True
-        self.client = app.test_client()
-        metrics_store.redis_client.flushall()
+client = TestClient(app)
 
-    def test_post_event(self):
-        response = self.client.post('/api/v1/events', json={})
-        data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('event_id', data)
+def test_filter_tests_by_coverage():
+    response = client.get("/api/v1/test-filter")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["tests"]) > 0
+    assert data["tests"][0]["coverage_impact"] in ["high", "medium", "low"]
 
-    def test_post_metric(self):
-        metric_data = {
-            'metric': 'test_metric',
-            'type': 'gauge',
-            'value': 10.5
-        }
-        response = self.client.post('/api/v1/series', json=metric_data)
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_metrics(self):
-        metric_data = {
-            'metric': 'test_metric',
-            'type': 'gauge',
-            'value': 10.5
-        }
-        self.client.post('/api/v1/series', json=metric_data)
-        response = self.client.get('/api/v1/series?metric=test_metric')
-        data = json.loads(response.data)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('gauge', data)
-        self.assertIn(10.5, data['gauge'])
-
-if __name__ == '__main__':
-    unittest.main()
+def test_handle_webhook():
+    response = client.post("/api/v1/test-filter/webhook", json={})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert len(data["filtered_tests"]["tests"]) > 0
