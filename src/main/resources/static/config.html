@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Surrogate-1 Configuration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        table { border-collapse: collapse; width: 80%; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .override-input { width: 100%; }
+        .note { color: #555; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Automated Configuration Settings</h1>
+    <p>Below are the common configurations that have been automatically detected and applied. You can override these settings using the form provided.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Setting</th>
+                <th>Default Value</th>
+                <th>Current Value</th>
+                <th>Override</th>
+            </tr>
+        </thead>
+        <tbody id="configTableBody">
+            <!-- Configuration rows will be dynamically populated here -->
+        </tbody>
+    </table>
+
+    <div class="note">Note: Any changes made here will override the default values.</div>
+
+    <script>
+        async function fetchConfig() {
+            const response = await fetch('/api/config');
+            const data = await response.json();
+            const tableBody = document.getElementById('configTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            for (const [key, defaultValue] of Object.entries(data.defaults)) {
+                const currentValue = data.config[key];
+                const isOverridden = data.overridden.includes(key);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${key}</td>
+                    <td>${defaultValue}</td>
+                    <td>${currentValue}</td>
+                    <td>
+                        <input type="text" class="override-input" ${isOverridden ? '' : 'disabled'} value="${currentValue}">
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchConfig);
+
+        document.addEventListener('change', async (event) => {
+            if (event.target.classList.contains('override-input')) {
+                const key = event.target.parentElement.previousElementSibling.textContent;
+                const newValue = event.target.value;
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ [key]: newValue })
+                });
+                const result = await response.json();
+                console.log(result);
+                await fetchConfig(); // Refresh the table with updated values
+            }
+        });
+    </script>
+</body>
+</html>
