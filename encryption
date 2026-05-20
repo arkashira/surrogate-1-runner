@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "Task mismatch: surrogate-1 is a parallel dataset ingestion project (HuggingFace data processing), not a shell access management system. The task requests 'end-to-end encryption for shell sessions' with MFA and access logging, which doesn't match this project's purpose (data enrichment, deduplication, upload).",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "Confirm correct project path for shell access encryption feature, or provide concrete file paths within surrogate-1 that should be modified for this encryption task"
+}
