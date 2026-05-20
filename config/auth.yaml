@@ -1,0 +1,4 @@
+oidc:
+  issuer: https://your-okta-domain/oauth2/default
+  client_id: your-client-id
+  client_secret: your-client-secret
