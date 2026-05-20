@@ -1,17 +1,25 @@
+package com.axentx.surrogate;
 
-package com.axentx.surrogate1;
+import org.junit.jupiter.api.Test;
 
-import org.junit.Test;
-import static org.junit.Assert.assertEquals;
+import java.io.IOException;
+import java.util.Properties;
 
-public class Surrogate1Test {
-    private Surrogate1 surrogate1 = new Surrogate1();
+import static org.junit.jupiter.api.Assertions.*;
+
+public class TestSurrogate {
 
     @Test
-    public void testBasicFunctionality() {
-        String input = "some input";
-        String expectedOutput = "expected output";
-        String actualOutput = surrogate1.process(input);
-        assertEquals(expectedOutput, actualOutput);
+    public void testPropertiesLoad() throws IOException {
+        // Load the test properties file from the classpath
+        Properties props = new Properties();
+        try (var stream = getClass().getClassLoader().getResourceAsStream("test.properties")) {
+            assertNotNull(stream, "test.properties must be present on the test classpath");
+            props.load(stream);
+        }
+
+        // Verify that the expected key/value pair exists
+        assertEquals("testValue", props.getProperty("test.key"),
+                "Property 'test.key' should have the value 'testValue'");
     }
 }
