@@ -1,28 +1,19 @@
-
 package websocket
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 type Collaboration struct {
-	clients     map[*websocket.Conn]bool
-	broadcast   chan []byte
-	register    chan *websocket.Conn
-	unregister  chan *websocket.Conn
-	sync.RWMutex
+	clients    map[*websocket.Conn]bool
+	broadcast  chan []byte
+	register   chan *websocket.Conn
+	unregister chan *websocket.Conn
+	mu         sync.Mutex
 }
 
 func NewCollaboration() *Collaboration {
@@ -34,83 +25,58 @@ func NewCollaboration() *Collaboration {
 	}
 }
 
-func (c *Collaboration) ServeWs(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer conn.Close()
-
-	c.Lock()
-	c.clients[conn] = true
-	c.Unlock()
-
-	for msg := range c.broadcast {
-		err := conn.WriteMessage(websocket.TextMessage, msg)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}
-
-	go func() {
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Println(err)
-				break
+func (c *Collaboration) Run() {
+	for {
+		select {
+		case client := <-c.register:
+			c.mu.Lock()
+			c.clients[client] = true
+			c.mu.Unlock()
+		case client := <-c.unregister:
+			c.mu.Lock()
+			if _, ok := c.clients[client]; ok {
+				delete(c.clients, client)
+				close(client)
 			}
-
-			c.broadcast <- msg
+			c.mu.Unlock()
+		case message := <-c.broadcast:
+			c.mu.Lock()
+			for client := range c.clients {
+				err := client.WriteMessage(websocket.TextMessage, message)
+				if err != nil {
+					log.Printf("error: %v", err)
+					client.Close()
+					delete(c.clients, client)
+				}
+			}
+			c.mu.Unlock()
 		}
-
-		c.Lock()
-		delete(c.clients, conn)
-		c.Unlock()
-	}()
-}
-
-func (c *Collaboration) Register(conn *websocket.Conn) {
-	c.Lock()
-	c.register <- conn
-	c.Unlock()
-}
-
-func (c *Collaboration) Unregister(conn *websocket.Conn) {
-	c.Lock()
-	c.unregister <- conn
-	c.Unlock()
-}
-
-func (c *Collaboration) Broadcast(data []byte) {
-	c.Lock()
-	for client := range c.clients {
-		client.WriteMessage(websocket.TextMessage, data)
 	}
-	c.Unlock()
 }
 
-func (c *Collaboration) Start() {
-	http.HandleFunc("/collaboration", func(w http.ResponseWriter, r *http.Request) {
-		c.ServeWs(w, r)
-	})
+func (c *Collaboration) Serve(ws *websocket.Conn) {
+	defer ws.Close()
 
-	go func() {
-		for {
-			conn := <-c.register
-			c.Lock()
-			c.clients[conn] = true
-			c.Unlock()
-		}
-	}()
+	c.register <- ws
+	defer func() { c.unregister <- ws }()
 
-	go func() {
-		for {
-			conn := <-c.unregister
-			c.Lock()
-			delete(c.clients, conn)
-			c.Unlock()
+	for {
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			break
 		}
-	}()
+		c.broadcast <- message
+	}
+}
+
+func ExampleCollaboration() {
+	c := NewCollaboration()
+	go c.Run()
+
+	ws, _, _ := websocket.DefaultDialer.Dial("ws://localhost:8080/ws", nil)
+	defer ws.Close()
+
+	c.Serve(ws)
+
+	fmt.Println("Example completed")
 }
