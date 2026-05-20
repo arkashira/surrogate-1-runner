@@ -1,0 +1,2 @@
+# Configuration file for the /metrics endpoint
+bearer_token: "your-secret-token-here"

@@ -1,114 +1,125 @@
 """
-Core module that implements:
-
-* In‑memory caching of daily total cost
-* Deterministic cost calculation (placeholder)
-* Background worker that recomputes the previous day’s cost at UTC midnight
+Flask API for surrogate-1 service.
+Exposes Prometheus metrics with bearer token authentication.
 """
 
-import datetime
-import threading
-import time
-from typing import Dict
+import os
+import yaml
+from flask import Flask, request, Response, abort
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+)
 
 # --------------------------------------------------------------------------- #
-# Cache infrastructure
+# Configuration
 # --------------------------------------------------------------------------- #
-_daily_cost_cache: Dict[str, float] = {}
-_cache_lock = threading.Lock()
 
+METRICS_CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), 
+    "metrics.yaml"
+)
 
-def _compute_daily_cost_for_date(target_date: datetime.date) -> float:
-    """
-    Deterministic placeholder for the real cost calculation.
-    The function is pure and side‑effect free, making it trivial to
-    monkey‑patch in tests.
-    """
-    epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
-    ts = int(target_date.replace(tzinfo=datetime.timezone.utc).timestamp())
-    return float(ts) / 1_000_000.0
-
-
-def _cache_daily_cost(target_date: datetime.date) -> None:
-    """
-    Compute the cost for *target_date* and store it in the cache.
-    Thread‑safe.
-    """
-    cost = _compute_daily_cost_for_date(target_date)
-    date_str = target_date.isoformat()
-    with _cache_lock:
-        _daily_cost_cache[date_str] = cost
-
-
-def get_daily_cost(date_str: str) -> float:
-    """
-    Public API to retrieve the cost for a given date.
-
-    Parameters
-    ----------
-    date_str : str
-        ISO‑8601 date string (`YYYY-MM-DD`).
-
-    Returns
-    -------
-    float
-        Total cost for the requested day.
-    """
+def load_metrics_config(path: str) -> dict:
+    """Load metrics configuration from YAML file."""
     try:
-        target_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError as exc:
-        raise ValueError(f"Invalid date format: {date_str}") from exc
+        with open(path, "r") as f:
+            return yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        print(f"Warning: Config file not found at {path}")
+        return {}
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML: {e}")
+        return {}
 
-    with _cache_lock:
-        if date_str in _daily_cost_cache:
-            return _daily_cost_cache[date_str]
+# Load token from metrics.yaml
+metrics_cfg = load_metrics_config(METRICS_CONFIG_PATH)
+METRICS_BEARER_TOKEN = metrics_cfg.get("bearer_token", "")
 
-    # Cache miss – compute and store
-    _cache_daily_cost(target_date)
-    return _daily_cost_cache[date_str]
-
+if not METRICS_BEARER_TOKEN:
+    print("WARNING: No bearer_token configured in metrics.yaml")
 
 # --------------------------------------------------------------------------- #
-# Background worker
+# Prometheus metrics (custom registry to avoid double registration)
 # --------------------------------------------------------------------------- #
-def _next_midnight_utc() -> float:
+
+registry = CollectorRegistry()
+
+surrogate_checks_total = Counter(
+    "surrogate_checks_total",
+    "Total number of surrogate checks performed",
+    ["service"],
+    registry=registry,
+)
+
+surrogate_checks_failed = Counter(
+    "surrogate_checks_failed",
+    "Total number of surrogate checks that failed",
+    ["service"],
+    registry=registry,
+)
+
+# --------------------------------------------------------------------------- #
+# Flask application
+# --------------------------------------------------------------------------- #
+
+app = Flask(__name__)
+
+def require_bearer_token(f):
+    """Decorator to enforce bearer token authentication."""
+    def wrapper(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        
+        if not auth_header:
+            abort(401, description="Missing Authorization header")
+        
+        if not auth_header.startswith("Bearer "):
+            abort(401, description="Invalid Authorization format")
+        
+        token = auth_header.split(" ", 1)[1]
+        
+        if token != METRICS_BEARER_TOKEN:
+            abort(403, description="Invalid bearer token")
+        
+        return f(*args, **kwargs)
+    
+    wrapper.__name__ = f.__name__
+    return wrapper
+
+@app.route("/metrics")
+@require_bearer_token
+def metrics():
     """
-    Timestamp of the next UTC midnight.
+    Expose Prometheus metrics.
+    
+    Returns metrics with correct Content-Type for Prometheus scraping.
     """
-    now = datetime.datetime.utcnow()
-    tomorrow = now + datetime.timedelta(days=1)
-    midnight = datetime.datetime(
-        year=tomorrow.year,
-        month=tomorrow.month,
-        day=tomorrow.day,
-        tzinfo=datetime.timezone.utc,
+    return Response(
+        generate_latest(registry),
+        mimetype=CONTENT_TYPE_LATEST,
     )
-    return midnight.timestamp()
 
+# --------------------------------------------------------------------------- #
+# Counter increment functions (call these from your application)
+# --------------------------------------------------------------------------- #
 
-def _daily_aggregation_worker() -> None:
-    """
-    Recompute the previous day’s cost at every UTC midnight.
-    """
-    while True:
-        sleep_seconds = _next_midnight_utc() - time.time()
-        if sleep_seconds > 0:
-            time.sleep(sleep_seconds)
+def increment_check_total(service_name: str):
+    """Increment the total checks counter for a service."""
+    surrogate_checks_total.labels(service=service_name).inc()
 
-        yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
-        _cache_daily_cost(yesterday)
+def increment_check_failed(service_name: str):
+    """Increment the failed checks counter for a service."""
+    surrogate_checks_failed.labels(service=service_name).inc()
 
+# --------------------------------------------------------------------------- #
+# Testing / development
+# --------------------------------------------------------------------------- #
 
-def start_daily_aggregation_scheduler() -> None:
-    """
-    Start the background worker thread.  The function is idempotent;
-    subsequent calls are no‑ops.
-    """
-    if not hasattr(start_daily_aggregation_scheduler, "_thread_started"):
-        thread = threading.Thread(
-            target=_daily_aggregation_worker,
-            name="DailyAggregationWorker",
-            daemon=True,
-        )
-        thread.start()
-        start_daily_aggregation_scheduler._thread_started = True
+if __name__ == "__main__":
+    # Initialize counters with sample data for testing
+    surrogate_checks_total.labels(service="surrogate-1").inc(10)
+    surrogate_checks_failed.labels(service="surrogate-1").inc(2)
+    
+    app.run(host="0.0.0.0", port=5000, debug=True)
