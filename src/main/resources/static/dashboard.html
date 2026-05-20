@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Dashboard</title>
+</head>
+<body>
+    <h1>Welcome, ${username}</h1>
+    <h2>Recorded Streams:</h2>
+    <ul>
+        <c:forEach items="${recordedStreams}" var="stream">
+            <li>${stream}</li>
+        </c:forEach>
+    </ul>
+    <a href="/login">Logout</a>
+</body>
+</html>
