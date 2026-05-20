@@ -1,19 +1,26 @@
-from django.db import models
+from datetime import datetime
+from typing import List
 
-class AuditLog(models.Model):
-    """Immutable log of every important action (registration, delivery, failure)."""
-    ACTION_CHOICES = [
-        ('WEBHOOK_REGISTERED', 'Webhook Registered'),
-        ('WEBHOOK_DELIVERED', 'Webhook Delivered'),
-        ('WEBHOOK_DELIVERY_FAILED', 'Webhook Delivery Failed'),
-    ]
+class AuditLog:
+    def __init__(self, user_id: str, timestamp: datetime, action: str, change_log: str):
+        self.user_id = user_id
+        self.timestamp = timestamp
+        self.action = action
+        self.change_log = change_log
 
-    action = models.CharField(max_length=32, choices=ACTION_CHOICES)
-    details = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    def to_dict(self) -> dict:
+        return {
+            "user_id": self.user_id,
+            "timestamp": self.timestamp.isoformat(),
+            "action": self.action,
+            "change_log": self.change_log,
+        }
 
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self) -> str:
-        return f"{self.get_action_display()} @ {self.created_at.isoformat()}"
+    @staticmethod
+    def from_dict(data: dict) -> 'AuditLog':
+        return AuditLog(
+            user_id=data["user_id"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            action=data["action"],
+            change_log=data["change_log"],
+        )
