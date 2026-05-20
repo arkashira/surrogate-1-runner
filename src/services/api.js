@@ -1,48 +1,36 @@
-import fetch from 'node-fetch';
+const axios = require('axios');
 
-/**
- * Generic HTTP client wrapper for the Stripe API.
- *
- * @param {string} endpoint - Full URL to request.
- * @param {object} options  - Fetch options.
- * @returns {Promise<object>}  Parsed JSON response.
- */
-export async function request(endpoint, options = {}) {
-  const response = await fetch(endpoint, options);
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(
-      `API request failed: ${response.status} ${response.statusText} - ${errorBody}`
-    );
+class ApiClient {
+  constructor(baseUrl, token) {
+    this.client = axios.create({
+      baseURL: baseUrl,
+      timeout: 10000, // Prevent hanging requests
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
   }
 
-  return response.json();
+  async get(endpoint, params = {}) {
+    try {
+      const response = await this.client.get(endpoint, { params });
+      return response.data;
+    } catch (err) {
+      console.error(`API GET ${endpoint} error:`, err.message);
+      throw err;
+    }
+  }
+
+  async post(endpoint, body = {}) {
+    try {
+      const response = await this.client.post(endpoint, body);
+      return response.data;
+    } catch (err) {
+      console.error(`API POST ${endpoint} error:`, err.message);
+      throw err;
+    }
+  }
 }
 
-/**
- * GET helper.
- */
-export async function get(url, headers = {}) {
-  return request(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-  });
-}
-
-/**
- * POST helper.
- */
-export async function post(url, body = {}, headers = {}) {
-  return request(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: JSON.stringify(body),
-  });
-}
+module.exports = ApiClient;
