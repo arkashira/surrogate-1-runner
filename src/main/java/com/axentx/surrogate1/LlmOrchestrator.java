@@ -1,28 +1,43 @@
-import com.axentx.surrogate1.LlmProvider;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
 
 public class LlmOrchestrator {
-    private final List<LlmProvider> providers;
+    private List<LlmProvider> providers;
+    private Map<String, LlmProvider> providerMap;
 
     public LlmOrchestrator(List<LlmProvider> providers) {
         this.providers = providers;
+        this.providerMap = providers.stream().collect(Collectors.toMap(LlmProvider::getId, p -> p));
     }
 
-    public String getResponse(String input) {
-        AtomicReference<String> response = new AtomicReference<>();
-        providers.stream()
-                  .filter(LlmProvider::isAlive)
-                  .forEach(provider -> {
-                      try {
-                          String result = provider.generateResponse(input);
-                          if (result != null) {
-                              response.set(result);
-                          }
-                      } catch (Exception e) {
-                          // Handle or log exception
-                      }
-                  });
-        return response.get();
+    public LlmProvider getProvider(String id) {
+        return providerMap.get(id);
+    }
+
+    public void configureLoadBalancing() {
+        // Implement load-balancing logic here
+        // For example, you can use a round-robin algorithm
+        int index = 0;
+        for (LlmProvider provider : providers) {
+            // Assign the current provider to the load-balancer
+            // ...
+            index = (index + 1) % providers.size();
+        }
+    }
+
+    public void configureFailover() {
+        // Implement failover logic here
+        // For example, you can use a simple failover strategy
+        // where if a provider fails, the next one in the list is used
+        int index = 0;
+        for (LlmProvider provider : providers) {
+            try {
+                // Try to use the current provider
+                // ...
+            } catch (Exception e) {
+                // If the provider fails, move to the next one
+                index = (index + 1) % providers.size();
+            }
+        }
     }
 }
