@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "Missing concrete code context: repository structure, existing Surrogate implementation, freerouter integration details, and test expectations are not provided.",
+  "request_to": "prd-daemon|architect-daemon|design-thinking",
+  "minimal_spec_needed": "Provide the current Surrogate source files, freerouter usage, and desired test scenarios to allow concrete code changes."
+}
