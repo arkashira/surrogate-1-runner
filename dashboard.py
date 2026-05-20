@@ -1,32 +1,39 @@
-import logging
-import time
-import requests
 
-# Set up logging
+from flask import Flask, render_template, jsonify, request
+import logging
+from axentx_api.client import AxentxApiClient
+
+app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Define a function to update the dashboard
-def update_dashboard(data):
-    # Simulate updating the dashboard (replace with actual dashboard update logic)
-    url = 'http://localhost:8080/update'
-    response = requests.post(url, json=data)
-    if response.status_code == 200:
-        logger.info('Dashboard updated successfully')
-    else:
-        logger.error('Failed to update dashboard')
+api_client = AxentxApiClient()
 
-# Define a function to display data on the dashboard
-def display_data(data):
-    # Simulate displaying data on the dashboard (replace with actual dashboard display logic)
-    print(f'Latency: {data["latency"]}')
-    print(f'Cost: {data["cost"]}')
-    print(f'Error Rate: {data["error_rate"]}')
+@app.route('/')
+def index():
+    """Render the main dashboard page."""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 25, type=int)
+        
+        detections = api_client.get_signature_drift_detections(
+            page=page, 
+            per_page=per_page
+        )
+        return render_template('dashboard.html', detections=detections)
+    except Exception as e:
+        logger.error(f"Error fetching detections: {e}")
+        return render_template('error.html', error=str(e)), 500
 
-# Define a function to collect data and display it on the dashboard
-def collect_and_display_data():
-    data = collect_data()
-    display_data(data)
+@app.route('/api/detections')
+def api_detections():
+    """JSON endpoint for real-time polling."""
+    try:
+        detections = api_client.get_signature_drift_detections(limit=50)
+        return jsonify({'detections': detections, 'count': len(detections)})
+    except Exception as e:
+        logger.error(f"API error: {e}")
+        return jsonify({'error': str(e)}), 500
 
-# Start collecting and displaying data
-collect_and_display_data()
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)  # Never use debug=True in production
