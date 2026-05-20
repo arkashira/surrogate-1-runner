@@ -1,11 +1,9 @@
-from sqlalchemy import Column, Integer, String, Text
-from .database import Base
+from . import db
+from flask_login import UserMixin
 
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    email = Column(String, unique=True, index=True)
-    bio = Column(Text, nullable=True)
-    # Add other fields as needed
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    company_name = db.Column(db.String(80), nullable=False)
+    confirmed = db.Column(db.Boolean, default=False)
