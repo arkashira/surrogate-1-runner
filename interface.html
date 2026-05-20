@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Axentx Web Shell</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="interface.css">
+</head>
+<body>
+  <main id="shell-container" aria-label="Web Shell">
+    <section id="output" class="output" aria-live="polite" role="log"></section>
+
+    <form id="cmd-form" aria-label="Command input">
+      <label for="cmd-input" class="visually-hidden">Command</label>
+      <input
+        type="text"
+        id="cmd-input"
+        class="cmd-input"
+        autocomplete="off"
+        placeholder="Enter command..."
+        aria-describedby="cmd-hint"
+        required
+      />
+      <button type="submit" class="cmd-submit" aria-label="Run command">Run</button>
+    </form>
+  </main>
+
+  <script src="interface.js" defer></script>
+</body>
+</html>
