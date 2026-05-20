@@ -1,0 +1,9 @@
+
+cron_scout:
+  jobs:
+    daily_account_snapshot:
+      command: "python /opt/axentx/surrogate-1/bin/daily_account_snapshot.py"
+      schedule: "0 2 * * *"
+      retry_count: 3
+      retry_delay: 60
+      log_path: "/var/log/axentx/cron-scout-audit/daily_scan.log"
