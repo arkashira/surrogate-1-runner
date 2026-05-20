@@ -1,38 +1,24 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+/**
+ * Budget management module.
+ *
+ * Budgets are stored in localStorage for simplicity. In a real
+ * deployment, these would be persisted via an API.
+ *
+ * Exports:
+ *   - getBudget: retrieves the current budget value.
+ *   - setBudget: updates the budget value.
+ */
 
-const Budget = () => {
-  const [budget, setBudget] = useState(0);
-  const [forecast, setForecast] = useState(0);
+const STORAGE_KEY = 'axentx_budget';
 
-  const setBudgetHandler = async (e) => {
-    e.preventDefault();
-    await axios.post('/api/budget', { budget });
-    // TODO: Show success message
-  };
+export function getBudget() {
+  const val = localStorage.getItem(STORAGE_KEY);
+  return val ? parseFloat(val) : null;
+}
 
-  const fetchForecast = async () => {
-    const response = await axios.get('/api/forecast');
-    setForecast(response.data.forecast);
-  };
-
-  useEffect(() => {
-    fetchForecast();
-  }, []);
-
-  return (
-    <div>
-      <h2>Budget</h2>
-      <form onSubmit={setBudgetHandler}>
-        <label>
-          Set Budget:
-          <input type="number" value={budget} onChange={e => setBudget(e.target.value)} />
-        </label>
-        <button type="submit">Set Budget</button>
-      </form>
-      <h3>Forecast: ${forecast.toFixed(2)}</h3>
-    </div>
-  );
-};
-
-export default Budget;
+export function setBudget(amount) {
+  if (typeof amount !== 'number' || amount < 0) {
+    throw new Error('Budget must be a non‑negative number');
+  }
+  localStorage.setItem(STORAGE_KEY, amount.toString());
+}
