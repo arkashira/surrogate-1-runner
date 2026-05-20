@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Surrogate-1 Setup Wizard</title>
+    <style>
+        .step { display: none; }
+        .step.active { display: block; }
+        .feedback { color: green; margin-top: 0.5em; }
+        button { margin-top: 1em; }
+    </style>
+</head>
+<body>
+<h1>Surrogate-1 Setup Wizard</h1>
+<div id="wizard">
+    <!-- Step 1 -->
+    <div class="step active" data-step="1">
+        <h2>Step 1: Welcome</h2>
+        <p>Welcome to Surrogate-1. Click Next to continue.</p>
+        <button onclick="nextStep()">Next</button>
+        <div class="feedback" id="feedback1"></div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step" data-step="2">
+        <h2>Step 2: Configure</h2>
+        <p>Enter your API key (optional for demo):</p>
+        <input type="text" id="apiKey" placeholder="API key"/>
+        <button onclick="completeStep(2)">Complete Step 2</button>
+        <div class="feedback" id="feedback2"></div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step" data-step="3">
+        <h2>Step 3: Finish</h2>
+        <p>Setup is complete. You can now start using Surrogate-1.</p>
+        <button onclick="finish()">Finish</button>
+        <div class="feedback" id="feedback3"></div>
+    </div>
+</div>
+
+<script>
+    function nextStep() {
+        document.querySelector('.step.active').classList.remove('active');
+        document.querySelector('.step[data-step="2"]').classList.add('active');
+        document.getElementById('feedback1').textContent = 'Step 1 completed';
+    }
+
+    function completeStep(step) {
+        const apiKey = document.getElementById('apiKey').value;
+        const params = new URLSearchParams({ step: 'step' + step, apiKey });
+
+        fetch('/setup/step', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('feedback' + step).textContent = 'Step ' + step + ' completed';
+            // Move to next step
+            document.querySelector('.step.active').classList.remove('active');
+            const next = step + 1;
+            const nextDiv = document.querySelector('.step[data-step="' + next + '"]');
+            if (nextDiv) nextDiv.classList.add('active');
+        })
+        .catch(() => {
+            document.getElementById('feedback' + step).textContent = 'Error completing step';
+        });
+    }
+
+    function finish() {
+        document.getElementById('feedback3').textContent = 'All steps done! 🎉';
+    }
+</script>
+</body>
+</html>
