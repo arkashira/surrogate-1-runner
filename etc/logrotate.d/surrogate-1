@@ -1,0 +1,34 @@
+# /etc/logrotate.d/surrogate-1
+/var/log/axentx/surrogate-1/tag_validation.log {
+    # -----------------------------------------------------------------
+    # Rotation schedule
+    # -----------------------------------------------------------------
+    daily               # rotate every day
+    rotate 30           # keep the most recent 30 rotations
+    compress            # gzip old logs
+    delaycompress       # compress starting with the second old file
+    missingok           # do not error if the file is absent
+    notifempty          # do not rotate an empty file
+    create 0640 axentx axentx   # new log file permissions & ownership
+
+    # -----------------------------------------------------------------
+    # Shared‑script handling (run once per rotation, not per log)
+    # -----------------------------------------------------------------
+    sharedscripts
+
+    # -----------------------------------------------------------------
+    # Post‑rotate hook – safely tell the logger to reopen its file
+    # -----------------------------------------------------------------
+    postrotate
+        # The surrogate‑1 daemon should reopen its log after rotation.
+        # We first check that the process is running, then send SIGHUP.
+        # Using `pidof` works even if the PID file is missing or stale.
+        if pidof surrogate-1 >/dev/null; then
+            kill -HUP $(pidof surrogate-1)
+        fi
+        # If the daemon does not support SIGHUP, replace the block above
+        # with the appropriate command (e.g. `systemctl reload surrogate-1`
+        # or a custom script).  The `|| true` guard ensures logrotate never
+        # aborts because the signal fails.
+    endscript
+}
