@@ -1,34 +1,34 @@
 import sqlite3
-from datetime import datetime
 
-class Database:
-    def __init__(self, db_file):
-        self.connection = sqlite3.connect(db_file)
-        self.create_logs_table()
+class DBHandler:
+    def __init__(self, db_path='usage_logs.db'):
+        self.conn = sqlite3.connect(db_path)
+        self.cursor = self.conn.cursor()
+        self.create_table()
 
-    def create_logs_table(self):
-        with self.connection:
-            self.connection.execute('''
-                CREATE TABLE IF NOT EXISTS user_usage_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    model_name TEXT NOT NULL,
-                    usage_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    action TEXT NOT NULL
-                )
-            ''')
+    def create_table(self):
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ai_model_usage (
+                timestamp TEXT,
+                user_id TEXT,
+                model_name TEXT,
+                usage_details TEXT
+            )
+        ''')
+        self.conn.commit()
 
-    def log_usage(self, user_id, model_name, action):
-        with self.connection:
-            self.connection.execute('''
-                INSERT INTO user_usage_logs (user_id, model_name, action)
-                VALUES (?, ?, ?)
-            ''', (user_id, model_name, action))
+    def store_log(self, log_entry):
+        self.cursor.execute('''
+            INSERT INTO ai_model_usage (timestamp, user_id, model_name, usage_details)
+            VALUES (?, ?, ?, ?)
+        ''', (log_entry['timestamp'], log_entry['user_id'], log_entry['model_name'], str(log_entry['usage_details'])))
+        self.conn.commit()
 
     def get_logs(self):
-        cursor = self.connection.cursor()
-        cursor.execute('SELECT * FROM user_usage_logs')
-        return cursor.fetchall()
+        self.cursor.execute('SELECT * FROM ai_model_usage')
+        return self.cursor.fetchall()
 
-    def close(self):
-        self.connection.close()
+if __name__ == "__main__":
+    # Example usage
+    db_handler = DBHandler()
+    print(db_handler.get_logs())
