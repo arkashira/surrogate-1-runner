@@ -1,0 +1,4 @@
+gpus: []
+bridge:
+  type: auto
+  load_balancing: true
