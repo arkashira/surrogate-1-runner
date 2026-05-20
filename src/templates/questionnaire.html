@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Questionnaire</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Submit</button>
+  </form>
+  <div id="progress-bar">
+    <progress value="0" max="100"></progress>
+  </div>
+{% endblock %}
