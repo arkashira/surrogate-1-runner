@@ -1,0 +1,8 @@
+# Use default config
+python main.py
+
+# Use custom config
+python main.py --config /path/to/custom.yaml
+
+# Save current config as new default
+python main.py --config /path/to/custom.yaml --save-default
