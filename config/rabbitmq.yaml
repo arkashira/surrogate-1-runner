@@ -1,0 +1,6 @@
+host: rabbitmq.axentx.internal
+port: 5672
+vhost: surrogate1
+username: surrogate1_user
+password: ${RABBITMQ_PASSWORD}
+queue_name: surrogate1_tasks
