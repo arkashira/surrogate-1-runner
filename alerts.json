@@ -1,0 +1,21 @@
+{
+  "groups": [
+    {
+      "name": "ingestion-alerts",
+      "rules": [
+        {
+          "alert": "IngestionDelay",
+          "expr": "ingestion_latency_seconds > 300",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Ingestion delay detected",
+            "description": "Ingestion latency has exceeded 5 minutes"
+          }
+        }
+      ]
+    }
+  ]
+}

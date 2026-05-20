@@ -1,0 +1,50 @@
+{
+  "dashboard": {
+    "title": "Ingestion Metrics",
+    "panels": [
+      {
+        "title": "Ingestion Throughput",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ingestion_throughput_total[1m])",
+            "legendFormat": "Throughput"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Ingestion Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ingestion_latency_seconds",
+            "legendFormat": "Latency"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "Datasource",
+          "type": "datasource",
+          "query": "prometheus",
+          "refresh": 1
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}
