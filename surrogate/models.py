@@ -1,21 +1,15 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
+from django.db import models
 
-Base = declarative_base()
+class FounderProfile(models.Model):
+    email = models.EmailField(unique=True)
+    password_hash = models.CharField(max_length=255)
+    stage = models.CharField(max_length=50, blank=True, null=True)
+    target_market = models.CharField(max_length=100, blank=True, null=True)
+    pricing_model = models.CharField(max_length=50, blank=True, null=True)
+    current_funnel = models.CharField(max_length=100, blank=True, null=True)
+    biggest_growth_pain = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-
-class AuditLog(Base):
-    __tablename__ = "audit_logs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    article_id = Column(Integer, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    author = Column(String(255), nullable=False)
-    action = Column(Text, nullable=False)
-
-    def __repr__(self) -> str:  # handy for debugging
-        return (
-            f"<AuditLog id={self.id} article_id={self.article_id} "
-            f"author={self.author} action={self.action[:20]}>"
-        )
+    def __str__(self):
+        return self.email
