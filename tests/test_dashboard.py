@@ -1,14 +1,16 @@
-import pytest
-from src.dashboard import dashboard_bp
-from src.dashboard_config import get_connected_repositories
+import unittest
+from unittest.mock import patch
+from src.dashboard import app
 
-def test_dashboard_route():
-    test_client = dashboard_bp.test_client()
-    response = test_client.get('/dashboard')
-    assert response.status_code == 200
-    assert b'Connected Repositories' in response.data
+class TestDashboard(unittest.TestCase):
+    def test_launch_session(self):
+        with patch("src.dashboard.launch_session_logic") as mock_launch_session:
+            response = app.callback(
+                Output("session-status", "children"),
+                [Input("launch-button", "n_clicks")],
+                [dash.dependencies.State("instance-select", "value")],
+            )
+            mock_launch_session.assert_called_once()
 
-def test_repository_data():
-    repos = get_connected_repositories()
-    assert len(repos) >= 2
-    assert all('name' in repo and 'url' in repo for repo in repos)
+if __name__ == "__main__":
+    unittest.main()
