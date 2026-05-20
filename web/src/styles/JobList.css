@@ -1,0 +1,19 @@
+.job-list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.job-list li {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 0;
+}
+
+.job-list li:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 768px) {
+  .job-list li {
+    padding: 5px 0;
+  }
+}
