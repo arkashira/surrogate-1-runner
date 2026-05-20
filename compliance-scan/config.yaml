@@ -1,0 +1,14 @@
+version: 1.0
+scanning:
+  enabled: true
+  file_types:
+    - terraform
+    - helm
+  output:
+    format: json
+    destination: /opt/axentx/surrogate-1/compliance-scan/results.json
+remediation:
+  enabled: true
+  strategies:
+    - auto_fix
+    - manual_review
