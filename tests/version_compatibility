@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "Task mismatch: surrogate-1 is a dataset ingestion project (HuggingFace pipeline workers), not a KiCAD upgrade tool. The PRD task asks for KiCAD 9 version compatibility testing, but this project has no KiCAD-related codebase, tests, or infrastructure. The path /opt/axentx/surrogate-1/tests/version_compatibility does not exist in this project's scope.",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "Clarification on whether this task should be redirected to a different project (e.g., axentx/kicad-upgrade-tool) or if surrogate-1 needs a new KiCAD compatibility module (which would require a feature branch and spec from prd-daemon)"
+}
