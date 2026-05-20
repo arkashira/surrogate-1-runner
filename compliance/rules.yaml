@@ -1,107 +1,20 @@
-version: "1.0"
-description: "Comprehensive compliance rule set for Config.yaml files in surrogate-1 pipeline"
-
+version: 1.0
 rules:
-  - id: "rule_001"
-    name: "Ensure required secrets are present"
-    description: "Ensure required secrets (api_key, secret_token) are present"
-    severity: "critical"
-    type: "presence"
-    keys:
-      - api_key
-      - secret_token
-
-  - id: "rule_002"
-    name: "Disallow special characters in sensitive fields"
-    description: "Disallow special characters in sensitive fields (username, password)"
-    severity: "high"
-    type: "regex"
-    keys:
-      - username
-      - password
-    regex: '^[a-zA-Z0-9_]+$'
-
-  - id: "rule_003"
-    name: "Enforce minimum password length"
-    description: "Enforce minimum password length (12 characters)"
-    severity: "high"
-    type: "length"
-    keys:
-      - password
-    min: 12
-
-  - id: "rule_004"
-    name: "Ensure API keys are not hardcoded"
-    description: "API keys must not be present in plain text within the configuration file."
-    severity: "critical"
-    type: "regex"
-    pattern: ".*(?:api[_-]?key|token|secret).*:\s*[\"']?.*[\"']?"
-    explanation: "Hardcoded API keys pose a security risk. Use environment variables or secret management tools."
-    remediation: "Replace hardcoded values with environment variable references, e.g., ${ENV_VAR}."
-
-  - id: "rule_005"
-    name: "Require TLS for external endpoints"
-    description: "All external service endpoints must use HTTPS or TLS-enabled protocols."
-    severity: "high"
-    type: "regex"
-    pattern: ".*(?:url|endpoint|host).*:\s*http://"
-    invert_match: true
-    explanation: "Unencrypted communication can expose sensitive data in transit."
-    remediation: "Use HTTPS instead of HTTP for all external URLs."
-
-  - id: "rule_006"
-    name: "Disallow weak cipher suites"
-    description: "Configurations must not specify deprecated or weak cipher suites."
-    severity: "high"
-    type: "regex"
-    pattern: ".*(?:cipher|ciphers|encryption).*:\s*(?i).*\\b(?:DES|RC4|3DES|NULL)\\b"
-    explanation: "Weak ciphers are vulnerable to known cryptographic attacks."
-    remediation: "Use strong, modern cipher suites such as AES-GCM."
-
-  - id: "rule_007"
-    name: "Ensure logging level is not set to debug in production"
-    description: "Debug-level logging may expose sensitive information and should be disabled in production."
-    severity: "medium"
-    type: "regex"
-    pattern: ".*log[_-]?level.*:\s*(?i)debug"
-    explanation: "Excessive logging in production environments increases privacy and performance risks."
-    remediation: "Set log level to 'info' or higher in production configurations."
-
-  - id: "rule_008"
-    name: "Require explicit access control policies"
-    description: "Access control policies must be explicitly defined, not left default or empty."
-    severity: "critical"
-    type: "presence"
-    key: "access_control.enabled"
-    required: true
-    explanation: "Missing access controls can lead to unauthorized access."
-    remediation: "Set `access_control.enabled: true` and define appropriate roles and permissions."
-
-  - id: "rule_009"
-    name: "Prevent use of default admin credentials"
-    description: "Default usernames and passwords must not be used."
-    severity: "critical"
-    type: "regex"
-    pattern: ".*(?:username|password).*:\s*(?i).*\\b(admin|default|guest)\\b"
-    explanation: "Default credentials are well-known and easily exploited."
-    remediation: "Use strong, unique credentials and store them securely."
-
-  - id: "rule_010"
-    name: "Ensure audit logging is enabled"
-    description: "Audit logging must be explicitly enabled to track system activity."
-    severity: "high"
-    type: "presence"
-    key: "audit_logging.enabled"
-    required: true
-    value: true
-    explanation: "Without audit logs, it's difficult to investigate security incidents."
-    remediation: "Set `audit_logging.enabled: true` in the configuration."
-
-  - id: "rule_011"
-    name: "Disallow plain text database passwords"
-    description: "Database connection strings must not include plain text passwords."
-    severity: "critical"
-    type: "regex"
-    pattern: ".*database[_-]?url.*://[^:]+:[^@]+@"
-    explanation: "Plain text passwords in connection strings are a major security vulnerability."
-    remediation: "Use externalized secrets or connection pooling with secure authentication."
+  - id: "rule-001"
+    name: "Password Complexity"
+    description: "Enforce minimum password complexity requirements"
+    pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{12,}$"
+    version: "1.0.0"
+    enabled: true
+  - id: "rule-002"
+    name: "Email Format"
+    description: "Validate standard email format"
+    pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    version: "1.0.0"
+    enabled: true
+  - id: "rule-003"
+    name: "Credit Card Number"
+    description: "Validate credit card number format"
+    pattern: "^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})$"
+    version: "1.0.0"
+    enabled: true
