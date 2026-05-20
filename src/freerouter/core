@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "The task references Java-dependent components in /opt/axentx/surrogate-1/src/freerouter/core, but the specific files, Java APIs used, and desired Python replacements are not provided. Without concrete code or a clear interface description, I cannot produce a valid code diff.",
+  "request_to": "prd-daemon|architect-daemon|design-thinking",
+  "minimal_spec_needed": "Provide the list of Java classes/files to refactor, the APIs they expose, and the target Python functionality or libraries to replace them."
+}
