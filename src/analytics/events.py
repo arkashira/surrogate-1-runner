@@ -1,25 +1,29 @@
-
-import time
-import json
 from datetime import datetime
+import uuid
 
-# Function to log events
-def log_event(event_type, user_id):
-    timestamp = int(time.time())
-    event_data = {
-        'event_type': event_type,
-        'user_id': user_id,
-        'timestamp': timestamp
-    }
-    # Assuming we have a function to write to a log file or a database
-    write_event_to_storage(event_data)
+class AnalyticsEvent:
+    def __init__(self, event_type, data=None):
+        self.event_id = str(uuid.uuid4())
+        self.timestamp = datetime.utcnow()
+        self.event_type = event_type
+        self.data = data or {}
 
-def write_event_to_storage(event_data):
-    # Placeholder for actual storage logic (e.g., database or file)
-    with open('/opt/axentx/surrogate-1/src/analytics/event_log.jsonl', 'a') as f:
-        f.write(json.dumps(event_data) + '\n')
+    def serialize(self):
+        return {
+            'event_id': self.event_id,
+            'timestamp': self.timestamp.isoformat(),
+            'event_type': self.event_type,
+            'data': self.data
+        }
 
-# Example usage
-# log_event('upload', 'user123')
-# log_event('search', 'user123')
-# log_event('open', 'user123')
+def record_build_completed_event(build_data):
+    event = AnalyticsEvent('build_completed', build_data)
+    # Assuming there's a function to send events to an analytics service
+    send_analytics_event(event.serialize())
+
+def send_analytics_event(event_data):
+    # Placeholder for actual implementation of sending the event
+    print(f"Sending analytics event: {event_data}")
+
+# Example usage:
+# record_build_completed_event({'components': ['CPU', 'GPU'], 'total_cost': 1500})
