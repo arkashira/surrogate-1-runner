@@ -6,13 +6,14 @@ HuggingFace dataset.
 
 ## What this does
 
-Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **configurable parallel runners** (default 4). Each runner takes a deterministic slice of the public dataset list, streams, normalizes per-schema, dedups via the central md5 hash store, and uploads its output to a unique path on the dataset repo.
+Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**.
+Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`)
+of the public dataset list defined in `bin/dataset-enrich.sh`, streams,
+normalizes per-schema, dedups via the central md5 hash store, and uploads
+its output to a unique path on the dataset repo:
 
 ## Configuration
+The `MAX_SIZE_MB` environment variable can be set to configure the maximum dataset size per ingestion. The default value is 5000 MB. If a dataset exceeds this limit, it will be skipped and logged, and a warning will be emitted to the metrics endpoint.
 
-- Set the number of workers using the `WORKER_COUNT` environment variable.
-
-## Summary
-
-- Implemented configurable worker count using `WORKER_COUNT` environment variable.
-- Updated README to reflect the change.
+## Environment Variables
+* `MAX_SIZE_MB`: The maximum dataset size per ingestion in megabytes. Default: 5000 MB.
