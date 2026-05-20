@@ -1,0 +1,40 @@
+name: "Default Validation Template"
+version: "1.0"
+description: "Template for basic data validation steps"
+steps:
+  - name: "Check JSON Format"
+    type: "format"
+    parameters:
+      format: "json"
+    description: "Validates that input data is properly formatted JSON"
+    
+  - name: "Check Required Fields"
+    type: "required"
+    parameters:
+      fields: ["id", "timestamp", "content"]
+    description: "Ensures mandatory fields are present in the data"
+    
+  - name: "Validate Data Types"
+    type: "type"
+    parameters:
+      rules:
+        id: "integer"
+        timestamp: "datetime"
+        content: "string"
+        metadata: "object"
+    description: "Verifies data types for specific fields"
+    
+  - name: "Check Value Ranges"
+    type: "range"
+    parameters:
+      field: "score"
+      min: 0
+      max: 100
+    description: "Validates numeric values fall within acceptable range"
+    
+  - name: "Check URL Format"
+    type: "regex"
+    parameters:
+      field: "source_url"
+      pattern: "^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([\\/\\w .-]*)*\\/?$"
+    description: "Ensures URLs follow standard format"
