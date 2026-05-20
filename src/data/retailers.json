@@ -1,0 +1,49 @@
+{
+  "retailers": [
+    {
+      "id": "amazon",
+      "name": "Amazon",
+      "url": "https://api.amazon.com",
+      "categories": ["electronics", "books", "clothing"],
+      "currency": "USD",
+      "rating": 4.5,
+      "delivery": "2-3 days"
+    },
+    {
+      "id": "walmart",
+      "name": "Walmart",
+      "url": "https://api.walmart.com",
+      "categories": ["groceries", "electronics", "home"],
+      "currency": "USD",
+      "rating": 4.2,
+      "delivery": "1-2 days"
+    },
+    {
+      "id": "bestbuy",
+      "name": "Best Buy",
+      "url": "https://api.bestbuy.com",
+      "categories": ["electronics", "home"],
+      "currency": "USD",
+      "rating": 4.3,
+      "delivery": "1-3 days"
+    },
+    {
+      "id": "target",
+      "name": "Target",
+      "url": "https://api.target.com",
+      "categories": ["clothing", "home", "groceries"],
+      "currency": "USD",
+      "rating": 4.4,
+      "delivery": "1-2 days"
+    },
+    {
+      "id": "ebay",
+      "name": "eBay",
+      "url": "https://api.ebay.com",
+      "categories": ["electronics", "collectibles", "clothing"],
+      "currency": "USD",
+      "rating": 4.1,
+      "delivery": "7-14 days"
+    }
+  ]
+}
