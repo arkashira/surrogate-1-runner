@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Feedback List</title>
+</head>
+<body>
+    <h1>Feedback List</h1>
+    <ul>
+    {% for feedback in feedbacks %}
+        <li>
+            {{ feedback.feedback_text }} (Rating: {{ feedback.rating }})
+        </li>
+    {% endfor %}
+    </ul>
+</body>
+</html>

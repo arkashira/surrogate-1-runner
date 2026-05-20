@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recommendation {{ recommendation.id }}</title>
+</head>
+<body>
+    <h1>Recommendation {{ recommendation.id }}</h1>
+    <p>Feedback form:</p>
+    {{ render('feedback.html', recommendation=recommendation, current_user=current_user) }}
+</body>
+</html>

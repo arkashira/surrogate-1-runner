@@ -1,7 +1,7 @@
-from django.urls import path
-from .views import get_template, save_template
+from flask import render_template
+from models import Feedback
 
-urlpatterns = [
-    path('api/templates/<str:template_id>/', get_template, name='get_template'),
-    path('api/templates/<str:template_id>/', save_template, name='save_template'),
-]
+@app.route('/admin/feedback')
+def view_feedback():
+    feedbacks = Feedback.query.all()
+    return render_template('feedback_list.html', feedbacks=feedbacks)
