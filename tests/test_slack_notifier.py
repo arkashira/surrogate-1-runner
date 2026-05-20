@@ -1,61 +1,46 @@
 import unittest
-from unittest.mock import patch, Mock
-from slack_notifier import SlackNotifier
-import os
-import json
-from datetime import datetime
+from unittest.mock import patch
+from src.notifications.slack import SlackNotifier
 
 class TestSlackNotifier(unittest.TestCase):
-
     def setUp(self):
-        self.container_name = 'test_container'
-        self.exit_code = 1
-        self.timestamp = datetime.now().isoformat()
-        self.payload = {
-            'container': self.container_name,
-            'exit_code': self.exit_code,
-            'timestamp': self.timestamp
-        }
-        os.environ['SLACK_WEBHOOK_URL'] = 'http://test_webhook_url'
-        os.environ['COMPOSE_GUARD_SLACK_ENABLED'] = 'True'
+        self.webhook_url = "TEST_WEBHOOK_URL"
+        self.notifier = SlackNotifier(self.webhook_url)
 
-    @patch('slack_notifier.requests.post')
-    def test_send_notification_success(self, mock_post):
-        mock_response = Mock()
+    @patch('requests.post')
+    def test_send_alert_success(self, mock_post):
+        mock_response = unittest.mock.Mock()
         mock_response.status_code = 200
         mock_post.return_value = mock_response
 
-        notifier = SlackNotifier()
-        result = notifier.send_notification(self.container_name, self.exit_code, self.timestamp)
+        alert_payload = {
+            "account_id": "12345",
+            "service": "Storage",
+            "current_cost": 150.0,
+            "previous_avg": 100.0,
+            "percentage_change": 50,
+            "dashboard_link": "http://example.com/dashboard"
+        }
+        self.notifier.send_alert(alert_payload)
 
-        mock_post.assert_called_once_with(
-            'http://test_webhook_url',
-            json=self.payload,
-            headers={'Content-Type': 'application/json'}
-        )
-        self.assertTrue(result)
+        mock_post.assert_called_once()
 
-    @patch('slack_notifier.requests.post')
-    def test_send_notification_failure_retry(self, mock_post):
-        mock_response = Mock()
+    @patch('requests.post')
+    def test_send_alert_failure(self, mock_post):
+        mock_response = unittest.mock.Mock()
         mock_response.status_code = 500
         mock_post.return_value = mock_response
 
-        notifier = SlackNotifier()
-        result = notifier.send_notification(self.container_name, self.exit_code, self.timestamp)
-
-        self.assertEqual(mock_post.call_count, 3)
-        self.assertFalse(result)
-
-    @patch('slack_notifier.requests.post')
-    def test_send_notification_disabled(self, mock_post):
-        os.environ['COMPOSE_GUARD_SLACK_ENABLED'] = 'False'
-
-        notifier = SlackNotifier()
-        result = notifier.send_notification(self.container_name, self.exit_code, self.timestamp)
-
-        mock_post.assert_not_called()
-        self.assertFalse(result)
+        alert_payload = {
+            "account_id": "12345",
+            "service": "Storage",
+            "current_cost": 150.0,
+            "previous_avg": 100.0,
+            "percentage_change": 50,
+            "dashboard_link": "http://example.com/dashboard"
+        }
+        with self.assertRaises(ValueError):
+            self.notifier.send_alert(alert_payload)
 
 if __name__ == '__main__':
     unittest.main()

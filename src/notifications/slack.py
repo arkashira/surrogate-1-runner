@@ -1,114 +1,34 @@
-# src/notifications/slack.py
-from __future__ import annotations
-
-import json
-import logging
-import os
-import re
-import time
-from dataclasses import dataclass
-from typing import Optional
-
 import requests
-
-logger = logging.getLogger(__name__)
-
-
-# Best-effort mapping: email local-part -> Slack handle (without @)
-# Replace with a real directory/identity lookup in production.
-def _email_to_slack_mention(email: Optional[str]) -> Optional[str]:
-    if not email:
-        return None
-    local = email.strip().split("@")[0].lower()
-    handle = re.sub(r"[^a-z0-9\-_]", "", local)
-    return f"@{handle}" if handle else None
-
-
-@dataclass(frozen=True)
-class StatusChange:
-    request_title: str
-    new_status: str
-    public_url: str
-    sla_timer_seconds: Optional[int] = None
-    requester_email: Optional[str] = None
-    request_id: Optional[str] = None
-
+import json
 
 class SlackNotifier:
-    """
-    Post status changes to Slack via incoming webhook with exponential backoff retry.
-
-    Behavior:
-    - Returns True only on HTTP 2xx.
-    - Retries on network errors and 5xx (max_retries, exponential backoff).
-    - Does NOT retry on 4xx (treated as permanent client errors).
-    - Raises only on unrecoverable programming errors.
-    """
-
-    def __init__(
-        self,
-        webhook_url: str,
-        channel: Optional[str] = None,
-        max_retries: int = 3,
-        backoff_factor: float = 1.0,
-        timeout: float = 10.0,
-    ) -> None:
-        if not webhook_url:
-            raise ValueError("webhook_url is required")
+    def __init__(self, webhook_url):
         self.webhook_url = webhook_url
-        self.channel = channel
-        self.max_retries = max(1, int(max_retries))
-        self.backoff_factor = float(backoff_factor)
-        self.timeout = float(timeout)
 
-    def notify_status_change(self, change: StatusChange) -> bool:
-        payload = self._build_payload(change)
-        last_exception: Optional[Exception] = None
+    def send_alert(self, alert_payload):
+        message = self._format_message(alert_payload)
+        response = requests.post(
+            self.webhook_url,
+            data=json.dumps(message),
+            headers={'Content-Type': 'application/json'}
+        )
+        if response.status_code != 200:
+            raise ValueError(f'Request to slack returned an error {response.status_code}, the response is:\n{response.text}')
 
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                resp = requests.post(
-                    self.webhook_url,
-                    json=payload,
-                    timeout=self.timeout,
-                    headers={"Content-Type": "application/json"},
-                )
-                if 200 <= resp.status_code < 300:
-                    logger.info(
-                        "Slack notification sent for request=%s status=%s",
-                        change.request_id or change.request_title,
-                        change.new_status,
-                    )
-                    return True
+    def _format_message(self, alert_payload):
+        return {
+            "text": f"Cost anomaly detected!\nAccount ID: {alert_payload['account_id']}\nService: {alert_payload['service']}\nCurrent Cost: {alert_payload['current_cost']}\nPrevious Avg: {alert_payload['previous_avg']}\n% Change: {alert_payload['percentage_change']}%\nDashboard Link: {alert_payload['dashboard_link']}"
+        }
 
-                # Permanent client errors: do not retry
-                if 400 <= resp.status_code < 500:
-                    logger.error(
-                        "Slack webhook client error (status=%s): %s",
-                        resp.status_code,
-                        resp.text,
-                    )
-                    return False
-
-                # Transient server errors or unexpected codes: retry
-                logger.warning(
-                    "Slack webhook attempt %s/%s failed (status=%s): %s",
-                    attempt,
-                    self.max_retries,
-                    resp.status_code,
-                    resp.text,
-                )
-            except (requests.Timeout, requests.ConnectionError) as exc:
-                logger.warning(
-                    "Slack webhook attempt %s/%s network error: %s",
-                    attempt,
-                    self.max_retries,
-                    exc,
-                )
-                last_exception = exc
-            except Exception as exc:
-                logger.exception("Unexpected error posting to Slack")
-                last_exception = exc
-
-            if attempt < self.max_retries:
-                sleep_
+# Example usage
+if __name__ == "__main__":
+    notifier = SlackNotifier("YOUR_SLACK_WEBHOOK_URL")
+    alert_payload = {
+        "account_id": "12345",
+        "service": "Storage",
+        "current_cost": 150.0,
+        "previous_avg": 100.0,
+        "percentage_change": 50,
+        "dashboard_link": "http://example.com/dashboard"
+    }
+    notifier.send_alert(alert_payload)
