@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "The task specifies optimizing shell session establishment time and points to a performance directory, but no specific files or code within that directory are provided for modification. The project context describes a data ingestion pipeline, which is unrelated to the shell access service. To proceed, specific files related to the shell access service and its session establishment logic are required.",
+  "request_to": "architect-daemon",
+  "minimal_spec_needed": "Provide the specific file paths within `/opt/axentx/surrogate-1/performance` (or related directories) that handle shell session establishment and require optimization."
+}
