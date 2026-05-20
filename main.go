@@ -2,18 +2,17 @@ package main
 
 import (
 	"log"
+	"net/http"
 
-	"github.com/axentx/surrogate-1/config"
-	"github.com/axentx/surrogate-1/hipaa"
-	"github.com/axentx/surrogate-1/soc2"
+	"surrogate-1/internal/api"
 )
 
 func main() {
-	hipaaConfig := config.NewHIPAAConfig()
-	soc2Config := config.NewSOC2Config()
+	mux := http.NewServeMux()
+	api.RegisterSyntheticRoutes(mux)
 
-	hipaa.Integrate(hipaaConfig)
-	soc2.Integrate(soc2Config)
-
-	log.Println("HIPAA and SOC2 integration completed.")
+	log.Println("Listening on :8080")
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		log.Fatal(err)
+	}
 }
