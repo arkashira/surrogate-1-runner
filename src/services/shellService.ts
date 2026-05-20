@@ -1,65 +1,72 @@
-import { v4 as uuidv4 } from 'uuid';
+import { logSessionAttempt, SessionLog } from './loggingService';
 
-/**
- * Represents a shell session.
- */
-export interface ShellSession {
-  id: string;
-  user: string;
-  node: string;
-  startTime: Date;
-  status: 'active' | 'terminated';
+export interface User {
+  /** Unique username */
+  username: string;
+  /** Role assigned to the user (e.g., 'admin', 'operator') */
+  role: string;
+}
+
+export interface Node {
+  /** Hostname or IP of the target node */
+  hostname: string;
+  /** Role required to access this node */
+  requiredRole: string;
 }
 
 /**
- * In-memory store for active sessions.
- * In a real implementation this would be backed by a database or
- * a distributed session store.
+ * Initiates a shell session to a remote node after performing
+ * authentication and RBAC checks. All attempts are logged with
+ * metadata for audit purposes.
+ *
+ * @param user - The user attempting the session
+ * @param node - The target node to connect to
+ * @param credentials - Authentication token or password
+ * @throws Will throw an error if authentication or RBAC fails
  */
-const sessionStore: Map<string, ShellSession> = new Map();
+export async function startShellSession(
+  user: User,
+  node: Node,
+  credentials: string,
+): Promise<void> {
+  const timestamp = new Date().toISOString();
+  let success = false;
+  let error: string | undefined;
 
-/**
- * Create a new shell session (used by other parts of the system).
- * This helper is not part of the requested feature but is useful
- * for testing and demonstration purposes.
- */
-export function createSession(user: string, node: string): ShellSession {
-  const session: ShellSession = {
-    id: uuidv4(),
-    user,
-    node,
-    startTime: new Date(),
-    status: 'active',
-  };
-  sessionStore.set(session.id, session);
-  return session;
-}
+  try {
+    // ---- Authentication ----
+    // Placeholder: in production this would verify a token or password.
+    if (!credentials || credentials !== 'valid-token') {
+      throw new Error('Invalid credentials');
+    }
 
-/**
- * Retrieve all active sessions.
- */
-export async function getActiveSessions(): Promise<ShellSession[]> {
-  // In a real system this might involve async DB calls.
-  return Array.from(sessionStore.values()).filter(
-    (s) => s.status === 'active'
-  );
-}
+    // ---- RBAC Check ----
+    if (user.role !== node.requiredRole) {
+      throw new Error(
+        `User role ${user.role} does not have access to node ${node.hostname}`,
+      );
+    }
 
-/**
- * Terminate a session by ID.
- * @throws {Error} if the session does not exist or is already terminated.
- */
-export async function terminateSession(sessionId: string): Promise<void> {
-  const session = sessionStore.get(sessionId);
-  if (!session) {
-    const err = new Error('SessionNotFound');
-    throw err;
+    // ---- Session Initiation ----
+    // In a real system this would spawn an SSH process or similar.
+    // Here we simply simulate a successful start.
+    success = true;
+  } catch (e: any) {
+    error = e.message;
+    success = false;
+  } finally {
+    const log: SessionLog = {
+      user: user.username,
+      node: node.hostname,
+      role: user.role,
+      timestamp,
+      success,
+      error,
+    };
+    logSessionAttempt(log);
   }
-  if (session.status === 'terminated') {
-    const err = new Error('SessionAlreadyTerminated');
-    throw err;
+
+  if (!success) {
+    throw new Error(error ?? 'Session initiation failed');
   }
-  // Mark as terminated and remove from store
-  session.status = 'terminated';
-  sessionStore.delete(sessionId);
 }
