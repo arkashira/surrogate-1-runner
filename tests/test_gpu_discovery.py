@@ -1,58 +1,38 @@
 import unittest
-from unittest.mock import patch, MagicMock
-from axentx.surrogate.gpu import GPUDiscovry, GPUAllocation
+from unittest.mock import patch
+from src.gpu_discovery import GPUDiscovery
 
-class TestGPUDiscovry(unittest.TestCase):
-    def setUp(self):
-        self.gpu_discovery = GPUDiscovry()
+class TestGPUDiscovery(unittest.TestCase):
+    @patch('subprocess.run')
+    def test_detect_gpus(self, mock_run):
+        # Mock the subprocess.run output
+        mock_run.return_value.stdout = """
+00:02.0 VGA compatible controller [0300]: Intel Corporation Device [8086:1234] (rev 02)
+    Subsystem: Intel Corporation Device [8086:5678]
+    Kernel driver in use: i915
+    Kernel modules: i915
+01:00.0 VGA compatible controller [0300]: NVIDIA Corporation Device [10de:2345] (rev a1)
+    Subsystem: NVIDIA Corporation Device [10de:6789]
+    Kernel driver in use: nvidia
+    Kernel modules: nvidia
+"""
 
-    @patch('axentx.surrogate.gpu.subprocess')
-    def test_discover_gpus(self, mock_subprocess):
-        mock_subprocess.check_output.return_value = (
-            b'GPU 0: NVIDIA GeForce RTX 3090 (UUID: GPU-00000000-0000-0000-0000-000000000000)\n'
-            b'  Total memory: 24576 MiB\n'
-            b'  PCIe bandwidth: 16 GT/s\n'
-            b'  Driver version: 510.47.03\n'
-            b'GPU 1: NVIDIA GeForce RTX 3090 (UUID: GPU-00000000-0000-0000-0000-000000000001)\n'
-            b'  Total memory: 24576 MiB\n'
-            b'  PCIe bandwidth: 16 GT/s\n'
-            b'  Driver version: 510.47.03\n'
-        )
-        gpus = self.gpu_discovery.discover_gpus()
+        gpu_discovery = GPUDiscovery()
+        gpus = gpu_discovery.detect_gpus()
+
         self.assertEqual(len(gpus), 2)
-        self.assertEqual(gpus[0]['id'], 'GPU-00000000-0000-0000-0000-000000000000')
-        self.assertEqual(gpus[0]['total_memory'], 24576)
-        self.assertEqual(gpus[0]['pcie_bandwidth'], 16)
-        self.assertEqual(gpus[0]['driver_version'], '510.47.03')
+        self.assertEqual(gpus[0]['driver'], 'i915')
+        self.assertEqual(gpus[1]['driver'], 'nvidia')
 
-    @patch('axentx.surrogate.gpu.subprocess')
-    def test_discover_gpus_no_gpus(self, mock_subprocess):
-        mock_subprocess.check_output.return_value = b'No GPUs found'
-        gpus = self.gpu_discovery.discover_gpus()
-        self.assertEqual(len(gpus), 0)
+    def test_generate_load_balancing_profile(self):
+        gpu_discovery = GPUDiscovery()
+        gpu_discovery.gpu_info = [{'driver': 'i915'}, {'driver': 'nvidia'}]
 
-class TestGPUAllocation(unittest.TestCase):
-    def setUp(self):
-        self.gpu_allocation = GPUAllocation()
+        profile = gpu_discovery.generate_load_balancing_profile()
 
-    def test_allocate_gpu(self):
-        gpu_id = 'GPU-00000000-0000-0000-0000-000000000000'
-        handle = self.gpu_allocation.allocate_gpu(gpu_id)
-        self.assertIsNotNone(handle)
-        self.assertEqual(self.gpu_allocation.allocate_gpu(gpu_id), None)
-
-    def test_allocate_gpu_invalid_id(self):
-        gpu_id = 'invalid_id'
-        handle = self.gpu_allocation.allocate_gpu(gpu_id)
-        self.assertIsNone(handle)
-
-    def test_release_gpu(self):
-        gpu_id = 'GPU-00000000-0000-0000-0000-000000000000'
-        handle = self.gpu_allocation.allocate_gpu(gpu_id)
-        self.gpu_allocation.release_gpu(handle)
-        new_handle = self.gpu_allocation.allocate_gpu(gpu_id)
-        self.assertIsNotNone(new_handle)
-        self.assertNotEqual(handle, new_handle)
+        self.assertEqual(profile['gpu_count'], 2)
+        self.assertEqual(profile['load_balancing'], 'round_robin')
+        self.assertTrue(profile['performance_overlay'])
 
 if __name__ == '__main__':
     unittest.main()
