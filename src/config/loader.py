@@ -1,30 +1,39 @@
 import os
-from .utils.secrets import get_secret_value
+import yaml
 
-def load_environment_config() -> dict:
-    """
-    Load configuration based on the current environment (Docker or Kubernetes).
-    Returns a dictionary with configuration values.
-    """
-    config = {}
+class ComplianceConfig:
+    SUPPORTED_PROFILES = ['hipaa', 'soc2']
 
-    # Detect environment type
-    is_k8s = is_kubernetes_environment()
-    config['env_type'] = 'kubernetes' if is_k8s else 'docker'
+    def __init__(self, repo_root):
+        self.config_path = os.path.join(repo_root, '.surrogate', 'compliance.yml')
+        self.enabled = False
+        self.profile = None
+        self.load_config()
 
-    # Load secrets from appropriate sources
-    secrets = {
-        'api_key': get_secret_value('SURROGATE_API_KEY'),
-        'database_url': get_secret_value('DB_URL'),
-        'model_path': get_secret_value('MODEL_PATH'),
-        'dataset_repo': get_secret_value('DATASET_REPO'),
-    }
+    def load_config(self):
+        if not os.path.exists(self.config_path):
+            return
 
-    # Fallback to environment variables if secrets are missing
-    for key, value in secrets.items():
-        if value is None:
-            env_var = f"{key.upper()}"
-            secrets[key] = os.getenv(env_var)
+        with open(self.config_path, 'r') as file:
+            config = yaml.safe_load(file)
 
-    config.update(secrets)
-    return config
+        if not isinstance(config, dict):
+            return
+
+        self.enabled = config.get('enabled', False)
+        self.profile = config.get('profile')
+
+        if not isinstance(self.enabled, bool) or (self.profile not in self.SUPPORTED_PROFILES and self.profile is not None):
+            self.enabled = False
+            self.profile = None
+
+    def is_scan_enabled(self):
+        return self.enabled
+
+    def get_profile(self):
+        return self.profile
+
+    @classmethod
+    def should_skip_scan(cls, repo_root):
+        config = cls(repo_root)
+        return not config.is_scan_enabled()
