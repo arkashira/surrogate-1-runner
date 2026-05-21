@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Active Shell Sessions</title>
+</head>
+<body>
+    <h1>Active Shell Sessions</h1>
+    <ul id="session-list">
+        <!-- Sessions will be dynamically populated here -->
+    </ul>
+    <script>
+        fetch('/sessions')
+            .then(response => response.json())
+            .then(data => {
+                const sessionList = document.getElementById('session-list');
+                data.forEach(session => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = session;
+                    sessionList.appendChild(listItem);
+                });
+            })
+            .catch(error => console.error('Error fetching sessions:', error));
+    </script>
+</body>
+</html>
