@@ -1,0 +1,129 @@
+
+/* Layout Container */
+.aws-console-container {
+  display: flex;
+  height: 100vh;
+  font-family: 'Amazon Ember', Arial, sans-serif;
+  color: #333;
+  overflow: hidden;
+}
+
+/* Sidebar Styles */
+.aws-sidebar {
+  width: 240px;
+  background-color: #232f3e; /* AWS Dark Blue */
+  color: white;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 20px;
+  background-color: #1a2533;
+  border-bottom: 1px solid #34445c;
+}
+
+.sidebar-header h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+.service-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.service-nav-list li {
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  border-left: 4px solid transparent;
+}
+
+.service-nav-list li:hover {
+  background-color: #3a4a5a;
+}
+
+.service-nav-list li.active {
+  background-color: #3a4a5a;
+  border-left-color: #ff9900; /* AWS Orange accent */
+  font-weight: bold;
+}
+
+/* Main Content Styles */
+.aws-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f3f3f3;
+  overflow: hidden;
+}
+
+.content-header {
+  height: 50px;
+  background-color: white;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.content-header h3 {
+  margin: 0;
+  font-weight: 500;
+}
+
+.user-profile {
+  font-size: 12px;
+  color: #666;
+  background: #eee;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.content-body {
+  padding: 30px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Dashboard Component Styles */
+.service-dashboard h2 {
+  margin-top: 0;
+  color: #232f3e;
+}
+
+.placeholder-box {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 40px;
+  text-align: center;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.description {
+  color: #555;
+  margin-bottom: 20px;
+}
+
+.mock-action-btn {
+  background-color: #ff9900;
+  border: 1px solid #f2c900;
+  color: #111;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.mock-action-btn:hover {
+  background-color: #ec971f;
+}
