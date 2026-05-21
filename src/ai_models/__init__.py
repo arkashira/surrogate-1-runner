@@ -1,6 +1,7 @@
-from .claude import ClaudeAPI
+from .gpt4 import GPT4Model
 
-__all__ = ["ClaudeAPI"]
-
-# Initialize Claude API with environment variable
-claude_api = ClaudeAPI(api_key=os.getenv("CLAUDE_API_KEY"))
+def get_ai_model(model_name, api_key, api_url):
+    if model_name == 'gpt4':
+        return GPT4Model(api_key, api_url)
+    else:
+        raise ValueError('Unsupported AI model')
