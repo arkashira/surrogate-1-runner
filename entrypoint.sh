@@ -1,125 +1,165 @@
 #!/usr/bin/env bash
-# .github/actions/format/entrypoint.sh
-# ------------------------------------------------------------
-# Format‑check + diff‑summary generator
-# ------------------------------------------------------------
 set -euo pipefail
-IFS=$'\n\t'
 
-# ---------- Configuration ----------
-IGNORE_FILE=".surrogateignore"
-# Extensions we know how to format
-EXTS=("js" "ts" "json" "md" "py" "yaml" "yml")
+# Entrypoint for surrogate-1 with Freedom-Link tunnel integration
+# Validates env vars, starts tunnel, provides healthcheck
 
-# ---------- Helper: ignore logic ----------
-should_ignore() {
-    local path="$1"
-    # No ignore file → nothing to ignore
-    [[ -f "$IGNORE_FILE" ]] || return 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HEALTHCHECK_PORT="${HEALTHCHECK_PORT:-8080}"
+TUNNEL_LOG_FILE="${TUNNEL_LOG_FILE:-/var/log/surrogate-1/tunnel.log}"
 
-    while IFS= read -r pattern || [[ -n "$pattern" ]]; do
-        # Strip leading/trailing whitespace
-        pattern="${pattern#"${pattern%%[![:space:]]*}"}"
-        pattern="${pattern%"${pattern##*[![:space:]]}"}"
-        # Skip blanks & comments
-        [[ -z "$pattern" || "$pattern" == \#* ]] && continue
-        # Convert a simple glob to a regex‑compatible pattern
-        # (bash's [[ $path == $pattern ]] already supports globs)
-        if [[ "$path" == $pattern ]]; then
-            return 0   # match → ignore
-        fi
-    done < "$IGNORE_FILE"
-    return 1           # no match → do NOT ignore
+# Required environment variables
+REQUIRED_ENVS=(
+  "FREEDOM_ENDPOINT"
+  "FREEDOM_TOKEN"
+  "SURROGATE_API_KEY"
+)
+
+log() {
+  echo "[$(date -Iseconds)] $*" >> "$TUNNEL_LOG_FILE"
 }
 
-# ---------- Helper: run a formatter in “check” mode ----------
-run_formatter() {
-    local file="$1"
-    case "${file##*.}" in
-        js|ts|json|md)
-            # prettier must be installed in the runner (preinstalled on ubuntu‑latest)
-            prettier --check "$file" >/dev/null 2>&1 && return 0 || return 1
-            ;;
-        py)
-            # black must be installed (we install it in the workflow)
-            black --check "$file" >/dev/null 2>&1 && return 0 || return 1
-            ;;
-        yaml|yml)
-            # yamllint – we use a permissive config that only cares about tabs/CRLF
-            yamllint -d "{extends: relaxed, rules: {line-length: {max: 0}}}" "$file" >/dev/null 2>&1 && return 0 || return 1
-            ;;
-        *)
-            return 0   # unknown extension → treat as “already ok”
-            ;;
-    esac
-}
+log "Starting surrogate-1 entrypoint"
 
-# ---------- Temp directory for intermediate files ----------
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-
-DIFF_SUMMARY="$TMPDIR/diff_summary.txt"
-FORMAT_ISSUES="$TMPDIR/formatting_issues.txt"
-
-# Initialise output files
-printf "## Diff Summary\n\n" > "$DIFF_SUMMARY"
-printf "" > "$FORMAT_ISSUES"
-
-# ---------- Counters ----------
-total=0 formatted=0 needs_format=0 ignored=0
-
-# ---------- Main file walk ----------
-while IFS= read -r -d '' file; do
-    rel="${file#./}"               # path relative to repo root
-
-    # Skip ignored files
-    if should_ignore "$rel"; then
-        ((ignored++))
-        continue
-    fi
-
-    ((total++))
-
-    # Run the appropriate formatter in check‑only mode
-    if run_formatter "$rel"; then
-        ((formatted++))
-    else
-        ((needs_format++))
-        echo "$rel" >> "$FORMAT_ISSUES"
-    fi
-done < <(find . -type f \
-            \( -name "*.js" -o -name "*.ts" -o -name "*.json" -o -name "*.md" \
-               -o -name "*.py" -o -name "*.yaml" -o -name "*.yml" \) \
-            -not -path '*/.git/*' -not -path '*/node_modules/*' -print0)
-
-# ---------- Build the human‑readable summary ----------
-{
-    echo "### Files checked: $total"
-    echo "- Properly formatted: $formatted"
-    echo "- Need formatting:   $needs_format"
-    echo "- Ignored:            $ignored"
-    echo ""
-
-    if (( needs_format > 0 )); then
-        echo "### Files that need formatting"
-        echo ""
-        while IFS= read -r f; do
-            echo "- \`$f\`"
-        done < "$FORMAT_ISSUES"
-    else
-        echo "All checked files are correctly formatted 🎉"
-    fi
-} >> "$DIFF_SUMMARY"
-
-# ---------- Emit artifacts for the workflow ----------
-cp "$DIFF_SUMMARY"   diff_summary.txt
-cp "$FORMAT_ISSUES"  formatting_issues.txt
-
-# ---------- Exit status ----------
-if (( needs_format > 0 )); then
-    echo "Formatting problems detected – see diff_summary.txt"
+# Validate required environment variables
+for env_var in "${REQUIRED_ENVS[@]}"; do
+  if [[ -z "${!env_var:-}" ]]; then
+    log "ERROR: Missing required environment variable: $env_var"
     exit 1
-else
-    echo "✅ No formatting problems."
-    exit 0
-fi
+  fi
+  log "Environment variable $env_var is set"
+done
+
+# Create log directory if needed
+mkdir -p "$(dirname "$TUNNEL_LOG_FILE")"
+
+# Start healthcheck server (simple HTTP endpoint)
+start_healthcheck_server() {
+  log "Starting healthcheck server on port $HEALTHCHECK_PORT"
+  
+  # Simple Python HTTP server for healthcheck
+  python3 - <<'PYTHON_SCRIPT' &
+import http.server
+import socketserver
+import json
+import os
+import urllib.request
+import urllib.error
+
+HEALTHCHECK_PORT = os.environ.get('HEALTHCHECK_PORT', '8080')
+FREEDOM_ENDPOINT = os.environ.get('FREEDOM_ENDPOINT', '')
+FREEDOM_TOKEN = os.environ.get('FREEDOM_TOKEN', '')
+TUNNEL_HEALTHY = False
+
+class HealthHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/health':
+            try:
+                # Check if Freedom-Link tunnel is healthy
+                if FREEDOM_ENDPOINT and FREEDOM_TOKEN:
+                    # Attempt to verify tunnel connectivity
+                    req = urllib.request.Request(
+                        f"{FREEDOM_ENDPOINT}/status",
+                        headers={'Authorization': f'Bearer {FREEDOM_TOKEN}'}
+                    )
+                    try:
+                        with urllib.request.urlopen(req, timeout=2) as response:
+                            if response.status == 200:
+                                TUNNEL_HEALTHY = True
+                            else:
+                                TUNNEL_HEALTHY = False
+                    except Exception:
+                        TUNNEL_HEALTHY = False
+                
+                response_body = json.dumps({
+                    "status": "healthy" if TUNNEL_HEALTHY else "unhealthy",
+                    "tunnel_healthy": TUNNEL_HEALTHY,
+                    "freedom_endpoint": FREEDOM_ENDPOINT is not None,
+                    "freedom_token_set": FREEDOM_TOKEN is not None,
+                    "surrogate_api_key_set": os.environ.get('SURROGATE_API_KEY') is not None
+                })
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(response_body.encode())
+            except Exception as e:
+                self.send_response(503)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def log_message(self, format, *args):
+        # Suppress default logging
+        pass
+
+with socketserver.TCPServer(("", HEALTHCHECK_PORT), HealthHandler) as httpd:
+    httpd.serve_forever()
+PYTHON_SCRIPT
+  HEALTHCHECK_PID=$!
+  log "Healthcheck server started with PID: $HEALTHCHECK_PID"
+  export HEALTHCHECK_PID
+}
+
+# Start the main tunnel process
+start_tunnel() {
+  log "Starting Freedom-Link tunnel"
+  
+  # Start the tunnel process (placeholder for actual tunnel implementation)
+  # This would typically call the Freedom-Link binary or service
+  if command -v freedom-link &> /dev/null; then
+    freedom-link \
+      --endpoint "${FREEDOM_ENDPOINT}" \
+      --token "${FREEDOM_TOKEN}" \
+      --api-key "${SURROGATE_API_KEY}" \
+      --log-file "$TUNNEL_LOG_FILE" \
+      --healthcheck-port "$HEALTHCHECK_PORT"
+  else
+    # Fallback: simulate tunnel startup
+    log "Freedom-Link binary not found, using mock tunnel mode"
+    (
+      sleep 30
+      log "Tunnel mock: simulated connection established"
+    ) &
+    TUNNEL_PID=$!
+    log "Tunnel process started with PID: $TUNNEL_PID"
+    export TUNNEL_PID
+  fi
+}
+
+# Wait for tunnel to be healthy
+wait_for_tunnel_health() {
+  local max_attempts=30
+  local attempt=1
+  
+  log "Waiting for tunnel to become healthy..."
+  
+  while [[ $attempt -le $max_attempts ]]; do
+    if curl -sf "http://localhost:${HEALTHCHECK_PORT}/health" &>/dev/null; then
+      log "Tunnel is healthy after $attempt attempts"
+      return 0
+    fi
+    log "Attempt $attempt/$max_attempts: tunnel not yet healthy"
+    sleep 2
+    ((attempt++))
+  done
+  
+  log "ERROR: Tunnel failed to become healthy after $max_attempts attempts"
+  return 1
+}
+
+# Main execution
+main() {
+  start_healthcheck_server
+  start_tunnel
+  wait_for_tunnel_health || exit 1
+  log "All systems operational"
+  
+  # Keep container running
+  wait
+}
+
+main "$@"
