@@ -1,55 +1,32 @@
 import smtplib
 from email.mime.text import MIMEText
-from typing import Dict, List
-from config.alerts import alert_config
-from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
 
-class AlertManager:
-    def __init__(self):
-        self.alert_throttle: Dict[str, List[datetime]] = {}
+def send_alert(email, subject, body):
+    msg = MIMEMultipart()
+    msg['From'] = 'alerts@axentx.com'
+    msg['To'] = email
+    msg['Subject'] = subject
 
-    def send_alert(self, policy_name: str, violation_details: str, recipients: List[str]):
-        """Send an alert if the policy is not silenced and throttling limits are not exceeded."""
-        if alert_config.is_policy_silenced(policy_name):
-            return
+    msg.attach(MIMEText(body, 'plain'))
 
-        if not self._check_throttle(policy_name):
-            return
+    with smtplib.SMTP('smtp.axentx.com', 587) as server:
+        server.starttls()
+        server.login('alerts@axentx.com', 'password')
+        server.send_message(msg)
 
-        subject = f"Compliance Violation: {policy_name}"
-        body = f"Policy: {policy_name}\nDetails: {violation_details}"
+def format_alert(vulnerability):
+    subject = f"Critical Vulnerability Alert: {vulnerability['dependency']}"
+    body = f"""
+    Critical Vulnerability Detected:
 
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = 'alerts@axentx.com'
-        msg['To'] = ', '.join(recipients)
+    Dependency: {vulnerability['dependency']}
+    Version: {vulnerability['version']}
+    Severity: {vulnerability['severity']}
+    Description: {vulnerability['description']}
+    """
+    return subject, body
 
-        with smtplib.SMTP('localhost') as server:
-            server.sendmail('alerts@axentx.com', recipients, msg.as_string())
-
-        self._log_alert(policy_name, violation_details)
-
-    def _check_throttle(self, policy_name: str) -> bool:
-        """Check if the alert can be sent based on throttling limits."""
-        now = datetime.now()
-        if policy_name not in self.alert_throttle:
-            self.alert_throttle[policy_name] = []
-
-        # Remove alerts older than 1 hour
-        self.alert_throttle[policy_name] = [
-            alert_time for alert_time in self.alert_throttle[policy_name]
-            if now - alert_time <= timedelta(hours=1)
-        ]
-
-        if len(self.alert_throttle[policy_name]) >= 5:
-            return False
-
-        self.alert_throttle[policy_name].append(now)
-        return True
-
-    def _log_alert(self, policy_name: str, violation_details: str):
-        """Log the alert in the audit trail."""
-        with open('/var/log/axentx/audit.log', 'a') as log_file:
-            log_file.write(f"{datetime.now()} - Alert sent for policy: {policy_name}, Details: {violation_details}\n")
-
-alert_manager = AlertManager()
+def send_vulnerability_alert(email, vulnerability):
+    subject, body = format_alert(vulnerability)
+    send_alert(email, subject, body)

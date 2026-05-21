@@ -1,25 +1,41 @@
 import unittest
-from src.alerts.email import EmailAlert
-from src.alerts.in_app import InAppNotification
+from unittest.mock import patch
+from src.alerts import send_alert, format_alert, send_vulnerability_alert
 
-class TestEmailAlert(unittest.TestCase):
-    def setUp(self):
-        self.email_alert = EmailAlert('smtp.example.com', 587, 'sender@example.com', 'password')
+class TestAlerts(unittest.TestCase):
+    @patch('src.alerts.smtplib.SMTP')
+    def test_send_alert(self, mock_smtp):
+        send_alert('test@example.com', 'Test Subject', 'Test Body')
+        mock_smtp.assert_called_once_with('smtp.axentx.com', 587)
+        instance = mock_smtp.return_value.__enter__.return_value
+        instance.starttls.assert_called_once()
+        instance.login.assert_called_once_with('alerts@axentx.com', 'password')
+        instance.send_message.assert_called_once()
 
-    def test_send_alert(self):
-        # Mock SMTP server interaction
-        pass
+    def test_format_alert(self):
+        vulnerability = {
+            'dependency': 'test-dependency',
+            'version': '1.0.0',
+            'severity': 'critical',
+            'description': 'Test description'
+        }
+        subject, body = format_alert(vulnerability)
+        self.assertEqual(subject, 'Critical Vulnerability Alert: test-dependency')
+        self.assertIn('Dependency: test-dependency', body)
+        self.assertIn('Version: 1.0.0', body)
+        self.assertIn('Severity: critical', body)
+        self.assertIn('Description: Test description', body)
 
-class TestInAppNotification(unittest.TestCase):
-    def setUp(self):
-        self.notification_service = MockNotificationService()
-        self.in_app_notification = InAppNotification(self.notification_service)
-
-    def test_send_alert(self):
-        user_id = 'user123'
-        message = 'An unusual pattern has been detected in your cloud costs.'
-        self.in_app_notification.send_alert(user_id, message)
-        self.assertTrue(self.notification_service.notified)
+    @patch('src.alerts.send_alert')
+    def test_send_vulnerability_alert(self, mock_send_alert):
+        vulnerability = {
+            'dependency': 'test-dependency',
+            'version': '1.0.0',
+            'severity': 'critical',
+            'description': 'Test description'
+        }
+        send_vulnerability_alert('test@example.com', vulnerability)
+        mock_send_alert.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
