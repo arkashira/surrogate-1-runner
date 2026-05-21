@@ -1,0 +1,43 @@
+name: Dependency Checker
+description: Check for dependency mismatches
+inputs:
+  token:
+    description: GitHub token
+    required: true
+  repository:
+    description: Repository to check
+    required: true
+  branch:
+    description: Branch to check
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Run dependency checker
+      run: |
+        ./entrypoint.sh --ci
+      shell: bash
+    - name: Create summary comment
+      run: |
+        echo "## Summary" >> summary.md
+        echo "Missing imports:" >> summary.md
+        ./entrypoint.sh --ci --output summary.md
+      shell: bash
+    - name: Upload summary comment
+      uses: actions/upload-artifact@v3
+      with:
+        name: summary.md
+        path: summary.md
+    - name: Post summary comment
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          github.issues.createComment({
+            issue_number: github.context.pullRequest.number,
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            body: github.actions.uploadArtifact('summary.md', { name: 'summary.md' })
+          })
