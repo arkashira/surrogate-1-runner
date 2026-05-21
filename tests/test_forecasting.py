@@ -1,22 +1,24 @@
 import unittest
-from src.forecasting.model import train_and_forecast
-from src.forecasting.data import get_prepared_data
+import pandas as pd
+from datetime import datetime, timedelta
+from src.cloud_optimize.forecasting import Forecasting
 
 class TestForecasting(unittest.TestCase):
     def setUp(self):
-        self.data_path = 'path/to/historical_cost_data.csv'
+        # Create sample historical data
+        self.historical_data = [
+            {'date': '2023-01-01', 'cost': 100},
+            {'date': '2023-01-02', 'cost': 150},
+            {'date': '2023-01-03', 'cost': 200},
+            {'date': '2023-01-04', 'cost': 250},
+            {'date': '2023-01-05', 'cost': 300},
+        ]
+        self.forecasting = Forecasting(self.historical_data)
 
-    def test_model_training(self):
-        model = train_and_forecast(self.data_path)
-        self.assertIsNotNone(model)
-
-    def test_data_preparation(self):
-        X_train, X_test, y_train, y_test = get_prepared_data(self.data_path)
-        self.assertIsNotNone(X_train)
-        self.assertIsNotNone(X_test)
-        self.assertIsNotNone(y_train)
-        self.assertIsNotNone(y_test)
-
+    def test_forecast_costs(self):
+        forecast_df = self.forecasting.forecast_costs(days=5)
+        self.assertEqual(len(forecast_df), 5)
+        self.assertTrue(all(forecast_df['cost'] > 0))
 
 if __name__ == '__main__':
     unittest.main()
