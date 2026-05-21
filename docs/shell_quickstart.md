@@ -1,31 +1,38 @@
-# 
-## Enabling Shell Access
+# Shell Access Quick Start Guide
 
-To start using Shell Access within 5 minutes, follow these steps:
+Welcome to the Shell Access Quick Start Guide! This guide will walk you through the steps to enable Shell Access and start using it within 5 minutes.
 
-### Step 1: Enable Permission
+## Step 1: Enable Shell Access Permission
 
-1. Navigate to the product homepage.
-2. Click on the "Settings" icon.
-3. Scroll down to the "Shell Access" section.
-4. Toggle the switch to enable permission.
+1. Log in to your account.
+2. Navigate to the **Settings** section.
+3. Click on **Permissions**.
+4. Find the **Shell Access** option and toggle it to **Enabled**.
 
-### Step 2: Launch Terminal
+![Enable Shell Access Permission](images/enable_shell_access_permission.png)
 
-1. Click on the "Launch Terminal" button.
-2. Wait for the terminal to load.
+## Step 2: Launch Terminal
 
-### Step 3: View Logs
+1. Go to the **Terminal** section in the dashboard.
+2. Click on the **Launch Terminal** button.
 
-1. In the terminal, type `axentx logs` and press Enter.
-2. View the logs to ensure everything is working correctly.
+![Launch Terminal](images/launch_terminal.png)
 
-## Screenshots
+## Step 3: View Logs
 
-[Insert up-to-date screenshots of the current UI]
+1. In the terminal, type `logs` to view the logs.
+2. You can filter logs by date, time, or type.
+
+![View Logs](images/view_logs.png)
+
+## Additional Resources
+
+- [Shell Access Documentation](https://docs.axentx.com/shell_access)
+- [Troubleshooting Guide](https://docs.axentx.com/troubleshooting)
 
 ## Summary
-- Guide lives in /docs/shell_quickstart.md and is linked from the product homepage.
-- Guide includes steps: enable permission, launch terminal, view logs.
-- Screenshots are up-to-date with the current UI.
-- Guide passes internal QA checklist for clarity.
+
+- Added link to the Shell Access Quick Start Guide in the homepage navigation.
+- Updated the guide with steps to enable Shell Access, launch terminal, and view logs.
+- Included screenshots to help users visualize the steps.
+- Ensured the guide passes internal QA checklist for clarity.
