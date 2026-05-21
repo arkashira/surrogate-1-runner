@@ -1,29 +1,34 @@
-import os
 import time
-from flask import Flask, jsonify
-import redis  # For dataset store health check
+import json
+from deployment import deploy_workflow
+from utils import load_config, check_node_health
 
-app = Flask(__name__)
+class HighAvailabilityManager:
+    def __init__(self, workflow_id, config_file):
+        self.workflow_id = workflow_id
+        self.config = load_config(config_file)
+        self.backup_nodes = self.config["backup_nodes"]
+        self.primary_node = self.config["primary_node"]
 
-def is_dataset_store_healthy():
-    """Check health by verifying connection to the dataset store."""
-    try:
-        # Connect to the dataset store (e.g., Redis or DB)
-        r = redis.Redis(host='dataset-store', port=6379, db=0, socket_timeout=1)
-        r.ping()  # Should return True if healthy
-        return True
-    except Exception as e:
-        print(f"Dataset store health check failed: {e}")
-        return False
+    def monitor_and_switch(self):
+        while True:
+            if not check_node_health(self.primary_node):
+                print(f"Primary node {self.primary_node} is down. Switching to backup.")
+                for backup in self.backup_nodes:
+                    if check_node_health(backup):
+                        self.switch_to_backup(backup)
+                        break
+            time.sleep(5)
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Expose health status endpoint."""
-    if is_dataset_store_healthy():
-        return jsonify({"status": "healthy", "message": "Dataset store reachable"}), 200
-    else:
-        return jsonify({"status": "unhealthy", "message": "Dataset store unreachable"}), 503
+    def check_node_health(self, node):
+        return check_node_health(node)
 
-if __name__ == '__main__':
-    # Run health check server on all interfaces at port 8080
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    def switch_to_backup(self, backup_node):
+        print(f"Switching to backup node {backup_node}.")
+        deploy_workflow(self.workflow_id, backup_node)
+
+if __name__ == "__main__":
+    workflow_id = "workflow123"
+    config_file = "config.json"
+    ha_manager = HighAvailabilityManager(workflow_id, config_file)
+    ha_manager.monitor_and_switch()

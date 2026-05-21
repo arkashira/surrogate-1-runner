@@ -1,3 +1,5 @@
 {
-  "costBasedRouting": true
+    "backup_nodes": ["node1", "node2", "node3"],
+    "primary_node": "primary",
+    "latency_threshold": 200
 }
