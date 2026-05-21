@@ -1,42 +1,28 @@
 package engine
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"time"
-
-	"github.com/axentx/surrogate-1-training-pairs/axentx"
 )
 
-// Workflow represents a workflow
 type Workflow struct {
-	Name    string
-	Steps   []Step
-	Retry   int
-	Timeout time.Duration
+	ID        string
+	Name      string
+	Status    string
+	Timestamp time.Time
 }
 
-// Step represents a step in a workflow
-type Step struct {
-	Name    string
-	Command string
-}
+func ExecuteWorkflow(workflow Workflow) {
+	LogWorkflowExecution(workflow)
+	MonitorWorkflowExecution(workflow)
 
-// NewWorkflow returns a new workflow
-func NewWorkflow(name string, steps []Step, retry int, timeout time.Duration) Workflow {
-	return Workflow{
-		Name:    name,
-		Steps:   steps,
-		Retry:   retry,
-		Timeout: timeout,
-	}
-}
+	// Simulate workflow execution
+	time.Sleep(2 * time.Second)
 
-// NewStep returns a new step
-func NewStep(name string, command string) Step {
-	return Step{
-		Name:    name,
-		Command: command,
+	if workflow.Status == "failed" {
+		LogWorkflowFailure(workflow, fmt.Errorf("workflow failed"))
+		MonitorWorkflowFailure(workflow, fmt.Errorf("workflow failed"))
+	} else {
+		log.Println("Workflow executed successfully")
 	}
 }
