@@ -1,29 +1,20 @@
-import pytest
-from django.db import IntegrityError
-from surrogate.models import FounderProfile
+import unittest
+from src.models import ModelRegistry, ApprovedModel
 
-@pytest.mark.django_db
-def test_founder_profile_creation():
-    profile = FounderProfile.objects.create(
-        email="test@example.com",
-        password_hash="hashed_password",
-        stage="idea",
-        target_market="B2C",
-        pricing_model="subscription",
-        current_funnel="awareness",
-        biggest_growth_pain="Acquisition"
-    )
-    assert profile.id is not None
-    assert profile.email == "test@example.com"
+class TestModelRegistry(unittest.TestCase):
+    def test_add_approved_model(self):
+        registry = ModelRegistry()
+        model = ApprovedModel('Claude', 'Large Language Model')
+        registry.add_approved_model(model)
+        self.assertEqual(len(registry.get_approved_models()), 1)
 
-@pytest.mark.django_db
-def test_founder_profile_unique_email():
-    FounderProfile.objects.create(
-        email="test@example.com",
-        password_hash="hashed_password"
-    )
-    with pytest.raises(IntegrityError):
-        FounderProfile.objects.create(
-            email="test@example.com",
-            password_hash="hashed_password"
-        )
+    def test_get_approved_models(self):
+        registry = ModelRegistry()
+        model1 = ApprovedModel('Claude', 'Large Language Model')
+        model2 = ApprovedModel('Bert', 'Pre-trained Language Model')
+        registry.add_approved_model(model1)
+        registry.add_approved_model(model2)
+        self.assertEqual(len(registry.get_approved_models()), 2)
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,14 +1,18 @@
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from typing import List, Dict
 
-db = SQLAlchemy()
+class ApprovedModel:
+    def __init__(self, name: str, description: str):
+        self.name = name
+        self.description = description
 
-class UserEvent(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String(128), nullable=False)
-    event_type = db.Column(db.String(128), nullable=False)
-    payload = db.Column(db.JSON, nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+class ModelRegistry:
+    def __init__(self):
+        self.approved_models: List[ApprovedModel] = []
 
-    def __repr__(self):
-        return f"<UserEvent {self.id}>"
+    def add_approved_model(self, model: ApprovedModel):
+        self.approved_models.append(model)
+
+    def get_approved_models(self) -> List[ApprovedModel]:
+        return self.approved_models
+
+# src/models.py
