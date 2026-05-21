@@ -1,140 +1,148 @@
+"""
+LLM Pattern implementation for surrogate-1.
+
+This module defines the LLMPattern class which orchestrates
+LLM calls, rule enforcement, and audit logging.  It is
+designed to be plug‑in‑ready for any LLM client that
+exposes a ``call(prompt: str) -> str`` interface.
+"""
+
 import json
+import logging
 import os
-import time
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
-
-class LLMRuleError(Exception):
-    """Raised when LLM output violates a defined rule."""
-    pass
+# Configure module‑level logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(
+    logging.Formatter("[%(asctime)s] %(levelname)s %(name)s: %(message)s")
+)
+logger.addHandler(handler)
 
 
 class LLMPattern:
     """
-    Prototype for integrating an LLM‑based judgment into a workflow.
+    Orchestrates LLM interactions, rule enforcement, and audit logging.
 
-    Features
-    --------
-    * Deterministic mock LLM (can be overridden with a custom callable).
-    * Rule enforcement – each rule is a callable that receives the LLM output
-      and must return ``True`` to pass.
-    * Audit trail – every invocation is logged as a JSON line to the supplied
-      ``audit_path``.
+    Parameters
+    ----------
+    llm_client : Any
+        An object with a ``call(prompt: str) -> str`` method.
+    policy : Callable[[str], bool]
+        A function that receives the LLM's raw output and returns
+        ``True`` if the decision is acceptable, ``False`` otherwise.
+    audit_log_path : str | Path
+        Path to a JSONL file where audit records are appended.
     """
 
     def __init__(
         self,
-        *,
-        audit_path: str,
-        rules: Optional[List[Callable[[str], bool]]] = None,
-        llm_callable: Optional[Callable[[Dict[str, Any]], str]] = None,
+        llm_client: Any,
+        policy: Callable[[str], bool],
+        audit_log_path: str | Path,
     ) -> None:
+        self.llm_client = llm_client
+        self.policy = policy
+        self.audit_log_path = Path(audit_log_path)
+        # Ensure audit log directory exists
+        self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def run(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Parameters
-        ----------
-        audit_path: str
-            File path where audit entries are appended (JSON‑lines format).
-        rules: list of callables, optional
-            Functions that accept the LLM output string and return ``True`` if
-            the output satisfies the rule.
-        llm_callable: callable, optional
-            Function that receives the input payload and returns the LLM decision.
-            If omitted a simple deterministic mock implementation is used.
-        """
-        self.audit_path = audit_path
-        os.makedirs(os.path.dirname(self.audit_path), exist_ok=True)
-
-        self.rules = rules or [self._default_approval_rule]
-        self.llm_callable = llm_callable or self._default_mock_llm
-
-    @staticmethod
-    def _default_approval_rule(output: str) -> bool:
-        """Rule: output must be either 'APPROVE' or 'REJECT'."""
-        return output in {"APPROVE", "REJECT"}
-
-    @staticmethod
-    def _default_mock_llm(payload: Dict[str, Any]) -> str:
-        """
-        Very simple deterministic mock LLM.
-
-        Returns ``APPROVE`` when ``payload['value']`` >= 10, otherwise ``REJECT``.
-        """
-        value = payload.get("value", 0)
-        return "APPROVE" if value >= 10 else "REJECT"
-
-    def _enforce_rules(self, output: str) -> None:
-        """Validate the LLM output against all configured rules."""
-        for rule in self.rules:
-            if not rule(output):
-                raise LLMRuleError(f"LLM output '{output}' violated a rule.")
-
-    def _write_audit_entry(
-        self,
-        payload: Dict[str, Any],
-        output: str,
-        rule_passed: bool,
-        duration_ms: float,
-    ) -> None:
-        entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "payload": payload,
-            "llm_output": output,
-            "rule_passed": rule_passed,
-            "duration_ms": duration_ms,
-        }
-        line = json.dumps(entry, ensure_ascii=False)
-        with open(self.audit_path, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-
-    def evaluate(self, payload: Dict[str, Any]) -> str:
-        """
-        Run the LLM on ``payload``, enforce rules, and record an audit entry.
-
-        Returns
-        -------
-        str
-            The LLM decision (e.g., ``'APPROVE'`` or ``'REJECT'``).
-
-        Raises
-        ------
-        LLMRuleError
-            If any rule is violated.
-        """
-        start = time.time()
-        output = self.llm_callable(payload)
-        try:
-            self._enforce_rules(output)
-            rule_passed = True
-        except LLMRuleError:
-            rule_passed = False
-            raise
-        finally:
-            duration_ms = (time.time() - start) * 1000.0
-            self._write_audit_entry(payload, output, rule_passed, duration_ms)
-        return output
-
-    # --------------------------------------------------------------------- #
-    # Helper for sample workflow integration
-    # --------------------------------------------------------------------- #
-    def process_workflow_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Example integration point for a workflow step.
-
-        The method evaluates the LLM decision and annotates the item with the
-        result under the ``'llm_decision'`` key.
+        Execute the LLM pattern.
 
         Parameters
         ----------
-        item: dict
-            Arbitrary workflow payload.
+        prompt : str
+            The prompt to send to the LLM.
+        context : dict, optional
+            Additional context that may be useful for the audit trail.
 
         Returns
         -------
         dict
-            The original payload enriched with ``'llm_decision'``.
+            Structured result containing:
+                - decision: str
+                - rationale: str
+                - timestamp: str (ISO 8601)
+                - context: dict (original context)
         """
-        decision = self.evaluate(item)
-        enriched = dict(item)  # shallow copy to avoid side‑effects
-        enriched["llm_decision"] = decision
-        return enriched
+        logger.info("Sending prompt to LLM")
+        raw_output = self.llm_client.call(prompt)
+
+        # Simple split: first line is decision, rest is rationale
+        lines = raw_output.strip().splitlines()
+        decision = lines[0] if lines else ""
+        rationale = "\n".join(lines[1:]) if len(lines) > 1 else ""
+
+        # Enforce policy
+        is_acceptable = self.policy(decision)
+        if not is_acceptable:
+            logger.warning("Policy violation detected. Decision rejected.")
+            decision = "REJECTED"
+            rationale = "Policy violation: decision not allowed."
+
+        record = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "prompt": prompt,
+            "decision": decision,
+            "rationale": rationale,
+            "context": context or {},
+        }
+
+        self._audit(record)
+        return record
+
+    def _audit(self, record: Dict[str, Any]) -> None:
+        """
+        Append the audit record to the JSONL audit log.
+
+        Parameters
+        ----------
+        record : dict
+            The audit record to write.
+        """
+        try:
+            with self.audit_log_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record) + "\n")
+            logger.debug(f"Audit record written to {self.audit_log_path}")
+        except Exception as exc:
+            logger.error(f"Failed to write audit record: {exc}")
+
+    @staticmethod
+    def default_policy(decision: str) -> bool:
+        """
+        Default policy that rejects decisions containing prohibited words.
+
+        Parameters
+        ----------
+        decision : str
+            The decision string from the LLM.
+
+        Returns
+        -------
+        bool
+            ``True`` if decision is acceptable, ``False`` otherwise.
+        """
+        prohibited = {"reject", "disallow", "no", "deny"}
+        # Case‑insensitive check
+        return not any(word.lower() in decision.lower() for word in prohibited)
+
+
+# Example usage (would be removed in production code)
+if __name__ == "__main__":
+    class DummyLLM:
+        def call(self, prompt: str) -> str:
+            return "APPROVE\nThe request meets all criteria."
+
+    pattern = LLMPattern(
+        llm_client=DummyLLM(),
+        policy=LLMPattern.default_policy,
+        audit_log_path="audit.log",
+    )
+    result = pattern.run("Should we approve this request?", {"user_id": 42})
+    print(result)
