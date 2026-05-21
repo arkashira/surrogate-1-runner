@@ -1,38 +1,18 @@
-use clap::{App, Arg};
-use std::process;
+use std::error::Error;
+use log::{info, error};
+use env_logger;
 
-mod cli;
-mod dataset;
+mod clipboard;
 
-fn main() {
-    let matches = App::new("surrogate-1")
-        .version("1.0")
-        .author("axentx-dev-bot")
-        .about("Parallel public-dataset ingest workers")
-        .arg(
-            Arg::with_name("shard-id")
-                .long("shard-id")
-                .value_name("SHARD_ID")
-                .help("Sets the shard ID for the worker")
-                .takes_value(true)
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("output")
-                .long("output")
-                .value_name("OUTPUT_FILE")
-                .help("Sets the output file path")
-                .takes_value(true),
-        )
-        .get_matches();
+fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
 
-    let shard_id = matches.value_of("shard-id").unwrap().parse::<u32>().unwrap();
-    let output_file = matches.value_of("output").unwrap_or("output.json");
+    let text = "Hello, world!"; // In a real app this would come from elsewhere
 
-    if shard_id >= 16 {
-        eprintln!("Invalid shard ID: {}", shard_id);
-        process::exit(1);
+    match clipboard::paste_with_fallback(text) {
+        Ok(_) => info!("Clipboard paste succeeded"),
+        Err(e) => error!("All paste methods failed: {}", e),
     }
 
-    cli::run(shard_id, output_file);
+    Ok(())
 }
