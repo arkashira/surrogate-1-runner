@@ -1,23 +1,25 @@
 # /opt/axentx/surrogate-1/Dockerfile
-FROM python:3.9-slim
+
+# Stage 1: Build
+FROM golang:1.16 AS builder
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+COPY go.mod ./
+COPY go.sum ./
+RUN go mod download
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY *.go ./
+RUN go build -o sidecar
 
-# Copy the rest of the application
-COPY . .
+# Stage 2: Production
+FROM alpine:latest
 
-# Expose the port the app runs on
-EXPOSE 8000
+RUN apk add --no-cache ca-certificates && \
+    update-ca-certificates
 
-# Command to run the application
-CMD ["python", "main.py"]
+WORKDIR /app
+
+COPY --from=builder /app/sidecar .
+
+ENTRYPOINT ["./sidecar"]
