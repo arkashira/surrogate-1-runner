@@ -1,0 +1,30 @@
+---
+# Costinel Integration Configuration
+# Used by the hardening evidence exporter to push compliance data
+
+# Webhook URL for submitting hardening evidence
+webhook_url: "https://costinel.api.surrogate.axentx.com/v1/compliance"
+
+# Authentication token for the Costinel API
+api_token: "tok_costinel_surrogate1_XXXXXXXXXXXXXXXXXXXXXX"
+
+# Interval (in seconds) for automatic data export
+export_interval_seconds: 3600  # Once per hour
+
+# Logging configuration for the exporter
+log_file: "/var/log/axentx/surrogate/costinel_exporter.log"
+log_level: "INFO"  # Default log level (DEBUG for troubleshooting)
+
+# Feature flags
+enable_compliance_export: true  # Enable/disable the exporter service
+enable_debug_logging: false      # Additional debug logs if needed
+
+# Retry policy for failed exports
+max_retries: 3
+retry_backoff_seconds: 30  # Exponential backoff recommended for production
+
+# Data validation (optional)
+validate_data_before_export: true  # Ensure data meets Costinel schema requirements
+
+# UI Integration (if applicable)
+ui_notification_enabled: true  # Show export status in the UI
