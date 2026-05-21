@@ -2,14 +2,30 @@ package cli
 
 import (
 	"fmt"
-	"github.com/axentx/surrogate-1/validate"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
-func (c *Command) printReport(report *validate.Report) {
-	// ... (existing code)
+func RunCLI(validate bool, outputDir string) {
+	// Existing code generation logic...
+	// ... (assumed to be here but not modified by this change)
 
-	// Add link to Trivy report
-	fmt.Printf("Trivy report: %s\n", report.TrivyReportURL)
-
-	// ... (existing code)
+	if validate {
+		// Run Trivy security scan
+		trivyCmd := exec.Command("trivy", "config", "--exit-code", "1", "--severity", "HIGH,CRITICAL", outputDir)
+		trivyCmd.Stdout = os.Stdout
+		trivyCmd.Stderr = os.Stderr
+		
+		err := trivyCmd.Run()
+		if err != nil {
+			exitCode := 1
+			if _, ok := err.(*exec.ExitError); ok {
+				exitCode = 1
+			}
+			fmt.Fprintf(os.Stderr, "\n❌ Validation failed\n")
+			os.Exit(exitCode)
+		}
+		fmt.Fprintf(os.Stdout, "\n✅ Validation passed\n")
+	}
 }
