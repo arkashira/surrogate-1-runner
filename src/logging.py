@@ -1,32 +1,81 @@
-import logging
+import json
+import os
+import threading
 from datetime import datetime
+from typing import List, Optional, Dict
 
-class AIModelUsageLogger:
-    def __init__(self, db_handler):
-        self.logger = logging.getLogger('AIModelUsage')
-        self.logger.setLevel(logging.INFO)
-        self.db_handler = db_handler
+# Default location for the audit log.  In production this should be a
+# secure, append‑only location with appropriate OS permissions.
+DEFAULT_AUDIT_LOG_PATH = "/var/log/axentx/audit.log"
 
-    def log_usage(self, user_id, model_name, usage_details):
-        log_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'user_id': user_id,
-            'model_name': model_name,
-            'usage_details': usage_details
-        }
-        self.logger.info(f"Logging usage: {log_entry}")
-        self.db_handler.store_log(log_entry)
+# Allow the path to be overridden (useful for tests).
+AUDIT_LOG_PATH = os.getenv("AUDIT_LOG_PATH", DEFAULT_AUDIT_LOG_PATH)
 
-def setup_logger():
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger = logging.getLogger('AIModelUsage')
-    logger.addHandler(handler)
-    return logger
+# Ensure the directory exists.
+os.makedirs(os.path.dirname(AUDIT_LOG_PATH), exist_ok=True)
 
-if __name__ == "__main__":
-    # Example usage
-    db_handler = DBHandler()  # Assuming DBHandler is defined in db.py
-    logger = AIModelUsageLogger(db_handler)
-    logger.log_usage('user123', 'modelX', {'input': 'example input', 'output': 'example output'})
+# A simple file‑level lock to make appends thread‑safe.
+_lock = threading.Lock()
+
+
+def _write_entry(entry: Dict) -> None:
+    """Append a single JSON‑encoded audit entry to the log file."""
+    line = json.dumps(entry, separators=(",", ":")) + "\n"
+    with _lock, open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(line)
+
+
+def log_ai_request(user_id: str, ai_tool: str, request_payload: Dict) -> None:
+    """
+    Record an AI request for audit purposes.
+
+    Parameters
+    ----------
+    user_id: str
+        Identifier of the user making the request.
+    ai_tool: str
+        Name or identifier of the AI tool that was invoked.
+    request_payload: dict
+        The request data (will be stored as‑is; sensitive fields should be
+        stripped by the caller before logging).
+    """
+    entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "user_id": user_id,
+        "ai_tool": ai_tool,
+        "request": request_payload,
+    }
+    _write_entry(entry)
+
+
+def get_audit_trail(limit: Optional[int] = None) -> List[Dict]:
+    """
+    Retrieve audit entries.
+
+    Parameters
+    ----------
+    limit: int | None
+        Maximum number of most‑recent entries to return.  If ``None`` all
+        entries are returned.
+
+    Returns
+    -------
+    List[dict]
+        Audit entries ordered from newest to oldest.
+    """
+    if not os.path.exists(AUDIT_LOG_PATH):
+        return []
+
+    with _lock, open(AUDIT_LOG_PATH, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # Parse JSON lines; ignore malformed lines to keep the service robust.
+    entries = []
+    for line in reversed(lines):
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+        if limit is not None and len(entries) >= limit:
+            break
+    return entries
