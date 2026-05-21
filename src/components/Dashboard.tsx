@@ -1,16 +1,18 @@
 import React from 'react';
-import { Grid, Paper } from '@mui/material';
-import TroubleshootingGuide from './TroubleshootingGuide';
+import { Grid } from '@mui/material';
+import CostMetricsWidget from './CostMetricsWidget';
 
-const Dashboard = () => {
+const Dashboard: React.FC = () => {
+  const serviceTypes = ['all', 'compute', 'storage', 'network'];
+
   return (
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
-        <Paper>
-          <TroubleshootingGuide />
-        </Paper>
+    <div>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <CostMetricsWidget serviceTypes={serviceTypes} />
+        </Grid>
       </Grid>
-    </Grid>
+    </div>
   );
 };
 
