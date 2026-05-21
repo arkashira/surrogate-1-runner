@@ -1,55 +1,34 @@
 import os
-from tool_setup import ToolSetup
+import time
 
-class SetupWizard:
-    def __init__(self):
-        self.tool_setup = ToolSetup()
-        self.selected_tools = []
+def setup_surrogate_1():
+    print("Welcome to the Surrogate-1 setup wizard!")
+    print("This process should take less than 15 minutes.")
     
-    def run(self):
-        print("🚀 Welcome to AxentX Tool Setup Wizard!")
-        print("This will take less than 5 minutes. Let's get you started...")
-        
-        if not self.select_tools():
-            return False
-        if not self.configure_settings():
-            return False
-        if not self.finalize_setup():
-            return False
-            
-        print("\n✅ Setup complete! Your tools are ready to use.")
-        return True
+    # Step 1: Install dependencies
+    print("Installing dependencies...")
+    os.system("pip install -r requirements.txt")
     
-    def select_tools(self):
-        print("\n1️⃣ Step 1: Select Tools")
-        print("Available tools:")
-        for i, tool in enumerate(self.tool_setup.available_tools, 1):
-            print(f"  {i}. {tool['name']} - {tool['description']}")
-            
-        while True:
-            choice = input("\nEnter numbers separated by spaces (or 'q' to quit): ")
-            if choice.lower() == 'q':
-                return False
-                
-            try:
-                indices = [int(x)-1 for x in choice.split()]
-                self.selected_tools = [self.tool_setup.available_tools[i] for i in indices if 0 <= i < len(self.tool_setup.available_tools)]
-                return True
-            except:
-                print("❌ Invalid selection. Try again.")
-
-    def configure_settings(self):
-        print("\n2️⃣ Step 2: Configure Settings")
-        # Add actual configuration logic here
-        return True
+    # Step 2: Configure environment variables
+    print("Configuring environment variables...")
+    os.environ["SURROGATE_1_DATA_DIR"] = "/path/to/data"
+    os.environ["SURROGATE_1_MODEL_DIR"] = "/path/to/model"
     
-    def finalize_setup(self):
-        print("\n3️⃣ Step 3: Finalizing Setup")
-        for tool in self.selected_tools:
-            print(f"Installing {tool['name']}...")
-            self.tool_setup.install_tool(tool['name'])
-        return True
+    # Step 3: Initialize database
+    print("Initializing database...")
+    os.system("python init_db.py")
+    
+    # Step 4: Run setup script
+    print("Running setup script...")
+    os.system("python setup.py")
+    
+    print("Setup complete! Please restart the service.")
+    
+def main():
+    start_time = time.time()
+    setup_surrogate_1()
+    end_time = time.time()
+    print(f"Setup took {end_time - start_time} seconds.")
 
 if __name__ == "__main__":
-    wizard = SetupWizard()
-    wizard.run()
+    main()
