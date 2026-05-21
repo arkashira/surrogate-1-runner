@@ -1,0 +1,9 @@
+security_rules:
+  sql_injection_patterns:
+    - "'"
+    - "--"
+    - "#.*="
+    - "/\\*.*?\\*/"
+    - "%7C"
+    - "%27"
+    - "%5C"
