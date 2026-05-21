@@ -1,15 +1,27 @@
-package com.axentx.surrogate1.notification;
+# ──────────────────────────────────────────────────────
+# 1️⃣  OIDC / Spring‑Security configuration
+# ──────────────────────────────────────────────────────
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          oidc:
+            provider: oidc-provider
+            client-id: ${OIDC_CLIENT_ID}
+            client-secret: ${OIDC_CLIENT_SECRET}
+            scope: openid,profile,email,offline_access
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-name: OIDC Provider
+        provider:
+          oidc-provider:
+            issuer-uri: ${OIDC_ISSUER_URI}
 
-import org.springframework.stereotype.Service;
-
-/**
- * Stub for in‑app notification – replace with real push/notification logic.
- */
-@Service
-public class InAppNotificationService {
-
-    public void notifyAllUsers(String title, String message) {
-        // Placeholder: log the notification
-        System.out.printf("In‑app notification – %s: %s%n", title, message);
-    }
-}
+# ──────────────────────────────────────────────────────
+# 2️⃣  Custom properties used by the filter
+# ──────────────────────────────────────────────────────
+oidc:
+  issuer: ${OIDC_ISSUER_URI}          # e.g. https://idp.example.com
+  audience: ${OIDC_AUDIENCE}          # e.g. my‑service‑client‑id
+  jwk-set-uri: ${OIDC_JWK_SET_URI}    # e.g. https://idp.example.com/.well-known/jwks.json
+  audit-log-path: ${AUDIT_LOG_PATH}   # optional, e.g. /var/log/oidc-audit.log
