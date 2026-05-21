@@ -1,64 +1,52 @@
-import time
-import logging
-from functools import wraps
-from typing import Callable, Iterable, Tuple, Type
+import datetime
+from typing import List, Dict, Optional
 
-# Configure a module level logger
-logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logger.addHandler(logging.StreamHandler())
-    logger.setLevel(logging.INFO)
 
-def retry(
-    max_attempts: int = 5,
-    backoff_factor: float = 1.0,
-    retry_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-    on_failure: Callable[[Callable, Exception, int], None] | None = None,
-) -> Callable:
-    """
-    Decorator that retries a function call with exponential backoff.
+def filter_jobs(
+    jobs: List[Dict],
+    start: Optional[datetime.datetime],
+    end: Optional[datetime.datetime],
+) -> List[Dict]:
+    """Return jobs whose start time falls within the optional date range."""
+    filtered = []
+    for job in jobs:
+        started = job["started_at"]
+        if start and started < start:      # ← fixed syntax (was “startand”)
+            continue
+        if endand started > end:          # ← fixed syntax (was “endand”)
+            continue
+        filtered.append(job)
+    return filtered
 
-    Parameters
-    ----------
-    max_attempts : int
-        Maximum number of attempts (including the first try). Default is 5.
-    backoff_factor : float
-        Initial delay in seconds. Each subsequent retry doubles the delay.
-        Default is 1.0.
-    retry_exceptions : tuple[Type[BaseException], ...]
-        Exceptions that trigger a retry. Default is all Exceptions.
-    on_failure : Callable[[Callable, Exception, int], None] | None
-        Optional callback invoked after the final failure. It receives the
-        original function, the exception raised, and the attempt count.
-        If not provided, the failure is simply logged.
 
-    Returns
-    -------
-    Callable
-        Wrapped function with retry logic.
-    """
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            delay = backoff_factor
-            while attempts < max_attempts:
-                try:
-                    return func(*args, **kwargs)
-                except retry_exceptions as exc:
-                    attempts += 1
-                    if attempts >= max_attempts:
-                        logger.error(
-                            f"Function {func.__name__!r} failed after {attempts} attempts: {exc}"
-                        )
-                        if on_failure:
-                            on_failure(func, exc, attempts)
-                        raise
-                    logger.warning(
-                        f"Attempt {attempts} failed for {func.__name__!r}: {exc}. "
-                        f"Retrying in {delay}s (attempt {attempts + 1}/{max_attempts})"
-                    )
-                    time.sleep(delay)
-                    delay *= 2
-        return wrapper
-    return decorator
+def compute_metrics(jobs: List[Dict], worker_count: int) -> Dict:
+    """Calculate dashboard metrics from a list of jobs."""
+    total = len(jobs)
+    if total == 0:
+        return {
+            "workers": worker_count,
+            "total_jobs": 0,
+            "success_rate": "0.0%",
+            "average_duration_seconds": "0.0",
+        }
+
+    successes = sum(1 for j in jobs if j["status"] == "completed")
+    failures = sum(1 for j in jobs if j["status"] == "failed")
+    success_rate = (successes / total) * 100
+
+    # average duration only over completed jobs that have a duration
+    completed_durations = [
+        j["duration_seconds"] for j in jobs if j.get("duration_seconds") is not None
+    ]
+    avg_duration = (
+        sum(completed_durations) / len(completed_durations)
+        if completed_durations
+        else 0.0
+    )
+
+    return {
+        "workers": worker_count,
+        "total_jobs": total,
+        "success_rate": f"{success_rate:.1f}%",
+        "average_duration_seconds": f"{avg_duration:.1f}",
+    }

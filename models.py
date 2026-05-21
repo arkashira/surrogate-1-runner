@@ -1,21 +1,29 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+import datetime
+from typing import List, Dict
 
-Base = declarative_base()
+_jobs: List[Dict] = [
+    {
+        "id": 1,
+        "status": "running",
+        "started_at": datetime.datetime.utcnow() - datetime.timedelta(minutes=5),
+        "ended_at": None,
+        "duration_seconds": None,
+    },
+    {
+        "id": 2,
+        "status": "completed",
+        "started_at": datetime.datetime.utcnow() - datetime.timedelta(hours=1, minutes=10),
+        "ended_at": datetime.datetime.utcnow() - datetime.timedelta(hours=1),
+        "duration_seconds": 600,
+    },
+    {
+        "id": 3,
+        "status": "failed",
+        "started_at": datetime.datetime.utcnow() - datetime.timedelta(hours=2),
+        "ended_at": datetime.datetime.utcnow() - datetime.timedelta(hours=1, minutes=55),
+        "duration_seconds": 300,
+    },
+]
 
-class Pipeline(Base):
-    __tablename__ = 'pipelines'
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    statuses = relationship("PipelineStatus", back_populates="pipeline")
-
-class PipelineStatus(Base):
-    __tablename__ = 'pipeline_statuses'
-
-    id = Column(Integer, primary_key=True)
-    pipeline_id = Column(Integer, ForeignKey('pipelines.id'))
-    status = Column(String, nullable=False)
-    timestamp = Column(DateTime, nullable=False)
-    pipeline = relationship("Pipeline", back_populates="statuses")
+# In production this would be dynamic (e.g., from a metrics service)
+WORKER_COUNT = 16
