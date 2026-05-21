@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Connect Cloud Provider</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Connect Cloud Provider</h1>
+        <form id="cloudProviderForm">
+            <div class="form-group">
+                <label for="providerType">Cloud Provider:</label>
+                <select id="providerType" name="providerType" required>
+                    <option value="">Select a provider</option>
+                    <option value="aws">Amazon Web Services (AWS)</option>
+                    <option value="azure">Microsoft Azure</option>
+                    <option value="gcp">Google Cloud Platform (GCP)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="accessKey">Access Key:</label>
+                <input type="text" id="accessKey" name="accessKey" required>
+            </div>
+
+            <div class="form-group">
+                <label for="secretKey">Secret Key:</label>
+                <input type="password" id="secretKey" name="secretKey" required>
+            </div>
+
+            <div class="form-group">
+                <label for="region">Region (optional):</label>
+                <input type="text" id="region" name="region">
+            </div>
+
+            <button type="submit">Connect Provider</button>
+        </form>
+
+        <div id="statusMessage"></div>
+    </div>
+
+    <script src="/static/js/connect_cloud_provider.js"></script>
+</body>
+</html>
