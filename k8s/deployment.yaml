@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: surrogate-1
+spec:
+  replicas: 16
+  selector:
+    matchLabels:
+      app: surrogate-1
+  template:
+    metadata:
+      labels:
+        app: surrogate-1
+    spec:
+      containers:
+      - name: surrogate-1
+        image: axentx/surrogate-1:latest
+        env:
+        - name: SURROGATE_1_RUNTIME
+          value: /opt/axentx/surrogate-1/runtime
+        volumeMounts:
+        - name: runtime
+          mountPath: /opt/axentx/surrogate-1/runtime
+      volumes:
+      - name: runtime
+        emptyDir: {}
