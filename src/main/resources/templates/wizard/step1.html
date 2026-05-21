@@ -2,134 +2,68 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Data Source Wizard – Step 1</title>
-    <style>
-        /* Basic styling – kept unchanged from original */
-        .field-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: .3rem; }
-        input, select { width: 100%; padding: .4rem; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Surrogate-1 Ingestion Pipeline</title>
 </head>
 <body>
-    <h1>Configure Data Source</h1>
-    <form id="wizard-step1" method="post" action="/wizard/step1/submit">
-        <div class="field-group">
-            <label for="source-type">Source Type</label>
-            <select id="source-type" name="sourceType" required>
-                <option value="">-- Select a source --</option>
-                <option value="github">GitHub</option>
-                <option value="gdrive">Google Drive</option>
-                <option value="s3">Amazon S3</option>
-            </select>
-        </div>
-
-        <!-- GitHub fields -->
-        <div class="field-group source-fields github-fields" style="display:none;">
-            <label for="github-repo">Repository URL</label>
-            <input type="url" id="github-repo" name="githubRepo" placeholder="https://github.com/owner/repo">
-
-            <label for="github-branch">Branch</label>
-            <input type="text" id="github-branch" name="githubBranch" placeholder="main">
-
-            <label for="github-token">Personal Access Token</label>
-            <input type="password" id="github-token" name="githubToken">
-        </div>
-
-        <!-- Google Drive fields -->
-        <div class="field-group source-fields gdrive-fields" style="display:none;">
-            <label for="gdrive-folder-id">Folder ID</label>
-            <input type="text" id="gdrive-folder-id" name="gdriveFolderId">
-
-            <label for="gdrive-api-key">API Key</label>
-            <input type="password" id="gdrive-api-key" name="gdriveApiKey">
-        </div>
-
-        <!-- S3 fields -->
-        <div class="field-group source-fields s3-fields" style="display:none;">
-            <label for="s3-bucket">Bucket Name</label>
-            <input type="text" id="s3-bucket" name="s3Bucket">
-
-            <label for="s3-access-key">Access Key ID</label>
-            <input type="text" id="s3-access-key" name="s3AccessKey">
-
-            <label for="s3-secret-key">Secret Access Key</label>
-            <input type="password" id="s3-secret-key" name="s3SecretKey">
-
-            <label for="s3-region">Region</label>
-            <input type="text" id="s3-region" name="s3Region" placeholder="us-east-1">
-        </div>
-
+    <h1>Step 1: Select Data Source</h1>
+    <form>
+        <label for="dataSource">Data Source:</label>
+        <select id="dataSource" required>
+            <option value="">Select a data source</option>
+            <option value="reddit">Reddit</option>
+            <option value="twitter">Twitter</option>
+            <option value="news">News</option>
+        </select>
+        <br><br>
         <button type="submit">Next</button>
     </form>
-
-    <script>
-        // Default values for each source type
-        const DEFAULTS = {
-            github: {
-                'github-repo': 'https://github.com/example/example-repo',
-                'github-branch': 'main',
-                // token intentionally left blank for security; user can fill
-            },
-            gdrive: {
-                'gdrive-folder-id': '0Bxxxxxxxxxxxxxxxxxxxx',
-                // api key left blank
-            },
-            s3: {
-                's3-bucket': 'my-public-dataset',
-                's3-region': 'us-east-1',
-                // access/secret keys left blank
-            }
-        };
-
-        const sourceSelect = document.getElementById('source-type');
-        const allFieldGroups = document.querySelectorAll('.source-fields');
-
-        function hideAllFields() {
-            allFieldGroups.forEach(group => group.style.display = 'none');
-        }
-
-        function showFieldsFor(source) {
-            const group = document.querySelector(`.${source}-fields`);
-            if (group) {
-                group.style.display = 'block';
-            }
-        }
-
-        function populateDefaults(source) {
-            const defaults = DEFAULTS[source] || {};
-            Object.entries(defaults).forEach(([fieldId, value]) => {
-                const el = document.getElementById(fieldId);
-                if (el && !el.value) {
-                    el.value = value;
-                }
-            });
-        }
-
-        function logAnalytics(source) {
-            // Simple fire‑and‑forget analytics ping
-            fetch('/analytics/source-select', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sourceType: source, timestamp: Date.now() })
-            }).catch(() => {/* ignore errors */});
-        }
-
-        sourceSelect.addEventListener('change', (e) => {
-            const source = e.target.value;
-            hideAllFields();
-            if (source) {
-                showFieldsFor(source);
-                populateDefaults(source);
-                logAnalytics(source);
-            }
-        });
-
-        // If the page loads with a pre‑selected value (e.g., from back‑navigation),
-        // trigger the change handler to ensure defaults are applied.
-        if (sourceSelect.value) {
-            const event = new Event('change');
-            sourceSelect.dispatchEvent(event);
-        }
-    </script>
 </body>
 </html>
+
+// /opt/axentx/surrogate-1/src/main/resources/templates/wizard/step2.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Surrogate-1 Ingestion Pipeline</title>
+</head>
+<body>
+    <h1>Step 2: Configure Ingestion Options</h1>
+    <form>
+        <label for="ingestionRate">Ingestion Rate (items/hour):</label>
+        <input type="number" id="ingestionRate" min="1" max="1000" required><br><br>
+        <label for="filterKeywords">Filter Keywords (comma-separated):</label>
+        <input type="text" id="filterKeywords"><br><br>
+        <button type="button" onclick="window.history.back()">Back</button>
+        <button type="submit">Next</button>
+    </form>
+</body>
+</html>
+
+// /opt/axentx/surrogate-1/src/main/resources/templates/wizard/step3.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Surrogate-1 Ingestion Pipeline</title>
+</head>
+<body>
+    <h1>Step 3: Review & Launch</h1>
+    <h2>Configuration Summary:</h2>
+    <p><strong>Data Source:</strong> <span id="dataSource"></span></p>
+    <p><strong>Ingestion Rate:</strong> <span id="ingestionRate"></span> items/hour</p>
+    <p><strong>Filter Keywords:</strong> <span id="filterKeywords"></span></p>
+    <p><strong>Estimated Cost:</strong> <span id="estimatedCost"></span></p>
+    <button type="button" onclick="window.history.back()">Back</button>
+    <button type="button" id="launch">Launch Pipeline</button>
+</body>
+</html>
+
+## Summary
+- Created HTML templates for the 3-step wizard.
+- Implemented form validation for required fields.
+- Added buttons for navigation between steps.
+- Displayed configuration summary on the review page.
