@@ -1,23 +1,43 @@
 package rules
 
-import "github.com/axentx/surrogate-1/pkg/compliance/types"
+import (
+	"github.com/axentx/surrogate-1/pkg/compliance"
+)
 
-var soc2Rules = []types.Rule{
-	{
-		ID:          "CC6.1",
-		Name:        "Security Policy",
-		Description: "The service organization must implement and maintain a security policy that is consistent with the HIPAA Security Rule.",
-		Check:       func(accession types.Accession) bool { /* Implement the check logic here */ },
-	},
-	{
-		ID:          "CC6.2",
-		Name:        "Risk Assessment",
-		Description: "The service organization must perform a risk assessment to identify and implement safeguards to protect the integrity, confidentiality, and availability of PHI.",
-		Check:       func(accession types.Accession) bool { /* Implement the check logic here */ },
-	},
-	// Add more SOC2 rules here following the same format
+type SOC2Rule struct {
+	ID          string
+	Description string
+	Evaluate    func(data map[string]interface{}) (bool, error)
 }
 
-func GetSoc2Rules() []types.Rule {
-	return soc2Rules
+type SOC2RuleSet struct {
+	compliance.RuleSet
+	rules []SOC2Rule
+}
+
+func NewSOC2RuleSet() *SOC2RuleSet {
+	return &SOC2RuleSet{
+		RuleSet: RuleSet{
+			Name: "SOC2",
+		},
+		rules: []SOC2Rule{
+			{
+				ID:          "SOC2-CC1.1",
+				Description: "Security – Access controls are in place",
+				Evaluate: func(data map[string]interface{}) (bool, error) {
+					// Placeholder: always pass.
+					return true, nil
+				},
+			},
+			// Add more SOC2 rules following the same pattern...
+		},
+	}
+}
+
+func (rs *SOC2RuleSet) Rules() []compliance.Rule {
+	rules := make([]compliance.Rule, len(rs.rules))
+	for i, rule := range rs.rules {
+		rules[i] = rule
+	}
+	return rules
 }
