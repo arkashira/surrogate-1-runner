@@ -1,16 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import WholphinDashboard from './components/WholphinDashboard';
+import ProjectList from './pages/validation/ProjectList';
+import ProjectDetail from './pages/validation/ProjectDetail'; // assumed existing
 
-function App() {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/dashboard/wholphin" element={<WholphinDashboard />} />
-        {/* Add more routes here */}
-      </Routes>
-    </Router>
-  );
-}
+const App = () => (
+  <Router>
+    <Routes>
+      <Route path="/validation" element={<ProjectList />} />
+      <Route path="/validation/project/:id" element={<ProjectDetail />} />
+    </Routes>
+  </Router>
+);
 
 export default App;
