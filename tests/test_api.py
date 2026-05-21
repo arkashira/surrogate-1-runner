@@ -1,15 +1,14 @@
-import unittest
 from fastapi.testclient import TestClient
-from src.api import app
+from main import app
 
-class TestAPI(unittest.TestCase):
-    def setUp(self):
-        self.client = TestClient(app)
+client = TestClient(app)
 
-    def test_get_anomalies(self):
-        response = self.client.get("/anomalies")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("anomalies", response.json())
+def test_pause_pipeline():
+    response = client.put("/api/pipelines/1/pause")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Pipeline paused successfully"}
 
-if __name__ == '__main__':
-    unittest.main()
+def test_cancel_pipeline():
+    response = client.put("/api/pipelines/1/cancel")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Pipeline cancelled successfully"}
