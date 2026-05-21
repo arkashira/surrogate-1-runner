@@ -1,73 +1,23 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "LLM Policy",
-  "description": "Schema for defining compliance policies that govern LLM decisions.",
+  "title": "Policy",
   "type": "object",
-  "required": ["id", "version", "description", "rules"],
   "properties": {
-    "id": {
-      "type": "string",
-      "description": "Unique identifier for the policy."
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Semantic version of the policy (e.g., 1.0.0)."
-    },
-    "description": {
-      "type": "string",
-      "description": "Human-readable description of the policy purpose."
-    },
-    "rules": {
+    "packages": {
       "type": "array",
-      "description": "Ordered list of rules evaluated sequentially.",
       "items": {
         "type": "object",
-        "required": ["name", "condition", "action"],
         "properties": {
           "name": {
-            "type": "string",
-            "description": "Human-readable name of the rule."
+            "type": "string"
           },
-          "condition": {
-            "type": "object",
-            "description": "Specification of when the rule matches.",
-            "required": ["type", "parameters"],
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "contains",
-                  "regex",
-                  "max_tokens",
-                  "prohibited_topics"
-                ],
-                "description": "Type of condition to evaluate."
-              },
-              "parameters": {
-                "type": "object",
-                "description": "Arbitrary parameters required by the condition type."
-              }
-            },
-            "additionalProperties": false
-          },
-          "action": {
-            "type": "string",
-            "enum": ["allow", "deny"],
-            "description": "Result of the rule when the condition matches."
-          },
-          "metadata": {
-            "type": "object",
-            "description": "Optional free-form metadata for the rule."
+          "version": {
+            "type": "string"
           }
         },
-        "additionalProperties": false
+        "required": ["name", "version"]
       }
-    },
-    "metadata": {
-      "type": "object",
-      "description": "Optional free-form metadata for the policy."
     }
   },
-  "additionalProperties": false
+  "required": ["packages"]
 }
