@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upgrade Recommendations</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/recommendations.css') }}">
+</head>
+<body>
+  <h1>Upgrade Suggestions</h1>
+  <div id="recommendations">
+    {% for tier in tiers %}
+      <div class="tier">
+        <h2>{{ tier.name }} Tier</h2>
+        <ul>
+          {% for component in tier.components %}
+            <li>{{ component }}</li>
+          {% endfor %}
+        </ul>
+        <p>Projected FPS: {{ tier.fps }}</p>
+        <p>Total Cost: ${{ tier.cost }}</p>
+        <p>Community Rating: {{ tier.rating }}</p>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

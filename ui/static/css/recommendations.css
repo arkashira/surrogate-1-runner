@@ -1,0 +1,15 @@
+body {
+  font-family: Arial, sans-serif;
+}
+
+#recommendations {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tier {
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 5px;
+}
