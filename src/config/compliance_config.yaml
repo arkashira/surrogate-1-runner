@@ -1,7 +1,9 @@
-regions:
-  EU:
-    - rule1: true
-    - rule2: false
-  US:
-    - rule1: false
-    - rule2: true
+compliance:
+  data_residency:
+    enabled: true
+    regions:
+      - "us"
+      - "eu"
+      - "apac"
+    default_region: "us"
+    enforce: true
