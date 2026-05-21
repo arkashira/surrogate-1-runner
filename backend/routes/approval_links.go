@@ -1,16 +1,13 @@
 package routes
 
 import (
-	"surrogate-1/backend/controllers"
-
-	"github.com/gin-gonic/gin"
+	"github.com/gorilla/mux"
+	"github.com/axentx/surrogate-1/backend/controllers"
 )
 
-// RegisterApprovalLinkRoutes registers the approval‑link related routes.
-func RegisterApprovalLinkRoutes(r *gin.Engine) {
-	links := r.Group("/api/v1/approval-links")
-	{
-		links.GET("/:id", controllers.GetApprovalLink)
-		links.POST("/:id/decision", controllers.PostApprovalDecision)
-	}
+// RegisterApprovalLinksRoutes registers routes related to approval links
+func RegisterApprovalLinksRoutes(r *mux.Router) {
+	sub := r.PathPrefix("/api/v1/approval-links").Subrouter()
+	// id must be numeric
+	sub.HandleFunc("/{id:[0-9]+}/decision", controllers.PostDecision).Methods("POST")
 }
