@@ -1,30 +1,20 @@
-from fastapi.testclient import TestClient
-from src.main import app
+import unittest
+from unittest.mock import patch, MagicMock
+from src.main import main
 
-client = TestClient(app)
+class TestMain(unittest.TestCase):
+    @patch('src.main.ExpertInsights')
+    @patch('builtins.print')
+    def test_main(self, mock_print, mock_expert_insights):
+        mock_insights_instance = MagicMock()
+        mock_insights_instance.get_insights.return_value = {"insights": "test_insights"}
+        mock_insights_instance.get_recommendations.return_value = {"recommendations": "test_recommendations"}
+        mock_expert_insights.return_value = mock_insights_instance
 
+        main()
 
-def test_read_root():
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert resp.json() == {"message": "Hello World"}
+        mock_print.assert_any_call("Expert Insights:", {"insights": "test_insights"})
+        mock_print.assert_any_call("Expert Recommendations:", {"recommendations": "test_recommendations"})
 
-
-def test_run_workflow():
-    resp = client.get("/workflow/test_workflow")
-    assert resp.status_code == 200
-    assert resp.json() == {"workflow_name": "test_workflow", "status": "success"}
-
-    # Verify that a metric line for this request exists
-    metrics = client.get("/metrics").text
-    assert (
-        'surrogate_workflow_latency_seconds_count{workflow_name="test_workflow",status="success"} 1'
-        in metrics
-    )
-
-
-def test_metrics_endpoint():
-    resp = client.get("/metrics")
-    assert resp.status_code == 200
-    # Content‑type must be the one Prometheus expects
-    assert resp.headers["content-type"].startswith("text/plain")
+if __name__ == '__main__':
+    unittest.main()

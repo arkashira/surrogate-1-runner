@@ -1,32 +1,43 @@
 import requests
-from datetime import datetime
+from typing import Dict, Any
 
 class ExpertInsights:
-    def __init__(self, api_key):
+    def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.expertinsights.com/v1"
 
-    def get_insights(self, component_id):
-        url = f"{self.base_url}/insights/{component_id}"
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f"Failed to fetch insights: {response.status_code}")
+    def get_insights(self, component_id: str) -> Dict[str, Any]:
+        """
+        Fetch expert insights for a given component.
 
-    def validate_insights(self, insights):
-        if not insights.get("validated"):
-            raise Exception("Insights not validated by expert")
-        if insights.get("expiry_date") < datetime.now().isoformat():
-            raise Exception("Insights are outdated")
+        Args:
+            component_id (str): The ID of the component to fetch insights for.
 
-    def moderate_insights(self, insights):
-        if insights.get("moderation_status") != "approved":
-            raise Exception("Insights not approved by moderator")
+        Returns:
+            Dict[str, Any]: A dictionary containing the expert insights.
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        response = requests.get(f"{self.base_url}/insights/{component_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()
 
-    def get_validated_insights(self, component_id):
-        insights = self.get_insights(component_id)
-        self.validate_insights(insights)
-        self.moderate_insights(insights)
-        return insights
+    def get_recommendations(self, component_id: str) -> Dict[str, Any]:
+        """
+        Fetch expert recommendations for a given component.
+
+        Args:
+            component_id (str): The ID of the component to fetch recommendations for.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the expert recommendations.
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        response = requests.get(f"{self.base_url}/recommendations/{component_id}", headers=headers)
+        response.raise_for_status()
+        return response.json()

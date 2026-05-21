@@ -1,12 +1,15 @@
-import threading
-from thermal_monitor import ThermalMonitor
+from expert_insights import ExpertInsights
 
-def start_thermal_monitor():
-    monitor = ThermalMonitor()
-    monitor_thread = threading.Thread(target=monitor.monitor)
-    monitor_thread.daemon = True
-    monitor_thread.start()
+def main():
+    api_key = "your_api_key_here"
+    expert_insights = ExpertInsights(api_key)
+    component_id = "example_component_id"
+
+    insights = expert_insights.get_insights(component_id)
+    print("Expert Insights:", insights)
+
+    recommendations = expert_insights.get_recommendations(component_id)
+    print("Expert Recommendations:", recommendations)
 
 if __name__ == "__main__":
-    start_thermal_monitor()
-    # Other main application code
+    main()
