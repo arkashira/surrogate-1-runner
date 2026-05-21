@@ -1,13 +1,9 @@
-export interface Alert {
+export interface Finding {
   id: string;
-  message: string;
-  link: string;
-  timestamp: string; // ISO string for JSON serialisation
-}
-
-export interface Approval {
-  id: string;
-  message: string;
-  link: string;
-  timestamp: string;
+  title: string;
+  rule: string;
+  severity: string;
+  resourceType: string;
+  date: string;
+  description: string;
 }

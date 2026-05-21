@@ -1,16 +1,16 @@
 import React from 'react';
-import { Container, CssBaseline, Typography } from '@mui/material';
-import GPUDashboard from './components/GPUDashboard';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import Dashboard from './components/Dashboard/Dashboard';
+import DetailedFindingView from './components/Dashboard/DetailedFindingView';
 
-const App = () => {
+const App: React.FC = () => {
   return (
-    <Container component="main" maxWidth="md">
-      <CssBaseline />
-      <Typography variant="h4" component="h1" gutterBottom>
-        GPU Monitoring Dashboard
-      </Typography>
-      <GPUDashboard />
-    </Container>
+    <Router>
+      <Switch>
+        <Route path="/dashboard" exact component={Dashboard} />
+        <Route path="/dashboard/findings/:id" component={DetailedFindingView} />
+      </Switch>
+    </Router>
   );
 };
 
