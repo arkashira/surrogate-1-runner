@@ -1,39 +1,22 @@
-require('dotenv').config();
-require('express-async-errors'); // must be required before routes
-
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-
-const routes = require('./routes');
-const errorHandler = require('./middlewares/errorHandler');
-const notFound = require('./middlewares/notFound');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const validationRoutes = require('./routes/validation');
+const userMiddleware = require('./middleware/user'); // attaches req.user
 
 const app = express();
 
-/* ---------- Middleware ---------- */
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Logging
-app.use(morgan('combined'));
-
-// Rate limiting (adjust values for your traffic)
-const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 200,            // limit each IP to 200 requests per windowMs
+// --- DB -------------------------------------------------------
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
-app.use(limiter);
 
-/* ---------- Routes ---------- */
-app.use('/api', routes);
+// --- Middleware ------------------------------------------------
+app.use(bodyParser.json());
+app.use(userMiddleware); // e.g., sets req.user from JWT or session
 
-/* ---------- 404 & Error ---------- */
-app.use(notFound);
-app.use(errorHandler);
+// --- Routes ----------------------------------------------------
+app.use('/api/v1/validation', validationRoutes);
 
 module.exports = app;
