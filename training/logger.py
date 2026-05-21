@@ -25,39 +25,38 @@ def _get_logger(name: str) -> logging.Logger:
         logger.addHandler(file_handler)
     return logger
 
-def log_validation_result(result: dict) -> None:
+def log_training_event(event: dict) -> None:
     """
-    Log a validation result. The result dict is JSON‑serialised and written
-    to the validation log file. The same result is also appended to a
+    Log a training event. The event dict is JSON‑serialised and written
+    to the training log file. The same event is also appended to a
     JSON‑lines file for easy downstream consumption.
 
     Parameters
     ----------
-    result : dict
-        Arbitrary key/value pairs describing the validation outcome.
-        Expected keys include at least `passed` (bool) and `details` (str).
+    event : dict
+        Arbitrary key/value pairs describing the training event.
     """
-    logger = _get_logger("validation")
-    logger.info(json.dumps(result))
+    logger = _get_logger("training")
+    logger.info(json.dumps(event))
 
     # Append to a JSON‑lines file for quick parsing
-    jsonl_path = LOG_DIR / "validation_results.jsonl"
+    jsonl_path = LOG_DIR / "training_events.jsonl"
     with jsonl_path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(result) + "\n")
+        fh.write(json.dumps(event) + "\n")
 
-def read_validation_results() -> list[dict]:
+def read_training_events() -> list[dict]:
     """
-    Return all validation results that have been logged so far.
+    Return all training events that have been logged so far.
     """
-    jsonl_path = LOG_DIR / "validation_results.jsonl"
+    jsonl_path = LOG_DIR / "training_events.jsonl"
     if not jsonl_path.exists():
         return []
 
-    results = []
+    events = []
     with jsonl_path.open("r", encoding="utf-8") as fh:
         for line in fh:
             try:
-                results.append(json.loads(line))
+                events.append(json.loads(line))
             except json.JSONDecodeError:
                 continue
-    return results
+    return events
