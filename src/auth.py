@@ -1,25 +1,37 @@
-import bcrypt
-from .user_management import UserDB
+
+import hmac
+import hashlib
+import base64
 import secrets
+import time
 
-def authenticate_user(username: str, password: str) -> bool:
-    """Authenticate user credentials with hashed password verification"""
-    user_db = UserDB()
-    user = user_db.get_user(username)
-    if not user:
-        return False
-    
-    # Verify hashed password using bcrypt
-    return bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8'))
+SECRET_KEY = secrets.token_hex(32)
 
-def create_user_session(username: str) -> str:
-    """Create isolated session token for authenticated user"""
-    if not authenticate_user(username, input("Enter password: ")):
-        raise PermissionError("Authentication failed")
-    
-    # Generate cryptographically secure session token
-    session_token = secrets.token_urlsafe(32)
-    
-    # In production, this would store in secure session store
-    # with expiration and isolation controls
-    return session_token
+def generate_token(username):
+    data = f"{username}.{int(time.time())}".encode("utf-8")
+    signature = hmac.new(SECRET_KEY.encode("utf-8"), data, hashlib.sha256).digest()
+    token = base64.b64encode(signature).decode("utf-8")
+    return token
+
+# /opt/axentx/surrogate-1/src/ai_tools/gpt4.py
+
+import requests
+import json
+
+def access_gpt4(token):
+    url = "https://api.openai.com/v1/completions"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "gpt-4",
+        "prompt": "You are a helpful assistant.",
+        "max_tokens": 100,
+        "temperature": 0.9
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        return response.json()["choices"][0]["text"]
+    else:
+        return None
