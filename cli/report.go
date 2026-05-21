@@ -2,58 +2,41 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
+	"runtime"
 	"time"
 )
 
-// Report holds the performance metrics that the CLI emits after each run.
-// The field names are deliberately explicit and JSON‑tagged for downstream
-// consumption (e.g. CI dashboards, log aggregators, etc.).
-type Report struct {
-	// DurationMs is the elapsed wall‑clock time of the run in milliseconds.
-	DurationMs int64 `json:"duration_ms"`
-
-	// PeakMemoryMB is the peak resident set size observed during the run,
-	// expressed in megabytes (rounded down).
-	PeakMemoryMB int64 `json:"peak_memory_mb"`
-
-	// CacheHits is the number of successful cache look‑ups performed.
-	CacheHits int64 `json:"cache_hits"`
-
-	// Timestamp records when the report was generated, in RFC3339 UTC.
-	Timestamp string `json:"timestamp"`
+// PerformanceReport holds the metrics emitted when the --report flag is used.
+type PerformanceReport struct {
+	ElapsedSeconds float64 `json:"elapsed_seconds"` // wall‑clock time of the run
+	MemoryBytes    uint64  `json:"memory_bytes"`    // current heap allocation
+	CacheHits      uint64  `json:"cache_hits"`      // user‑supplied metric
 }
 
-// NewReport builds a Report from the raw measurements.  The timestamp is
-// automatically set to the current UTC time.
-func NewReport(duration time.Duration, peakMemoryMB, cacheHits int64) Report {
-	return Report{
-		DurationMs:   duration.Milliseconds(),
-		PeakMemoryMB: peakMemoryMB,
-		CacheHits:    cacheHits,
-		Timestamp:    time.Now().UTC().Format(time.RFC3339),
+// GenerateReport creates a PerformanceReport from the supplied start time and cache‑hit count.
+func GenerateReport(start time.Time, cacheHits uint64) PerformanceReport {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+
+	return PerformanceReport{
+		ElapsedSeconds: time.Since(start).Seconds(),
+		MemoryBytes:    mem.Alloc,
+		CacheHits:      cacheHits,
 	}
 }
 
-// WriteJSON writes the JSON representation of r to w.
-// If w is nil, os.Stdout is used.  The function returns an error instead of
-// exiting the process – this makes the API usable from tests and from other
-// Go packages.  The CLI entry‑point (main.go) decides whether to abort on error.
-func (r Report) WriteJSON(w *os.File) error {
-	if w == nil {
-		w = os.Stdout
-	}
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false) // keep URLs / paths readable
-	enc.SetIndent("", "  ")
+// EmitReport marshals the report to JSON and writes it to stdout.
+// The function returns any error from the encoder – callers can decide how to handle it.
+func EmitReport(r PerformanceReport) error {
+	enc := json.NewEncoder(stdout())
+	enc.SetEscapeHTML(false) // keep JSON clean for downstream tools
 	return enc.Encode(r)
 }
 
-// PrintReport is a thin convenience wrapper used by the binary’s main function.
-// It creates a Report from the supplied raw metrics and writes it to stdout.
-// The function returns an error so the caller can decide how to handle failures.
-func PrintReport(duration time.Duration, peakMemoryMB, cacheHits int64) error {
-	report := NewReport(duration, peakMemoryMB, cacheHits)
-	return report.WriteJSON(nil)
-}
+/*
+   stdout is a variable rather than a direct call to os.Stdout.
+   This indirection makes the code trivially testable – a test can replace it
+   with a buffer without touching the production behaviour.
+*/
+var stdout = func() *os.File { return os.Stdout }
