@@ -1,37 +1,45 @@
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
-import hmac
-import hashlib
-import base64
-import secrets
-import time
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+db = SQLAlchemy(app)
 
-SECRET_KEY = secrets.token_hex(32)
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(128), nullable=False)
+    is_approved = db.Column(db.Boolean, default=False)
 
-def generate_token(username):
-    data = f"{username}.{int(time.time())}".encode("utf-8")
-    signature = hmac.new(SECRET_KEY.encode("utf-8"), data, hashlib.sha256).digest()
-    token = base64.b64encode(signature).decode("utf-8")
-    return token
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
 
-# /opt/axentx/surrogate-1/src/ai_tools/gpt4.py
+    if not email or not password:
+        return jsonify({'message': 'Email and password are required!'}), 400
 
-import requests
-import json
+    hashed_password = generate_password_hash(password, method='sha256')
+    new_user = User(email=email, password=hashed_password)
 
-def access_gpt4(token):
-    url = "https://api.openai.com/v1/completions"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model": "gpt-4",
-        "prompt": "You are a helpful assistant.",
-        "max_tokens": 100,
-        "temperature": 0.9
-    }
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        return response.json()["choices"][0]["text"]
-    else:
-        return None
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({'message': 'User registered successfully!'}), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+
+    user = User.query.filter_by(email=email).first()
+    if user and check_password_hash(user.password, password):
+        return jsonify({'message': 'Login successful!'}), 200
+    return jsonify({'message': 'Invalid credentials!'}), 401
+
+if __name__ == '__main__':
+    db.create_all()
+    app.run(debug=True)
