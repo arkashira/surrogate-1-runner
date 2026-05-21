@@ -1,9 +1,7 @@
-compliance:
-  data_residency:
-    enabled: true
-    regions:
-      - "us"
-      - "eu"
-      - "apac"
-    default_region: "us"
-    enforce: true
+compliance_settings:
+  setting_1:
+    description: Setting 1 description
+    default_value: Setting 1 default value
+  setting_2:
+    description: Setting 2 description
+    default_value: Setting 2 default value
