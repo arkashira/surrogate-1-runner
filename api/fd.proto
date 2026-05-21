@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package fd;
+
+option go_package = "opt/axentx/surrogate-1/api/fd";
+
+import "google/protobuf/empty.proto";
+
+service FDService {
+  // ListFDs returns information about all open file descriptors of the
+  // process that runs the sidecar.
+  rpc ListFDs(google.protobuf.Empty) returns (ListFDsResponse);
+}
+
+// ListFDsResponse contains a repeated list of FDInfo messages.
+message ListFDsResponse {
+  repeated FDInfo fds = 1;
+}
+
+// FDInfo describes a single file descriptor.
+message FDInfo {
+  // The numeric file descriptor.
+  uint32 fd = 1;
+  // The target path the descriptor points to (result of readlink).
+  string target = 2;
+  // A short type description (e.g., "socket", "pipe", "file").
+  string type = 3;
+}
