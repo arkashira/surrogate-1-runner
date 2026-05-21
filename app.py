@@ -1,10 +1,13 @@
-from flask import Flask
-from dashboard_api import dashboard_api
+from flask import Flask, jsonify
+import os
 
-def create_app():
-    app = Flask(__name__)
-    app.register_blueprint(dashboard_api)
-    return app
+app = Flask(__name__)
 
-if __name__ == "__main__":
-    create_app().run(host="0.0.0.0", port=5000, debug=True)
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint that returns service status"""
+    return jsonify({"status": "healthy"}), 200
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)

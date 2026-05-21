@@ -1,6 +1,15 @@
-import requests
+import pytest
+from app import app
 
-def test_health_endpoint():
-    response = requests.get('http://localhost:8080/health')
+@pytest.fixture
+def client():
+    """Test client fixture"""
+    app.config['TESTING'] = True
+    with app.test_client() as client:
+        yield client
+
+def test_health_check(client):
+    """Test health endpoint returns correct response"""
+    response = client.get('/health')
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json == {"status": "healthy"}
