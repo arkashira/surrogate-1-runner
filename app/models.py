@@ -1,17 +1,13 @@
-from . import db
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+from .database import Base
 
-class Tip(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.String(500), nullable=False)
-    category = db.Column(db.String(80), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+class WorkflowSchedule(Base):
+    __tablename__ = "workflow_schedules"
 
-class TipFeedback(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    tip_id = db.Column(db.Integer, db.ForeignKey("tip.id"), nullable=False)
-    user_id = db.Column(db.String(80), nullable=False)
-    feedback = db.Column(db.String(20), nullable=False)  # 'helpful' | 'irrelevant'
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    tip = db.relationship("Tip", backref=db.backref("feedback", lazy=True))
+    id = Column(Integer, primary_key=True, index=True)
+    workflow_id = Column(String, nullable=False)
+    workflow_version = Column(Integer, nullable=False)
+    cron_expression = Column(String, nullable=False)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
