@@ -1,68 +1,47 @@
-import React from 'react';
-import { Card, CardContent, Typography, List, ListItem, ListItemText } from '@mui/material';
+     import React from 'react';
+     import { Link } from 'react-router-dom';
 
-const TroubleshootingGuide = () => {
-  const commonIssues = [
-    {
-      title: 'Mesh Quality Issues',
-      steps: [
-        'Check the mesh quality metrics (e.g., skewness, aspect ratio).',
-        'Refine the mesh in areas with poor quality.',
-        'Ensure the mesh is well-aligned with the geometry.'
-      ]
-    },
-    {
-      title: 'Boundary Conditions',
-      steps: [
-        'Verify the boundary conditions are correctly applied.',
-        'Ensure the boundary conditions are consistent with the physical problem.',
-        'Check for any inconsistencies in the boundary conditions.'
-      ]
-    },
-    {
-      title: 'Numerical Instability',
-      steps: [
-        'Reduce the time step size.',
-        'Use a more stable numerical scheme.',
-        'Check for any numerical errors in the solver.'
-      ]
-    },
-    {
-      title: 'Convergence Issues',
-      steps: [
-        'Check the residual history to identify where convergence is stalling.',
-        'Adjust the solver settings (e.g., relaxation factors, under-relaxation).',
-        'Ensure the initial conditions are reasonable.'
-      ]
-    }
-  ];
+     const TroubleshootingGuide: React.FC = () => {
+       return (
+         <div className="troubleshooting-guide">
+           <h1>CFD Simulation Troubleshooting Guide</h1>
+           <h2>Common Errors and Solutions</h2>
+           <ul>
+             <li>
+               <h3>Error: Convergence Failure</h3>
+               <p>
+                 Symptoms: Simulation iterations not reaching convergence criteria.<br/>
+                 Steps: Check mesh quality, reduce relaxation coefficients, verify boundary conditions, increase max iterations.
+               </p>
+               <Link to="/resources/convergence-failure">Read more</Link>
+             </li>
+             <li>
+               <h3>Error: Mesh Quality Issues</h3>
+               <p>
+                 Symptoms: High skewness or aspect ratio warnings.<br/>
+                 Steps: Run mesh quality check, identify problematic elements, apply local mesh refinement.
+               </p>
+               <Link to="/resources/mesh-quality-issues">Read more</Link>
+             </li>
+             <li>
+               <h3>Error: Boundary Condition Errors</h3>
+               <p>
+                 Symptoms: Pressure/velocity oscillations at boundaries.<br/>
+                 Steps: Verify boundary type assignments, check for conflicts, apply gradient conditions.
+               </p>
+               <Link to="/resources/boundary-condition-errors">Read more</Link>
+             </li>
+             <li>
+               <h3>Error: Numerical Instability</h3>
+               <p>
+                 Symptoms: Solution divergence or NaN values.<br/>
+                 Steps: Reduce time step size, enable second-order discretization, check for negative volume cells.
+               </p>
+               <Link to="/resources/numerical-instability">Read more</Link>
+             </li>
+           </ul>
+         </div>
+       );
+     };
 
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h5" component="h2">
-          CFD Simulation Troubleshooting Guide
-        </Typography>
-        <Typography variant="body2" color="textSecondary" component="p">
-          Follow these steps to diagnose and resolve common CFD simulation divergence issues.
-        </Typography>
-        {commonIssues.map((issue, index) => (
-          <div key={index}>
-            <Typography variant="h6" component="h3">
-              {issue.title}
-            </Typography>
-            <List>
-              {issue.steps.map((step, stepIndex) => (
-                <ListItem key={stepIndex}>
-                  <ListItemText primary={step} />
-                </ListItem>
-              ))}
-            </List>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-};
-
-export default TroubleshootingGuide;
+     export default TroubleshootingGuide;

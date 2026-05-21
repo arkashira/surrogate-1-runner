@@ -1,32 +1,17 @@
-import React, { useState } from 'react';
-import WorkflowDashboard from './components/WorkflowDashboard';
-import { Tool } from './types';
+     import React from 'react';
+     import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+     import Navigation from './components/Navigation';
+     import TroubleshootingGuide from './components/TroubleshootingGuide';
 
-const App: React.FC = () => {
-  const [tools, setTools] = useState<Tool[]>([]);
+     const App: React.FC = () => {
+       return (
+         <Router>
+           <Navigation />
+           <Routes>
+             <Route path="/troubleshooting" element={<TroubleshootingGuide />} />
+           </Routes>
+         </Router>
+       );
+     };
 
-  const handleAddTool = (tool: Tool) => {
-    setTools([...tools, { ...tool, id: Date.now().toString() }]);
-  };
-
-  const handleRemoveTool = (id: string) => {
-    setTools(tools.filter((tool) => tool.id !== id));
-  };
-
-  const handleUpdateTool = (updatedTool: Tool) => {
-    setTools(tools.map((tool) => (tool.id === updatedTool.id ? updatedTool : tool)));
-  };
-
-  return (
-    <div className="App">
-      <WorkflowDashboard
-        tools={tools}
-        onAddTool={handleAddTool}
-        onRemoveTool={handleRemoveTool}
-        onUpdateTool={handleUpdateTool}
-      />
-    </div>
-  );
-};
-
-export default App;
+     export default App;
