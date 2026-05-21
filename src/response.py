@@ -1,53 +1,37 @@
-"""
-LLMResponse – a stable, JSON‑serialisable container for language model responses.
-
-This module provides a consistent response object abstraction across different
-LLM providers, ensuring uniform handling of text, token usage, and finish reasons.
-
-Fields
-------
-text: str
-    The generated text content from the model.
-usage: Dict[str, int]
-    Token usage statistics (e.g. {"prompt_tokens": int, "completion_tokens": int,
-    "total_tokens": int}).
-finish_reason: str
-    Reason the model stopped generating (e.g. "stop", "length", "content_filter").
-
-Example
--------
->>> response = LLMResponse(
-...     text="Hello, world!",
-...     usage={"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8},
-...     finish_reason="stop"
-... )
->>> response.to_dict()
-{'text': 'Hello, world!', 'usage': {'prompt_tokens': 5, ...}, 'finish_reason': 'stop'}
-"""
-
+"""Common response schema for LLM providers."""
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Optional, Dict, Any
+
+
+@dataclass
+class Usage:
+    """Token usage information."""
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+    def to_dict(self) -> Dict[str, int]:
+        return {
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens,
+        }
 
 
 @dataclass
 class LLMResponse:
-    """A consistent response object for all LLM providers."""
-
+    """Common response object conforming to the unified schema."""
     text: str
-    usage: Dict[str, Any]
+    usage: Usage
     finish_reason: str
+    raw_response: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Return a plain‑dict representation suitable for JSON serialisation.
-
-        Uses ``asdict`` for robust recursive conversion of nested dataclasses.
-
-        Returns
-        -------
-        dict
-            ``{"text": ..., "usage": ..., "finish_reason": ...}``
-        """
-        return asdict(self)
+        return {
+            "text": self.text,
+            "usage": self.usage.to_dict(),
+            "finish_reason": self.finish_reason,
+            "raw_response": self.raw_response,
+        }
