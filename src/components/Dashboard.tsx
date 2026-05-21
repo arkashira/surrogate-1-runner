@@ -1,17 +1,32 @@
-import React from 'react';
-import { Grid } from '@mui/material';
-import CostMetricsWidget from './CostMetricsWidget';
+import React, { useEffect, useState } from 'react';
+import { fetchCostData } from '../services/costService';
+import CostChart from './CostChart';
+import DateRangePicker from './DateRangePicker';
+import ServiceFilter from './ServiceFilter';
 
 const Dashboard: React.FC = () => {
-  const serviceTypes = ['all', 'compute', 'storage', 'network'];
+  const [costData, setCostData] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<[Date, Date]>([new Date(), new Date()]);
+  const [serviceType, setServiceType] = useState<string>('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const data = await fetchCostData(dateRange, serviceType);
+      setCostData(data);
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [dateRange, serviceType]);
 
   return (
-    <div>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <CostMetricsWidget serviceTypes={serviceTypes} />
-        </Grid>
-      </Grid>
+    <div className="dashboard">
+      <h1>Real-time Cost Data</h1>
+      <DateRangePicker onChange={setDateRange} />
+      <ServiceFilter onChange={setServiceType} />
+      <CostChart data={costData} />
     </div>
   );
 };
