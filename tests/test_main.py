@@ -1,15 +1,25 @@
-import unittest
-from unittest.mock import patch, MagicMock
-from src.main import Worker
+import pytest
+from fastapi.testclient import TestClient
+from src.main import app, AIRequest
 
-class TestMain(unittest.TestCase):
-    @patch('src.main.Worker')
-    def test_main(self, mock_worker):
-        mock_worker_instance = MagicMock()
-        mock_worker.return_value = mock_worker_instance
-        import src.main
-        mock_worker_instance.start.assert_called_once()
-        mock_worker_instance.run.assert_called_once()
+client = TestClient(app)
 
-if __name__ == '__main__':
-    unittest.main()
+def test_ai_endpoint_with_valid_model():
+    payload = AIRequest(model="gpt-4", messages=[{"role": "user", "content": "Hello"}])
+    response = client.post("/ai", json=payload.dict())
+    assert response.status_code == 200
+
+def test_ai_endpoint_with_invalid_model():
+    payload = AIRequest(model="invalid-model", messages=[{"role": "user", "content": "Hello"}])
+    response = client.post("/ai", json=payload.dict())
+    assert response.status_code == 400
+
+def test_ai_endpoint_with_missing_model():
+    payload = AIRequest(messages=[{"role": "user", "content": "Hello"}])
+    response = client.post("/ai", json=payload.dict())
+    assert response.status_code == 422  # Unprocessable Entity (422) for validation error
+
+def test_ai_endpoint_with_invalid_payload():
+    payload = {"invalid_key": "invalid_value"}
+    response = client.post("/ai", json=payload)
+    assert response.status_code == 422  # Unprocessable Entity (422) for validation error
