@@ -1,0 +1,6 @@
+horizontal_scaling_enabled: true
+worker_nodes: 5
+max_replicas: 20
+min_replicas: 5
+target_cpu_utilization_percentage: 50
+target_memory_average_value: 50Mi
