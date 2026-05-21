@@ -1,6 +1,5 @@
-{
-  "need_clarification": true,
-  "reason": "The task requires updating /opt/axentx/surrogate-1/config/config.yaml to add policy config entries, but the current content of the file is not provided. Without the current content, we cannot produce a concrete code diff or update the file appropriately.",
-  "request_to": "prd-daemon",
-  "minimal_spec_needed": "The current content of /opt/axentx/surrogate-1/config/config.yaml so that we can add the policy section appropriately."
-}
+gpt4:
+  api_key: ${GPT4_API_KEY}
+  validation:
+    required: true
+    pattern: ^[a-zA-Z0-9_-]{32}$
