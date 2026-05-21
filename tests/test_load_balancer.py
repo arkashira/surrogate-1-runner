@@ -1,37 +1,29 @@
 import unittest
-from firmware.load_balancer import LoadBalancer
+from unittest.mock import patch, MagicMock
+from load_balancer import LoadBalancer
 
 class TestLoadBalancer(unittest.TestCase):
-    def test_balance_load(self):
-        num_gpus = 4
-        load_balancer = LoadBalancer(num_gpus)
+    def test_load_config(self):
+        config_file = '/opt/axentx/surrogate-1/config/scale_config.yaml'
+        load_balancer = LoadBalancer(config_file)
+        worker_nodes = load_balancer.get_worker_nodes()
+        self.assertEqual(len(worker_nodes), 5)
 
-        # Simulate task sizes
-        task_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
+    def test_add_worker_node(self):
+        config_file = '/opt/axentx/surrogate-1/config/scale_config.yaml'
+        load_balancer = LoadBalancer(config_file)
+        node = 'worker-node-6'
+        load_balancer.add_worker_node(node)
+        worker_nodes = load_balancer.get_worker_nodes()
+        self.assertEqual(len(worker_nodes), 6)
 
-        # Balance the load
-        gpu_tasks = load_balancer.balance_load(task_sizes)
-
-        # Check if the tasks are assigned to the GPUs
-        self.assertEqual(len(gpu_tasks), num_gpus)
-        self.assertEqual(sum([len(tasks) for tasks in gpu_tasks]), len(task_sizes))
-
-    def test_update_utilization(self):
-        num_gpus = 4
-        load_balancer = LoadBalancer(num_gpus)
-
-        # Simulate task sizes
-        task_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
-
-        # Balance the load
-        gpu_tasks = load_balancer.balance_load(task_sizes)
-
-        # Update the utilization of each GPU
-        load_balancer.update_utilization(gpu_tasks)
-
-        # Check if the utilization of each GPU is updated
-        self.assertEqual(len(load_balancer.gpu_utilization), num_gpus)
-        self.assertGreater(sum(load_balancer.gpu_utilization), 0)
+    def test_remove_worker_node(self):
+        config_file = '/opt/axentx/surrogate-1/config/scale_config.yaml'
+        load_balancer = LoadBalancer(config_file)
+        node_to_remove = 'worker-node-5'
+        load_balancer.remove_worker_node(node_to_remove)
+        worker_nodes = load_balancer.get_worker_nodes()
+        self.assertEqual(len(worker_nodes), 4)
 
 if __name__ == "__main__":
     unittest.main()
