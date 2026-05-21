@@ -1,0 +1,35 @@
+{
+  "metrics_response": {
+    "status": "ok",
+    "series": [
+      {
+        "metric": "system.cpu.user",
+        "points": [
+          [1625097600, 0.5],
+          [1625097660, 0.6]
+        ],
+        "tags": ["host:myhost", "region:us-west-1"]
+      }
+    ]
+  },
+  "events_response": {
+    "status": "ok",
+    "events": [
+      {
+        "date_happened": 1625097600,
+        "host": "myhost",
+        "message": "Test event",
+        "tags": ["test", "example"]
+      }
+    ]
+  },
+  "check_run_response": {
+    "status": "ok",
+    "check": {
+      "check": "test.check",
+      "host_name": "myhost",
+      "status": 2,
+      "tags": ["test", "example"]
+    }
+  }
+}
