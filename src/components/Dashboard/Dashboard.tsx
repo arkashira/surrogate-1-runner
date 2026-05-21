@@ -1,15 +1,12 @@
 import React from 'react';
-import { Grid } from '@mui/material';
-import FreeTierLimitations from './FreeTierLimitations';
+import IntegrationStatus from './IntegrationStatus';
 
 const Dashboard: React.FC = () => {
   return (
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
-        <FreeTierLimitations />
-      </Grid>
-      {/* Other dashboard components */}
-    </Grid>
+    <div className="dashboard">
+      <h1>Dashboard</h1>
+      <IntegrationStatus />
+    </div>
   );
 };
 
