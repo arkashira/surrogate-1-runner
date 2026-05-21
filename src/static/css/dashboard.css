@@ -1,13 +1,25 @@
-
-body {
-  font-family: Arial, sans-serif;
+.dashboard {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-#content {
-  max-width: 800px;
-  margin: 0 auto;
+.dashboard h1 {
+    margin-top: 0;
 }
 
-ul {
-  list-style-type: none;
+.dashboard .dropdown {
+    margin-bottom: 20px;
+}
+
+.dashboard .graph {
+    margin-bottom: 20px;
+}
+
+.dashboard .configuration {
+    margin-bottom: 20px;
 }
