@@ -1,18 +1,24 @@
 import axios from 'axios';
 
-const API_URL = 'https://api.example.com/workflows';
+interface Agent {
+  id: string;
+  name: string;
+  status: string;
+}
 
-export const createWorkflow = async (workflowData: any) => {
-  const response = await axios.post(API_URL, workflowData);
-  return response.data;
-};
+interface Workflow {
+  id: string;
+  name: string;
+  status: string;
+  agents: Agent[];
+}
 
-export const getWorkflows = async () => {
-  const response = await axios.get(API_URL);
-  return response.data;
-};
-
-export const executeWorkflow = async (id: string) => {
-  const response = await axios.post(`${API_URL}/${id}/execute`);
-  return response.data;
+export const fetchWorkflows = async (): Promise<Workflow[]> => {
+  try {
+    const response = await axios.get('/api/workflows');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching workflows:', error);
+    return [];
+  }
 };

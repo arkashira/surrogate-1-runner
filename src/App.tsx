@@ -1,23 +1,20 @@
 import React from 'react';
-import { Layout, Menu } from 'antd';
-import DataGenerationForm from './components/DataGenerationForm';
-import DataGenerationStatus from './components/DataGenerationStatus';
-
-const { Header, Content } = Layout;
+import { WorkflowProvider } from './contexts/WorkflowContext';
+import WorkflowDashboard from './components/WorkflowDashboard';
+import './App.css';
 
 const App: React.FC = () => {
   return (
-    <Layout>
-      <Header>
-        <Menu theme="dark" mode="horizontal" defaultSelectedKeys={['1']}>
-          <Menu.Item key="1">Data Generation</Menu.Item>
-        </Menu>
-      </Header>
-      <Content style={{ padding: '50px' }}>
-        <DataGenerationForm />
-        <DataGenerationStatus />
-      </Content>
-    </Layout>
+    <WorkflowProvider>
+      <div className="App">
+        <header className="App-header">
+          <h1>Workflow Monitoring Dashboard</h1>
+        </header>
+        <main>
+          <WorkflowDashboard />
+        </main>
+      </div>
+    </WorkflowProvider>
   );
 };
 
