@@ -1,0 +1,8 @@
+# 1. Quickly list the first 50 Go source files in the repository
+find /opt/axentx/surrogate-1 -type f -name "*.go" 2>/dev/null | head -50
+
+# 2. Inspect the top‑level directory to see the overall layout
+ls -la /opt/axentx/surrogate-1/
+
+# 3. Drill down into the source tree (most Go projects keep code under `src/`)
+ls -la /opt/axentx/surrogate-1/src/
