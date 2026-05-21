@@ -1,15 +1,14 @@
-import pytest
+import unittest
 from app import app
 
-@pytest.fixture
-def client():
-    """Test client fixture"""
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+class TestComplianceStatus(unittest.TestCase):
+    def setUp(self):
+        self.app = app.test_client()
 
-def test_health_check(client):
-    """Test health endpoint returns correct response"""
-    response = client.get('/health')
-    assert response.status_code == 200
-    assert response.json == {"status": "healthy"}
+    def test_compliance_status(self):
+        response = self.app.get('/compliance-status')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'status', response.data)
+
+if __name__ == '__main__':
+    unittest.main()

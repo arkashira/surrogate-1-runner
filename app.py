@@ -1,13 +1,17 @@
 from flask import Flask, jsonify
-import os
+import subprocess
 
 app = Flask(__name__)
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint that returns service status"""
-    return jsonify({"status": "healthy"}), 200
+@app.route('/compliance-status', methods=['GET'])
+def compliance_status():
+    # Run the CLI hook command for pre-deploy checks
+    result = subprocess.run(['./cli-hook', 'pre-deploy'], capture_output=True, text=True)
+    if result.returncode == 0:
+        status = "Compliant"
+    else:
+        status = "Non-compliant"
+    return jsonify({"status": status})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8000)
