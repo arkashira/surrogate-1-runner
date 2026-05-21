@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Compliance Rule Schema",
+  "description": "Defines the structure of compliance rules for model evaluation.",
+  "type": "object",
+  "properties": {
+    "rules": {
+      "type": "array",
+      "description": "List of compliance rules.",
+      "items": {
+        "type": "object",
+        "description": "A single compliance rule.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the rule.",
+            "pattern": "^[a-zA-Z0-9-_]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name of the rule."
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of what the rule checks."
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of rule (e.g., 'metadata', 'output', 'behavior').",
+            "enum": ["metadata", "output", "behavior"]
+          },
+          "condition": {
+            "type": "object",
+            "description": "The evaluation condition for the rule.",
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Name of the model metadata field to check."
+              },
+              "operator": {
+                "type": "string",
+                "description": "Comparison operator (e.g., 'equals', 'contains', 'regex').",
+                "enum": ["equals", "contains", "regex", "exists", "not_exists"]
+              },
+              "value": {
+                "type": "string",
+                "description": "The expected value or pattern."
+              }
+            },
+            "required": ["field", "operator", "value"]
+          },
+          "severity": {
+            "type": "string",
+            "description": "Severity level of the rule violation (e.g., 'low', 'medium', 'high').",
+            "enum": ["low", "medium", "high"]
+          },
+          "tags": {
+            "type": "array",
+            "description": "Tags associated with the rule (e.g., 'privacy', 'safety').",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["id", "name", "description", "type", "condition"]
+      }
+    }
+  },
+  "required": ["rules"]
+}
