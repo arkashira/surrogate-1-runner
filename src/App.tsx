@@ -1,16 +1,31 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
-import Dashboard from './components/Dashboard/Dashboard';
-import DetailedFindingView from './components/Dashboard/DetailedFindingView';
+import React, { useState } from 'react';
+import WorkflowDashboard from './components/WorkflowDashboard';
+import { Tool } from './types';
 
 const App: React.FC = () => {
+  const [tools, setTools] = useState<Tool[]>([]);
+
+  const handleAddTool = (tool: Tool) => {
+    setTools([...tools, { ...tool, id: Date.now().toString() }]);
+  };
+
+  const handleRemoveTool = (id: string) => {
+    setTools(tools.filter((tool) => tool.id !== id));
+  };
+
+  const handleUpdateTool = (updatedTool: Tool) => {
+    setTools(tools.map((tool) => (tool.id === updatedTool.id ? updatedTool : tool)));
+  };
+
   return (
-    <Router>
-      <Switch>
-        <Route path="/dashboard" exact component={Dashboard} />
-        <Route path="/dashboard/findings/:id" component={DetailedFindingView} />
-      </Switch>
-    </Router>
+    <div className="App">
+      <WorkflowDashboard
+        tools={tools}
+        onAddTool={handleAddTool}
+        onRemoveTool={handleRemoveTool}
+        onUpdateTool={handleUpdateTool}
+      />
+    </div>
   );
 };
 

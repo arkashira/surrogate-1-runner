@@ -1,6 +1,5 @@
-export interface Task {
+export interface Tool {
   id: string;
   name: string;
-  status: 'Running' | 'Completed';
-  dataSize: string;
+  status: 'active' | 'inactive';
 }
