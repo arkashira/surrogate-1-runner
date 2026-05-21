@@ -1,0 +1,41 @@
+<div class="filter-container">
+  <label for="filter-by-vulnerability-severity">Filter by Vulnerability Severity:</label>
+  <select id="filter-by-vulnerability-severity">
+    <option value="low">Low</option>
+    <option value="medium">Medium</option>
+    <option value="high">High</option>
+  </select>
+  <label for="sort-by-vulnerability-name">Sort by Vulnerability Name:</label>
+  <select id="sort-by-vulnerability-name">
+    <option value="asc">Ascending</option>
+    <option value="desc">Descending</option>
+  </select>
+  <button id="apply-filter-and-sort">Apply Filter and Sort</button>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const filterByVulnerabilitySeveritySelect = document.getElementById("filter-by-vulnerability-severity");
+    const sortByVulnerabilityNameSelect = document.getElementById("sort-by-vulnerability-name");
+    const applyFilterAndSortButton = document.getElementById("apply-filter-and-sort");
+
+    applyFilterAndSortButton.addEventListener("click", function () {
+      const filterValue = filterByVulnerabilitySeveritySelect.value;
+      const sortValue = sortByVulnerabilityNameSelect.value;
+
+      // Call API to apply filter and sort
+      fetch("/api/vulnerabilities?filter=" + filterValue + "&sort=" + sortValue)
+        .then(response => response.json())
+        .then(data => {
+          const vulnerabilitiesList = document.getElementById("vulnerabilities-list");
+          vulnerabilitiesList.innerHTML = "";
+
+          data.forEach(vulnerability => {
+            const vulnerabilityListItem = document.createElement("li");
+            vulnerabilityListItem.textContent = vulnerability.name + " (" + vulnerability.severity + ")";
+            vulnerabilitiesList.appendChild(vulnerabilityListItem);
+          });
+        });
+    });
+  });
+</script>
