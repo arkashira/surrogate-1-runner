@@ -1,0 +1,13 @@
+
+body {
+  font-family: Arial, sans-serif;
+}
+
+#content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+ul {
+  list-style-type: none;
+}
