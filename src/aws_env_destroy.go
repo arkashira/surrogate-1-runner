@@ -3,54 +3,71 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
-func DestroyAWSEnvironment(stackName string) error {
+func destroyAWSEnvironment() error {
 	ctx := context.Background()
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	client := cloudformation.NewFromConfig(cfg)
+	client := ec2.NewFromConfig(cfg)
 
-	input := &cloudformation.DeleteStackInput{
-		StackName: aws.String(stackName),
-	}
-
-	result, err := client.DeleteStack(ctx, input)
+	// List all instances
+	input := &ec2.DescribeInstancesInput{}
+	result, err := client.DescribeInstances(ctx, input)
 	if err != nil {
-		return fmt.Errorf("failed to delete stack: %w", err)
+		return fmt.Errorf("failed to describe instances: %w", err)
 	}
 
-	fmt.Printf("Stack deletion initiated: %v\n", result.StackId)
+	var instanceIDs []string
+	for _, reservation := range result.Reservations {
+		for _, instance := range reservation.Instances {
+			instanceIDs = append(instanceIDs, *instance.InstanceId)
+		}
+	}
 
-	// Wait for stack deletion to complete
-	waiter := cloudformation.NewStackDeleteCompleteWaiter(client)
-	err = waiter.Wait(ctx, &cloudformation.DescribeStacksInput{
-		StackName: aws.String(stackName),
-	}, 5*time.Minute)
+	if len(instanceIDs) == 0 {
+		fmt.Println("No instances found.")
+		return nil
+	}
+
+	// Terminate all instances
+	terminateInput := &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIDs,
+	}
+	_, err = client.TerminateInstances(ctx, terminateInput)
 	if err != nil {
-		return fmt.Errorf("stack deletion failed: %w", err)
+		return fmt.Errorf("failed to terminate instances: %w", err)
 	}
 
-	fmt.Println("Stack deleted successfully.")
+	fmt.Println("Instances termination initiated.")
 
+	// Wait for instances to terminate
+	waiter := ec2.NewInstanceTerminatedWaiter(client)
+	waiterInput := &ec2.DescribeInstancesInput{
+		InstanceIds: instanceIDs,
+	}
+	err = waiter.Wait(ctx, waiterInput, 300*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed waiting for instances to terminate: %w", err)
+	}
+
+	fmt.Println("All instances terminated successfully.")
 	return nil
 }
 
 func main() {
-	stackName := "practice-environment"
-
-	err := DestroyAWSEnvironment(stackName)
+	err := destroyAWSEnvironment()
 	if err != nil {
 		fmt.Printf("Error destroying AWS environment: %v\n", err)
 		return
 	}
-
 	fmt.Println("AWS environment destroyed successfully.")
 }
