@@ -1,6 +1,9 @@
-relay_endpoint: "https://relay.example.com"
-jwt_secret: "your-jwt-secret-here"
-chain_rpc_urls:
-  ethereum: "https://mainnet.infura.io/v3/YOUR_PROJECT_ID"
-  polygon: "https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID"
-  arbitrum: "https://arb-mainnet.g.alchemy.com/v2/YOUR_PROJECT_ID"
+# Default configuration – can be overridden by env vars
+budget: 1000.0          # USD
+threshold: 1.2          # 20% above budget
+slack_webhook_url: ""   # set in env or here
+email:
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  sender: "alerts@example.com"
+  recipient: "ops@example.com"
