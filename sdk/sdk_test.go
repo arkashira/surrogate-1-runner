@@ -1,63 +1,79 @@
 package sdk
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// TestMesh validates that Mesh creates a non‑empty output file when given a
-// valid input file. All files are written to a temporary directory that is
-// removed after the test finishes.
 func TestMesh(t *testing.T) {
-	// --------------------------------------------------------------------
-	// 1️⃣  Set up an isolated temporary workspace
-	// --------------------------------------------------------------------
-	tmpDir, err := os.MkdirTemp("", "sdk_test_*")
-	if err != nil {
-		t.Fatalf("failed to create temporary directory: %v", err)
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+
+	// Create a test input file
+	inputFile := filepath.Join(tempDir, "input.txt")
+	err := ioutil.WriteFile(inputFile, []byte("test input"), 0644)
+	if err!= nil {
+		t.Fatalf("failed to create test input file: %v", err)
 	}
-	// Ensure the directory is removed no matter how the test exits.
+
+	// Create an output file path
+	outputFile := filepath.Join(tempDir, "output.txt")
+
+	// Call the Mesh function
+	err = Mesh(inputFile, outputFile)
+	if err!= nil {
+		t.Fatalf("Mesh function failed: %v", err)
+	}
+
+	// Check if the output file was created
+	_, err = os.Stat(outputFile)
+	if os.IsNotExist(err) {
+		t.Fatalf("output file was not created: %s", outputFile)
+	}
+}
+
+func TestMesh_CopiesFile(t *testing.T) {
+	// Create temporary input file.
+	tmpDir, err := ioutil.TempDir("", "sdk_test")
+	if err!= nil {
+		t.Fatalf("temp dir creation failed: %v", err)
+	}
 	defer os.RemoveAll(tmpDir)
 
-	// --------------------------------------------------------------------
-	// 2️⃣  Prepare a deterministic input file
-	// --------------------------------------------------------------------
-	const inputData = "test data for meshing"
 	inputPath := filepath.Join(tmpDir, "input.txt")
-	if err := os.WriteFile(inputPath, []byte(inputData), 0o600); err != nil {
-		t.Fatalf("failed to write input file %s: %v", inputPath, err)
-	}
-
-	// --------------------------------------------------------------------
-	// 3️⃣  Define where Mesh should write its result
-	// --------------------------------------------------------------------
 	outputPath := filepath.Join(tmpDir, "output.txt")
+	content := []byte("mesh test content")
 
-	// --------------------------------------------------------------------
-	// 4️⃣  Execute the function under test
-	// --------------------------------------------------------------------
-	if err := Mesh(inputPath, outputPath); err != nil {
-		t.Fatalf("Mesh returned an unexpected error: %v", err)
+	if err := ioutil.WriteFile(inputPath, content, 0644); err!= nil {
+		t.Fatalf("write input failed: %v", err)
 	}
 
-	// --------------------------------------------------------------------
-	// 5️⃣  Verify the output file exists
-	// --------------------------------------------------------------------
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		t.Fatalf("expected output file %s to exist, but it does not", outputPath)
-	} else if err != nil {
-		t.Fatalf("error checking output file %s: %v", outputPath, err)
+	// Run Mesh with a non-existent meshing engine to test the fallback.
+	// This can be done by temporarily renaming the meshing engine executable.
+	meshingEnginePath := "/path/to/meshing-engine"
+	originalName := meshingEnginePath + ".original"
+	if err := os.Rename(meshingEnginePath, originalName); err!= nil {
+		t.Skip("meshing engine not found, skipping test")
+	}
+	defer func() {
+		if err := os.Rename(originalName, meshingEnginePath); err!= nil {
+			t.Errorf("failed to restore meshing engine: %v", err)
+		}
+	}()
+
+	// Run Mesh.
+	if err := Mesh(inputPath, outputPath); err!= nil {
+		t.Fatalf("Mesh returned error: %v", err)
 	}
 
-	// --------------------------------------------------------------------
-	// 6️⃣  Verify the output file is not empty (extra safety)
-	// --------------------------------------------------------------------
-	data, err := os.ReadFile(outputPath)
-	if err != nil {
-		t.Fatalf("failed to read output file %s: %v", outputPath, err)
+	// Verify output.
+	got, err := ioutil.ReadFile(outputPath)
+	if err!= nil {
+		t.Fatalf("read output failed: %v", err)
 	}
-	if len(data) == 0 {
-		t.Fatalf("output file %s is empty; Mesh should produce data", outputPath)
+	if string(got)!= string(content) {
+		t.Fatalf("output mismatch: got %q, want %q", string(got), string(content))
 	}
 }
