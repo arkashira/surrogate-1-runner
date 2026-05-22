@@ -1,0 +1,42 @@
+{
+  "layout": {
+    "breadcrumbs": ["Home", "Frameworks", "AIDA Model"],
+    "header": {
+      "title": "AIDA Model",
+      "tags": ["Content Strategy", "Classic"],
+      "action_buttons": ["Download PDF", "Share"]
+    },
+    "content": {
+      "overview": {
+        "description": "A century-old model for marketing messaging effectiveness",
+        "stats": {
+          "use_cases": "1,234 implementations",
+          "success_rate": "78% conversion improvement"
+        }
+      },
+      "steps": [
+        {
+          "title": "Attention",
+          "icon": "bullseye",
+          "content": "Capture audience focus with bold statements"
+        },
+        {
+          "title": "Interest",
+          "icon": "sparkle",
+          "content": "Educate with valuable information"
+        }
+      ],
+      "templates": {
+        "cta": "Create AIDA-optimized content",
+        "examples": [
+          "Headline generator template",
+          "Email subject line framework"
+        ]
+      }
+    }
+  },
+  "mobile": {
+    "collapsible_sections": true,
+    "step_animation": "fade-slide"
+  }
+}

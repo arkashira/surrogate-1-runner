@@ -1,0 +1,34 @@
+{
+  "global_nav": {
+    "desktop": {
+      "primary": {
+        "items": [
+          {"label": "Home", "icon": "home", "path": "/"},
+          {"label": "Frameworks", "icon": "grid", "path": "/frameworks"},
+          {"label": "Templates", "icon": "file", "path": "/templates"}
+        ],
+        "spacing": "24px"
+      },
+      "secondary": {
+        "items": [
+          {"label": "Profile", "icon": "user"},
+          {"label": "Settings", "icon": "gear"}
+        ],
+        "alignment": "right"
+      }
+    },
+    "mobile": {
+      "hamburger_menu": true,
+      "priority_items": ["Home", "Frameworks", "Profile"],
+      "animation": "slide-in"
+    }
+  },
+  "footer": {
+    "sections": [
+      {"title": "Resources", "links": ["Blog", "Case Studies"]},
+      {"title": "Company", "links": ["About", "Contact"]}
+    ],
+    "social_icons": ["twitter", "linkedin"],
+    "copyright": "© 2026 Axentx"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "layout": {
+    "navigation": {
+      "primary": ["Home", "Frameworks", "Templates", "Analytics"],
+      "secondary": ["Profile", "Settings"]
+    },
+    "hero": {
+      "title": "Marketing Frameworks Library",
+      "subtitle": "Find and apply battle-tested strategies",
+      "search": {
+        "placeholder": "Search frameworks, industries, or use cases"
+      }
+    },
+    "framework_grid": {
+      "columns": [
+        { "title": "Content Marketing", "count": 12 },
+        { "title": "Social Media", "count": 8 },
+        { "title": "Email Campaigns", "count": 5 }
+      ],
+      "cards": [
+        {
+          "title": "AIDA Model",
+          "category": "Content Strategy",
+          "tag": "Classic",
+          "preview": "Attention → Interest → Desire → Action"
+        },
+        {
+          "title": "4Ps Framework",
+          "category": "Marketing Mix",
+          "tag": "Advanced",
+          "preview": "Product, Price, Place, Promotion"
+        }
+      ]
+    }
+  },
+  "accessibility": {
+    "keyboard_navigation": true,
+    "contrast_ratio": "4.5:1",
+    "ARIA_labels": true
+  }
+}
