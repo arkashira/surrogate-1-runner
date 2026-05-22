@@ -1,47 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import { fetchComponentBenchmarks } from '../utils/api';
+import { useParams } from 'react-router-dom';
+import { fetchComponentDetails } from '../utils/api';
 
-const ComponentDetails = ({ componentId }) => {
-  const [benchmarks, setBenchmarks] = useState([]);
+const ComponentDetails = () => {
+  const { id } = useParams();
+  const [component, setComponent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchComponentBenchmarks(componentId)
-      .then(data => {
-        setBenchmarks(data);
+    const fetchData = async () => {
+      try {
+        const data = await fetchComponentDetails(id);
+        setComponent(data);
         setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         setError(err.message);
         setLoading(false);
-      });
-  }, [componentId]);
+      }
+    };
 
-  if (loading) return <div>Loading performance data...</div>;
+    fetchData();
+  }, [id]);
+
+  if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <div className="component-details">
-      <h2>Performance Benchmarks</h2>
-      <table className="benchmarks-table">
-        <thead>
-          <tr>
-            <th>Test Scenario</th>
-            <th>Result</th>
-            <th>Units</th>
-          </tr>
-        </thead>
-        <tbody>
-          {benchmarks.map((bench, index) => (
-            <tr key={index}>
-              <td>{bench.test_name}</td>
-              <td>{bench.value}</td>
-              <td>{bench.unit}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <h1>{component.name}</h1>
+      <p><strong>Description:</strong> {component.description}</p>
+      <p><strong>Performance Benchmarks:</strong></p>
+      <ul>
+        {component.performanceBenchmarks.map((benchmark, index) => (
+          <li key={index}>{benchmark}</li>
+        ))}
+      </ul>
     </div>
   );
 };

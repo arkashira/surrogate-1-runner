@@ -1,10 +1,10 @@
-export const fetchComponentBenchmarks = async (componentId) => {
-  try {
-    const response = await fetch(`/api/components/${componentId}/benchmarks`);
-    if (!response.ok) throw new Error('Benchmark data fetch failed');
-    return await response.json();
-  } catch (error) {
-    console.error('Benchmark API error:', error);
-    throw error;
-  }
+import axios from 'axios';
+
+const API_URL = 'https://api.example.com/components';
+
+const fetchComponentDetails = async (id) => {
+  const response = await axios.get(`${API_URL}/${id}`);
+  return response.data;
 };
+
+export { fetchComponentDetails };
