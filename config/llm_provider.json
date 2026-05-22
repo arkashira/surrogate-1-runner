@@ -1,16 +1,10 @@
 {
-  "providers": [
-    {
-      "name": "minimax",
-      "api_key_env": "MINIMAX_API_KEY",
-      "default_model": "mini-1b",
-      "endpoint": "https://api.minimax.ai/v1/chat/completions"
-    },
-    {
-      "name": "openai",
-      "api_key_env": "OPENAI_API_KEY",
-      "default_model": "gpt-3.5-turbo",
-      "endpoint": "https://api.openai.com/v1/chat/completions"
-    }
-  ]
+  "openai": {
+    "api_key": "",
+    "model_name": "gpt-3.5-turbo"
+  },
+  "anthropic": {
+    "api_key": "",
+    "model_name": "claude-v1"
+  }
 }
