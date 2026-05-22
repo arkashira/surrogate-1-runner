@@ -1,22 +1,12 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const validationRoutes = require('./routes/validation');
-const userMiddleware = require('./middleware/user'); // attaches req.user
-
 const app = express();
+const specEditorRoutes = require('./routes/specEditorRoutes');
 
-// --- DB -------------------------------------------------------
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+app.use(express.json());
+app.use('/api', specEditorRoutes);
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
-
-// --- Middleware ------------------------------------------------
-app.use(bodyParser.json());
-app.use(userMiddleware); // e.g., sets req.user from JWT or session
-
-// --- Routes ----------------------------------------------------
-app.use('/api/v1/validation', validationRoutes);
-
-module.exports = app;
