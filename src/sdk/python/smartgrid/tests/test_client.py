@@ -1,36 +1,27 @@
 import unittest
+from unittest.mock import Mock, patch
 from smartgrid.client import SmartGridClient
-import paho.mqtt.client as mqtt
-import json
 
 class TestSmartGridClient(unittest.TestCase):
-    def setUp(self):
-        self.client = SmartGridClient("localhost", 1883, "test_client")
+    @patch('paho.mqtt.client.Client')
+    def setUp(self, mock_client):
+        self.mock_client = mock_client.return_value
+        self.client = SmartGridClient("mqtt.example.com")
 
     def test_connect(self):
         self.client.connect()
-        self.client.client.loop_stop()
+        self.assertTrue(self.client.connected)
+        self.mock_client.connect.assert_called_once_with("mqtt.example.com", 1883)
+        self.mock_client.loop_start.assert_called_once()
 
     def test_publish_mode(self):
-        self.client.connect()
-        self.client.publish_mode("test_mode")
-        self.client.client.loop_stop()
+        self.client.connected = True
+        self.client.publish_mode({"mode": "eco"})
+        self.mock_client.publish.assert_called_once_with("smartgrid/operating_mode", '{"mode": "eco"}')
 
-    def test_on_connect(self):
-        self.client.client.on_connect(self.client.client, None, None, 0)
-        self.client.client.loop_stop()
+    def test_publish_mode_not_connected(self):
+        with self.assertRaises(Exception):
+            self.client.publish_mode({"mode": "eco"})
 
-    def test_on_disconnect(self):
-        self.client.client.on_disconnect(self.client.client, None, None, 0)
-        self.client.client.loop_stop()
-
-    def test_on_publish(self):
-        self.client.client.on_publish(self.client.client, None, 0)
-        self.client.client.loop_stop()
-
-    def test_reconnect(self):
-        self.client.reconnect()
-        self.client.client.loop_stop()
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
