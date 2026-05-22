@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Coaching Session Summary - [Session Date]</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
+        .highlight { color: #3498db; }
+        .action-item { margin: 15px 0; padding: 10px; background: #f8f9fa; border-left: 4px solid #3498db; }
+        .section { margin-top: 20px; }
+        .section h2 { font-size: 1.2em; margin-bottom: 8px; color: #2c3e50; }
+        .list { margin-left: 20px; }
+        .footer { margin-top: 30px; font-size: 0.9em; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Coaching Session Summary - <span th:text="${sessionDate}"></span></h2>
+        <p>Expert: <span th:text="${expertName}"></span> | Duration: <span th:text="${sessionDuration}"></span></p>
+    </div>
+
+    <p>Hi <span th:text="${founderName}"></span>,</p>
+
+    <p>Thank you for your coaching session with <span th:text="${expertName}"></span>. Below is a structured summary of key takeaways, action items, and next steps:</p>
+
+    <div class="section">
+        <h2>Key Discussion Points</h2>
+        <ul class="list">
+            <li><strong>Marketing Strategy:</strong> <span th:text="${marketingStrategySummary}"></span></li>
+            <li><strong>Target Audience:</strong> <span th:text="${audienceInsights}"></span></li>
+            <li><strong>Resource Allocation:</strong> <span th:text="${resourceRecommendations}"></span></li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Immediate Action Items</h2>
+        <ol class="list">
+            <li th:each="action : ${actionItems}"><span th:text="${action}"></span></li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>Next Steps & Recommendations</h2>
+        <p><span th:text="${nextSteps}"></span></p>
+    </div>
+
+    <p class="highlight">You have 24 hours from this email to ask follow-up questions to your coach.</p>
+
+    <div class="footer">
+        <p>This summary was generated automatically and sent within 24 hours of your coaching session.</p>
+        <p>If you have any questions, please reply to this email.</p>
+        <p>Best regards,<br>
+        The Axentx Coaching Team<br>
+        <span th:text="${expertEmail}"></span> | <span th:text="${expertPhone}"></span></p>
+    </div>
+</body>
+</html>
