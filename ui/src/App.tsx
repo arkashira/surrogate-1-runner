@@ -1,10 +1,11 @@
 import React from 'react';
-import TemplateCustomizer from './components/TemplateCustomizer';
+import TroubleshootingGuide from './components/TroubleshootingGuide';
+import './App.css';
 
-const App: React.FC = () => {
+const App = () => {
   return (
-    <div className="App">
-      <TemplateCustomizer />
+    <div className="app">
+      <TroubleshootingGuide />
     </div>
   );
 };
