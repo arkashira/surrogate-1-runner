@@ -1,24 +1,32 @@
-import unittest
-from unittest.mock import patch
-from prometheus_client import REGISTRY
-from src.metrics import INGESTION_DURATION, INGESTION_FAILURES
+"""
+Unit tests for Prometheus metrics integration in playbook generation.
+"""
 
-class TestMetrics(unittest.TestCase):
-    def test_ingestion_duration_metric_exists(self):
-        self.assertIn('ingestion_duration_seconds', REGISTRY._names_to_collectors)
+import pytest
+from backend.metrics import playbooks_generated_total, active_users_total
+from backend.playbook_generator import generate_playbook
 
-    def test_ingestion_failures_metric_exists(self):
-        self.assertIn('ingestion_failures_total', REGISTRY._names_to_collectors)
 
-    @patch('src.metrics.INGESTION_DURATION.time')
-    def test_ingestion_duration_observation(self, mock_time):
-        INGESTION_DURATION.observe(1.5)
-        mock_time.assert_called_once_with(1.5)
+@pytest.fixture(autouse=True)
+def reset_metrics():
+    """
+    Reset metric counters before each test to ensure isolation.
+    """
+    playbooks_generated_total._value.set(0)
+    active_users_total._value.set(0)
+    yield
+    playbooks_generated_total._value.set(0)
+    active_users_total._value.set(0)
 
-    def test_ingestion_failures_increment(self):
-        initial_value = INGESTION_FAILURES._value.get()
-        INGESTION_FAILURES.inc()
-        self.assertEqual(INGESTION_FAILURES._value.get(), initial_value + 1)
 
-if __name__ == '__main__':
-    unittest.main()
+def test_metrics_increment():
+    """
+    Verify that generating a playbook increments both counters by one.
+    """
+    initial_playbooks = playbooks_generated_total._value.get()
+    initial_users = active_users_total._value.get()
+
+    generate_playbook(user_id="user123", data={"foo": "bar"})
+
+    assert playbooks_generated_total._value.get() == initial_playbooks + 1
+    assert active_users_total._value.get() == initial_users + 1
