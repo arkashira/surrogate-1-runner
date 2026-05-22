@@ -1,5 +1,7 @@
-export interface Tool {
+export interface ClawVariant {
   id: string;
   name: string;
-  status: 'active' | 'inactive';
+  capabilities: {
+    [key: string]: boolean;
+  };
 }

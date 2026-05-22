@@ -1,20 +1,34 @@
 import React from 'react';
-import { WorkflowProvider } from './contexts/WorkflowContext';
-import WorkflowDashboard from './components/WorkflowDashboard';
-import './App.css';
+import ComparisonTable from './components/ComparisonTable';
+import { ClawVariant } from './types';
+
+const variants: ClawVariant[] = [
+  {
+    id: '1',
+    name: 'Variant A',
+    capabilities: {
+      'Feature X': true,
+      'Feature Y': false,
+      'Feature Z': true,
+    },
+  },
+  {
+    id: '2',
+    name: 'Variant B',
+    capabilities: {
+      'Feature X': false,
+      'Feature Y': true,
+      'Feature Z': true,
+    },
+  },
+];
 
 const App: React.FC = () => {
   return (
-    <WorkflowProvider>
-      <div className="App">
-        <header className="App-header">
-          <h1>Workflow Monitoring Dashboard</h1>
-        </header>
-        <main>
-          <WorkflowDashboard />
-        </main>
-      </div>
-    </WorkflowProvider>
+    <div className="App">
+      <h1>Claw Variant Comparison</h1>
+      <ComparisonTable variants={variants} />
+    </div>
   );
 };
 
