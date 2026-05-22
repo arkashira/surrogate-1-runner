@@ -1,16 +1,24 @@
 package main
 
 import (
-	"opt/axentx/surrogate-1/cli"
-	"os"
+	"context"
+	"log"
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/axentx/surrogate-1/pkg/metrics"
 )
 
 func main() {
-	outputDir, validate, err := cli.ParseFlags()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
-		os.Exit(1)
-	}
-	
-	cli.RunCLI(validate, outputDir)
+	mux := metrics.NewExporter().ServeMux()
+	http.Handle("/metrics", mux)
+
+	go func() {
+		for {
+			metrics.Collect(context.Background())
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
