@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cost‑Saving Recommendations</title>
+  <link rel="stylesheet" href="styles/recommendations.css">
+</head>
+<body>
+  <header>
+    <h1>Cost‑Saving Recommendations</h1>
+  </header>
+
+  <section id="recommendations" aria-live="polite">
+    <!-- Recommendation cards will be injected here by script -->
+  </section>
+
+  <script>
+    /* ------------------------------------------------------------
+     *  Data – in a real app this would come from an API
+     * ------------------------------------------------------------ */
+    const recommendations = [
+      {
+        id: 1,
+        title: "Reserve Instances for EC2",
+        description: "Switch to 1‑year reserved instances for under‑utilized EC2 instances.",
+        savings: "$1,200/month",
+        priority: 1
+      },
+      {
+        id: 2,
+        title: "Delete Unused EBS Volumes",
+        description: "Remove 50 unused EBS volumes to free up storage costs.",
+        savings: "$300/month",
+        priority: 2
+      },
+      {
+        id: 3,
+        title: "Enable S3 Intelligent‑Tiering",
+        description: "Move infrequently accessed data to Intelligent‑Tiering.",
+        savings: "$150/month",
+        priority: 3
+      },
+      {
+        id: 4,
+        title: "Resize under‑utilized EC2 instances",
+        description: "Switch from m5.large to t3.medium for 30% lower cost.",
+        savings: "$1,200/month",
+        priority: 2
+      }
+    ];
+
+    /* ------------------------------------------------------------
+     *  Helper – extract numeric value from a savings string
+     * ------------------------------------------------------------ */
+    const getSavingsValue = str => {
+      const num = parseFloat(str.replace(/[^0-9.-]/g, ""));
+      return isNaN(num) ? 0 : num;
+    };
+
+    /* ------------------------------------------------------------
+     *  Render logic
+     * ------------------------------------------------------------ */
+    function renderRecommendations() {
+      const container = document.getElementById('recommendations');
+
+      // Sort by priority first, then by savings (descending)
+      const sorted = [...recommendations].sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return getSavingsValue(b.savings) - getSavingsValue(a.savings);
+      });
+
+      sorted.forEach(rec => {
+        const card = document.createElement('div');
+        card.className = 'rec-card';
+        card.innerHTML = `
+          <h2>${rec.title}</h2>
+          <p class="description">${rec.description}</p>
+          <span class="savings">${rec.savings}</span>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', renderRecommendations);
+  </script>
+</body>
+</html>

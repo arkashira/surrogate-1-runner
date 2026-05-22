@@ -1,0 +1,65 @@
+
+/* Basic reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Body */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f5f7fa;
+  color: #333;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+/* Header */
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+h1 {
+  font-size: 2rem;
+  color: #2c3e50;
+}
+
+/* Recommendations grid */
+#recommendations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* Card */
+.rec-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.rec-card:hover {
+  transform: translateY(-5px);
+}
+
+.rec-card h2 {
+  font-size: 1.25rem;
+  margin-bottom: 10px;
+  color: #1abc9c;
+}
+
+.rec-card .description {
+  margin-bottom: 12px;
+  color: #555;
+}
+
+.rec-card .savings {
+  display: block;
+  font-weight: bold;
+  color: #e74c3c;
+}
