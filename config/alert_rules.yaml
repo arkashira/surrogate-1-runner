@@ -1,0 +1,5 @@
+alert_threshold: 0.2
+email:
+  from: sender@example.com
+  to: recipient@example.com
+  password: your_password_here
