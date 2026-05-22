@@ -1,10 +1,11 @@
-import { createStore } from 'vuex';
-import { alerts } from './modules/alerts';
+import { configureStore } from '@reduxjs/toolkit';
+import userReducer from './userSlice';
 
-export interface RootState {}
-
-export default createStore<RootState>({
-  modules: {
-    alerts,
+export const store = configureStore({
+  reducer: {
+    user: userReducer,
   },
 });
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

@@ -1,39 +1,39 @@
-.tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.task-item {
+.sandbox-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
 }
 
-.task-status {
+.free-tier-indicator {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 1rem;
 }
 
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+.sandbox-footer {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  text-align: center;
 }
 
-.status-indicator.running {
-  background-color: yellow;
+.watermark {
+  color: #6c757d;
+  font-size: 0.875rem;
 }
 
-.status-indicator.completed {
-  background-color: green;
+.button {
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
 }
 
-.task-details {
-  display: flex;
-  gap: 10px;
+.button:hover {
+  background-color: #0056b3;
 }
