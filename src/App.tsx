@@ -1,20 +1,16 @@
 import React from 'react';
-import { Provider } from 'react-redux';
-import { store } from './store';
-import SandboxHeader from './components/SandboxHeader';
-import SandboxFooter from './components/SandboxFooter';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import OnboardingFlow from './components/OnboardingFlow';
+import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
   return (
-    <Provider store={store}>
-      <div className="app">
-        <SandboxHeader />
-        <div className="sandbox-content">
-          {/* Sandbox content goes here */}
-        </div>
-        <SandboxFooter />
-      </div>
-    </Provider>
+    <Router>
+      <Routes>
+        <Route path="/" element={<OnboardingFlow />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </Router>
   );
 };
 
