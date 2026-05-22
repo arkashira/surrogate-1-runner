@@ -1,14 +1,16 @@
-
 # surrogate-1-runner
 
-[![CI Example](https://github.com/axentx/surrogate-1/actions/workflows/ci-example.yml/badge.svg)](https://github.com/axentx/surrogate-1/actions/workflows/ci-example.yml)
+## Overview
 
-Parallel public-dataset ingest workers for the [axentx/surrogate-1](https://github.com/axentx/surrogate-1) project.
+The `surrogate-1-runner` is designed to manage parallel public-dataset ingest workers for the
+[axentx/surrogate-1-training-pairs](https://huggingface.co/datasets/axentx/surrogate-1-training-pairs)
+HuggingFace dataset.
 
-## What this does
+## Functionality
 
-Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**. Each runner takes a deterministic 1/16 slice (`slug-hash bucket = SHARD_ID`) of the public dataset list defined in `bin/dataset-enrich.sh`, streams, normalizes per-schema, dedups via the central md5 hash store, and uploads its output to a unique path on the dataset repo:
+Every 30 minutes (or on `workflow_dispatch`), GitHub Actions launches **16 parallel runners**.
+Each runner processes a deterministic 1/16 slice of the public dataset list defined in `bin/dataset-enrich.sh`. The process includes streaming, normalizing per-schema, deduplication via a central MD5 hash store, and uploading the output to a unique path in the dataset repository.
 
-## Quick Start
+## CLI Command
 
-1. **Clone the repository**:
+To manually trigger the agent, use the following command:

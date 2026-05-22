@@ -1,46 +1,24 @@
-#!/usr/bin/env python3
+import click
 
-import argparse
-import json
-import sys
-from typing import Dict, Any
-
-from surrogate1.reporter import Reporter
-
-def main():
-    parser = argparse.ArgumentParser(description='Run surrogate-1 checks.')
-    parser.add_argument('--output', help='Output file path for JSON results')
-    args = parser.parse_args()
-
-    reporter = Reporter()
-
-    try:
-        reporter.run_checks()
-        result = {
-            'pass': True,
-            'details': reporter.details,
-            'summary': reporter.summary
-        }
-        print(json.dumps(result))
-
-        if args.output:
-            with open(args.output, 'w') as f:
-                json.dump(result, f)
-
-        sys.exit(0)
-    except Exception as e:
-        result = {
-            'pass': False,
-            'details': reporter.details,
-            'summary': str(e)
-        }
-        print(json.dumps(result))
-
-        if args.output:
-            with open(args.output, 'w') as f:
-                json.dump(result, f)
-
-        sys.exit(1)
+@click.command()
+@click.option('--url', required=True, help='The URL to trigger the workflow.')
+@click.option('--alert-id', required=True, help='The alert ID to diagnose.')
+def diagnose(url, alert_id):
+    """
+    Simulates triggering a workflow for diagnosing an alert.
+    
+    Args:
+        url (str): The URL to trigger the workflow.
+        alert_id (str): The alert ID to diagnose.
+    
+    Outputs:
+        Prints the incident ID and a download URL for the incident report.
+    """
+    # Simulate triggering the workflow
+    incident_id = "incident-12345"  # Placeholder for actual incident ID generation
+    download_url = f"{url}/download/{incident_id}"  # Placeholder for actual download URL
+    print(f"Incident ID: {incident_id}")
+    print(f"Download URL: {download_url}")
 
 if __name__ == '__main__':
-    main()
+    diagnose()
