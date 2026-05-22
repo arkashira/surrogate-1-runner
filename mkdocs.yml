@@ -1,0 +1,25 @@
+site_name: Axentx Surrogate-1
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+nav:
+  - Home: index.md
+  - Quick Start: quick-start.md
+  - API Reference: api-reference.md
+  - Samples:
+    - Home Assistant: samples/home-assistant.md
+  - Feedback: feedback.md
