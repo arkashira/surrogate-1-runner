@@ -1,20 +1,23 @@
-import os
-import asyncio
+from src.email_sender import EmailSender
+from src.data_fetcher import DataFetcher
+import schedule
+import time
 
-from .server import start_server
+def send_daily_emails():
+    data_fetcher = DataFetcher()
+    email_sender = EmailSender("smtp.example.com", 587, "sender@example.com", "password")
 
-def main() -> None:
-    """
-    Entry point for the surrogate-1 WebSocket server.
-    Reads the port from the SURROGATE_WS_PORT environment variable,
-    defaults to 8765, and starts the async server.
-    """
-    port = int(os.getenv("SURROGATE_WS_PORT", "8765"))
-    try:
-        asyncio.run(start_server(port))
-    except KeyboardInterrupt:
-        print("\nSurrogate-1 WebSocket server stopped.")
+    users = data_fetcher.get_users_with_accounts()
+    for user in users:
+        total_balance, mom_change = data_fetcher.get_account_summary(user['user_id'])
+        email_sender.send_email(user['email'], user['name'], total_balance, mom_change)
 
+def main():
+    schedule.every().day.at("06:00").do(send_daily_emails)
 
-if __name__ == "__main__":
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+if __name__ == '__main__':
     main()
