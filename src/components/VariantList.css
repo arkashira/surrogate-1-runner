@@ -1,0 +1,27 @@
+.variant-list {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.variant-item {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+}
+
+.variant-item h3 {
+  margin-top: 0;
+}
+
+.variant-item p {
+  margin: 5px 0;
+}

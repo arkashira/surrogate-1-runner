@@ -1,70 +1,55 @@
 import React, { useState } from 'react';
-import { getVariants, getVariantColumns } from '../utils/variant_utils';
+import './VariantList.css';
 
-const VariantList = () => {
-  const [selectedVariants, setSelectedVariants] = useState([]);
-  const variants = getVariants();
+const VariantList = ({ variants }) => {
+  const [sortKey, setSortKey] = useState('');
+  const [filterKey, setFilterKey] = useState('');
 
-  const handleSelect = (variant) => {
-    setSelectedVariants(prevState => {
-      if (prevState.includes(variant)) {
-        return prevState.filter(v => v !== variant);
-      } else {
-        return [...prevState, variant];
-      }
-    });
+  const handleSortChange = (event) => {
+    setSortKey(event.target.value);
   };
 
+  const handleFilterChange = (event) => {
+    setFilterKey(event.target.value);
+  };
+
+  const sortedVariants = variants.sort((a, b) => {
+    if (sortKey && a[sortKey] && b[sortKey]) {
+      return a[sortKey].localeCompare(b[sortKey]);
+    }
+    return 0;
+  });
+
+  const filteredVariants = sortedVariants.filter(variant => {
+    return variant.capabilities.includes(filterKey);
+  });
+
   return (
-    <div>
-      <h2>Select Variants</h2>
+    <div className="variant-list">
+      <div className="controls">
+        <label>
+          Sort By:
+          <select value={sortKey} onChange={handleSortChange}>
+            <option value="">None</option>
+            <option value="name">Name</option>
+            <option value="description">Description</option>
+          </select>
+        </label>
+        <label>
+          Filter By Capability:
+          <input type="text" value={filterKey} onChange={handleFilterChange} />
+        </label>
+      </div>
       <ul>
-        {variants.map((variant) => (
-          <li key={variant.id}>
-            <button onClick={() => handleSelect(variant)}>
-              {selectedVariants.includes(variant) ? 'Deselect' : 'Select'} {variant.name}
-            </button>
+        {filteredVariants.map((variant, index) => (
+          <li key={index} className="variant-item">
+            <h3>{variant.name}</h3>
+            <p><strong>Description:</strong> {variant.description}</p>
+            <p><strong>Capabilities:</strong> {variant.capabilities.join(', ')}</p>
           </li>
         ))}
       </ul>
-      <ComparisonTable variants={selectedVariants} />
     </div>
-  );
-};
-
-const ComparisonTable = ({ variants }) => {
-  if (variants.length < 2) {
-    return null;
-  }
-
-  const columns = getVariantColumns();
-
-  return (
-    <table>
-      <thead>
-        <tr>
-          <th>Variant Name</th>
-          {columns.map(column => (
-            <th key={column.key}>{column.label}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {variants.map((variant) => (
-          <tr key={variant.id}>
-            <td>{variant.name}</td>
-            {columns.map(column => (
-              <td key={column.key}>
-                {variant[column.key] === true || variant[column.key] === false ? 
-                  variant[column.key] ? 'Yes' : 'No' :
-                  Array.isArray(variant[column.key]) ? variant[column.key].join(', ') : variant[column.key]
-                }
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 };
 
