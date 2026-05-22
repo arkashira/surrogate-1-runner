@@ -1,10 +1,20 @@
-# 1. Install required package
-pip install schedule
+import os
+import asyncio
 
-# 2. Create necessary directories
-mkdir -p /opt/axentx/surrogate-1/{data,logs}
+from .server import start_server
 
-# 3. Run the scheduler
-python /opt/axentx/surrogate-1/src/cron_scheduler.py
+def main() -> None:
+    """
+    Entry point for the surrogate-1 WebSocket server.
+    Reads the port from the SURROGATE_WS_PORT environment variable,
+    defaults to 8765, and starts the async server.
+    """
+    port = int(os.getenv("SURROGATE_WS_PORT", "8765"))
+    try:
+        asyncio.run(start_server(port))
+    except KeyboardInterrupt:
+        print("\nSurrogate-1 WebSocket server stopped.")
 
-# 4. (Optional) Set up as systemd service for production
+
+if __name__ == "__main__":
+    main()
