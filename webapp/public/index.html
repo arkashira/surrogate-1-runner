@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .dashboard {
+            padding: 20px;
+        }
+        .time-range-selector {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="time-range-selector">
+            <label for="time-range">Select Time Range:</label>
+            <select id="time-range">
+                <option value="1">1 Week</option>
+                <option value="1" selected>1 Month</option>
+                <option value="3">3 Months</option>
+                <option value="6">6 Months</option>
+                <option value="12">12 Months</option>
+            </select>
+        </div>
+        <div class="chart-container">
+            <canvas id="plChart"></canvas>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('plChart').getContext('2d');
+            const plChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar'],
+                    datasets: [{
+                        label: 'Profit and Loss',
+                        data: [12000, 19000, 3000],
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '$' + context.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+
+            // Simulate data update
+            setInterval(function() {
+                const newData = plChart.data.datasets[0].data;
+                newData.push(Math.floor(Math.random() * 10000) - 5000);
+                newData.shift();
+                plChart.update();
+            }, 5000);
+
+            // Handle time range change
+            document.getElementById('time-range').addEventListener('change', function() {
+                // In a real implementation, this would fetch new data based on the selected range
+                console.log('Time range changed to:', this.value);
+            });
+        });
+    </script>
+</body>
+</html>
