@@ -2,92 +2,120 @@ import React, { useState, useEffect } from "react";
 import Reviews from "./Reviews";
 
 /**
- * ProductPage component
+ * ProductPage – shows a single product and lets the user filter its reviews.
  *
- * @param {{ productId: string|number, initialCriteria?: object }} props
+ * Props
+ * -----
+ * productId : string | number – the ID used by the backend API.
+ *
+ * Extensible: add more UI controls and push their values into `criteria`
+ * without touching the Reviews component.
  */
-const ProductPage = ({ productId, initialCriteria = {} }) => {
+const ProductPage = ({ productId }) => {
+  // ----------------------------------------------------------------------
+  // 1️⃣ Product data (once)
+  // ----------------------------------------------------------------------
   const [product, setProduct] = useState(null);
-  const [criteria, setCriteria] = useState(initialCriteria);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [productError, setProductError] = useState(null);
 
-  // -----------------------------------------------------------------
-  // 1️⃣ Fetch product details (mocked – replace with real API later)
-  // -----------------------------------------------------------------
   useEffect(() => {
-    let isMounted = true;
-    const fetchProduct = async () => {
-      try {
-        // 👉 Replace this block with a real fetch call.
-        const mockProduct = {
-          id: productId,
-          name: `Sample Product ${productId}`,
-          description:
-            "A great product for demonstration purposes. Replace with real data.",
-          price: "$99.99",
-        };
-        if (isMounted) {
-          setProduct(mockProduct);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err);
-          setLoading(false);
-        }
-      }
-    };
-    fetchProduct();
+    let cancelled = false;
+    fetch(`/api/products/${productId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setProduct(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setProductError(err.message);
+        console.error(err);
+      });
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, [productId]);
 
-  // -----------------------------------------------------------------
-  // 2️⃣ UI – filter criteria (currently only minRating)
-  // -----------------------------------------------------------------
-  const handleRatingChange = (e) => {
-    const rating = e.target.value;
+  // ----------------------------------------------------------------------
+  // 2️⃣ Search / filter criteria (flexible)
+  // ----------------------------------------------------------------------
+  const [criteria, setCriteria] = useState({
+    minRating: "",   // empty string = “any”
+    search: "",      // free‑text search
+    // future filters (price, brand, …) can be added here
+  });
+
+  const handleCriteriaChange = (e) => {
+    const { name, value } = e.target;
     setCriteria((prev) => ({
       ...prev,
-      minRating: rating ? Number(rating) : undefined,
+      [name]: value,
     }));
   };
 
-  // -----------------------------------------------------------------
+  // ----------------------------------------------------------------------
   // 3️⃣ Render
-  // -----------------------------------------------------------------
-  if (loading) return <div>Loading product…</div>;
-  if (error) return <div style={{ color: "red" }}>Failed to load product.</div>;
+  // ----------------------------------------------------------------------
+  if (productError) {
+    return <div className="error">Failed to load product: {productError}</div>;
+  }
+
+  if (!product) {
+    return <div className="loading">Loading product…</div>;
+  }
 
   return (
-    <div className="product-page" style={{ padding: "1rem" }}>
+    <div className="product-page" style={{ maxWidth: "800px", margin: "auto" }}>
+      {/* ---- Product header ------------------------------------------------ */}
       <h1>{product.name}</h1>
       <p>{product.description}</p>
-      <p>
-        <strong>{product.price}</strong>
-      </p>
 
-      {/* ----- Filter UI ----- */}
-      <div style={{ marginTop: "1rem" }}>
+      {/* ---- Criteria UI --------------------------------------------------- */}
+      <div
+        className="criteria-controls"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "1rem",
+          marginBottom: "1.5rem",
+        }}
+      >
+        {/* Minimum rating */}
         <label>
-          Minimum Rating:&nbsp;
+          Minimum Rating:
           <select
-            value={criteria.minRating ?? ""}
-            onChange={handleRatingChange}
+            name="minRating"
+            value={criteria.minRating}
+            onChange={handleCriteriaChange}
+            style={{ marginLeft: "0.5rem" }}
           >
             <option value="">Any</option>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
-                {n}★
-              </option>
-            ))}
+            <option value="1">1★+</option>
+            <option value="2">2★+</option>
+            <option value="3">3★+</option>
+            <option value="4">4★+</option>
+            <option value="5">5★</option>
           </select>
         </label>
+
+        {/* Free‑text search */}
+        <label>
+          Search Reviews:
+          <input
+            type="text"
+            name="search"
+            placeholder="keyword"
+            value={criteria.search}
+            onChange={handleCriteriaChange}
+            style={{ marginLeft: "0.5rem" }}
+          />
+        </label>
+
+        {/* Add more controls here – they will automatically flow into `criteria` */}
       </div>
 
-      {/* ----- Reviews (auto‑updates on criteria change) ----- */}
+      {/* ---- Reviews list --------------------------------------------------- */}
       <Reviews productId={productId} criteria={criteria} />
     </div>
   );
