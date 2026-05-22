@@ -1,0 +1,1 @@
+chmod +x bin/drift-detector.py
