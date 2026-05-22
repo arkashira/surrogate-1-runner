@@ -1,2 +1,8 @@
-SLICE=$(python -c "import hashlib, sys; print(int(hashlib.sha1('$GITHUB_REPOSITORY'.encode()).hexdigest(),16) % 16)")
-export SHARD_ID=$SLICE
+#!/bin/bash
+
+# This script takes a shard ID as an argument and processes the dataset accordingly
+SHARD_ID=$1
+
+# Process the dataset and generate design files
+# Add your dataset processing logic here
+echo "Processing dataset for shard $SHARD_ID"
