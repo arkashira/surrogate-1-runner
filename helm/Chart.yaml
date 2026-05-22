@@ -1,0 +1,26 @@
+apiVersion: v2
+name: surrogate-1
+description: A Helm chart for deploying the surrogate-1 application
+version: 0.1.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com
+
+dependencies:
+  - name: common
+    version: "1.x.x"
+    repository: "https://charts.example.com"
+
+keywords:
+  - surrogate-1
+  - deployment
+  - kubernetes
+
+sources:
+  - https://github.com/axentx/surrogate-1
+
+home: https://example.com/surrogate-1
+
+icon: https://example.com/icon.png
