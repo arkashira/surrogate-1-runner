@@ -1,31 +1,40 @@
-name: Neptune Connectivity Validation
+name: Neptune IAM Validation
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight
 
 jobs:
-  validate-neptune:
+  validate:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          python-version: '3.8'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install dependencies
+      - name: Install jq
         run: |
-          python -m pip install --upgrade pip
-          pip install boto3
+          sudo apt-get update
+          sudo apt-get install -y jq
 
-      - name: Run Neptune connectivity validation
-        run: python scripts/validate_neptune_connectivity.py
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          NEPTUNE_ENDPOINT: ${{ secrets.NEPTUNE_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Install AWS CLI
+        uses: aws-actions/aws-cli@v2
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run Neptune IAM validation
+        run: |
+          chmod +x bin/validate_neptune_iam.sh
+          bin/validate_neptune_iam.sh
+
+      - name: Exit with success
+        if: ${{ success() }}
+        run: echo "IAM permissions for Neptune are valid."
