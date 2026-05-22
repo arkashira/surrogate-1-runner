@@ -1,9 +1,6 @@
-
-cron_scout:
-  jobs:
-    daily_account_snapshot:
-      command: "python /opt/axentx/surrogate-1/bin/daily_account_snapshot.py"
-      schedule: "0 2 * * *"
-      retry_count: 3
-      retry_delay: 60
-      log_path: "/var/log/axentx/cron-scout-audit/daily_scan.log"
+cron:
+  - name: insight_email
+    schedule: 0 6 * * * # 06:00 UTC
+    task: com.axentx.rat.worker.InsightEmailWorker
+    delivery:
+      log_file: /var/log/axentx/cron-scout-audit/daily_scan.log
