@@ -1,100 +1,63 @@
-"""
-Anomaly detection for cost‑pattern data.
+import datetime
+from typing import Dict, List, Optional, Tuple
 
-Uses an IsolationForest trained on a rolling window of recent data.
-The detector exposes a simple API:
-    * train(df)
-    * predict(df) -> array of -1 (anomaly) / 1 (normal)
-    * detect_anomalies(df) -> DataFrame of anomalies
-"""
+class CostAnomalyDetector:
+    """
+    Detects cost anomalies using a 3-sigma rule on daily cost totals per service.
+    An anomaly is flagged if the current day's total deviates more than 3 standard
+    deviations from the historical mean.
+    """
 
-import pandas as pd
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
-from typing import Optional, Dict, Any
-
-class AnomalyDetector:
-    def __init__(
-        self,
-        contamination: float = 0.01,
-        window_size: int = 30,
-        random_state: Optional[int] = 42,
-        config: Optional[Dict[str, Any]] = None,
-    ):
+    def __init__(self, historical_data: Dict[str, List[float]]):
         """
-        Parameters
-        ----------
-        contamination : float
-            Proportion of outliers in the data set.
-        window_size : int
-            Number of recent rows to keep for training.
-        random_state : int | None
-            Seed for reproducibility.
-        config : dict | None
-            Optional dict to override defaults (e.g. thresholds).
+        Initializes the detector with historical daily cost data per service.
+
+        Args:
+            historical_data: Mapping from service identifier to list of daily totals.
+                             The list should contain totals for the past 7 days.
         """
-        self.contamination = contamination
-        self.window_size = window_size
-        self.random_state = random_state
-        self.config = config or {}
-        self.model: Optional[IsolationForest] = None
-        self.scaler = StandardScaler()
-        self._history: pd.DataFrame = pd.DataFrame()
+        self.historical_data = historical_data
 
-    # ------------------------------------------------------------------ #
-    #  Core training / prediction
-    # ------------------------------------------------------------------ #
-    def _fit(self, df: pd.DataFrame) -> None:
-        """Fit the IsolationForest on the current history."""
-        scaled = self.scaler.fit_transform(df)
-        self.model = IsolationForest(
-            n_estimators=100,
-            contamination=self.contamination,
-            random_state=self.random_state,
-            behaviour="new",  # for sklearn <1.2
-        )
-        self.model.fit(scaled)
+    def _calculate_statistics(self, daily_totals: List[float]) -> Tuple[Optional[float], Optional[float]]:
+        """
+        Calculates the mean and standard deviation of a list of daily totals.
 
-    def train(self, df: pd.DataFrame) -> None:
-        """Add new data to the rolling window and retrain."""
-        # Keep only the last `window_size` rows
-        self._history = pd.concat([self._history, df]).tail(self.window_size)
-        self._fit(self._history)
+        Args:
+            daily_totals: List of daily cost totals.
 
-    def predict(self, df: pd.DataFrame) -> pd.Series:
-        """Return -1 for anomalies, 1 for normal."""
-        if self.model is None:
-            raise RuntimeError("Model has not been trained yet.")
-        scaled = self.scaler.transform(df)
-        preds = self.model.predict(scaled)
-        return pd.Series(preds, index=df.index)
+        Returns:
+            A tuple (mean, std) or (None, None) if the list is empty.
+        """
+        if not daily_totals:
+            return None, None
+        mean = sum(daily_totals) / len(daily_totals)
+        variance = sum((x - mean) ** 2 for x in daily_totals) / len(daily_totals)
+        std = variance ** 0.5
+        return mean, std
 
-    # ------------------------------------------------------------------ #
-    #  Convenience helpers
-    # ------------------------------------------------------------------ #
-    def detect_anomalies(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Return the subset of `df` that were flagged as anomalies."""
-        preds = self.predict(df)
-        return df[preds == -1]
+    def detect_anomalies(self, current_daily_totals: Dict[str, float]) -> List[Dict[str, any]]:
+        """
+        Detects anomalies based on the 3-sigma rule.
 
-    # ------------------------------------------------------------------ #
-    #  Export / import (optional)
-    # ------------------------------------------------------------------ #
-    def to_dict(self) -> Dict[str, Any]:
-        """Export model parameters for persistence."""
-        return {
-            "contamination": self.contamination,
-            "window_size": self.window_size,
-            "random_state": self.random_state,
-            "config": self.config,
-        }
+        Args:
+            current_daily_totals: Mapping from service identifier to current day's total.
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AnomalyDetector":
-        """Recreate a detector from a dict."""
-        return cls(
-            contamination=data.get("contamination", 0.01),
-            window_size=data.get("window_size", 30),
-            random_state=data.get("random_state", 42),
-            config=data.get("config"),
-        )
+        Returns:
+            List of anomaly dictionaries with the required fields.
+        """
+        anomalies = []
+        for service, current_total in current_daily_totals.items():
+            mean, std = self._calculate_statistics(self.historical_data.get(service, []))
+            if mean is None or std is None:
+                continue  # Not enough historical data for this service
+            deviation = (current_total - mean) / std
+            if abs(deviation) > 3:
+                anomalies.append({
+                    'provider': service.get('provider', 'unknown'),
+                    'service': service.get('service', 'unknown'),
+                    'amount_usd': current_total,
+                    'baseline_usd': mean,
+                    'deviation_pct': abs(deviation) * 100,
+                    'timestamp': datetime.datetime.now().isoformat()
+                })
+        return anomalies
