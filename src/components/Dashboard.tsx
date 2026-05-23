@@ -1,11 +1,20 @@
-import React from 'react';
-import ComplianceIssues from './ComplianceIssues';
+import React, { useState } from 'react';
+import { Button } from 'react-bootstrap';
+import TemplatePickerModal from './TemplatePickerModal';
 
 const Dashboard: React.FC = () => {
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
   return (
-    <div className="dashboard">
+    <div>
       <h1>Dashboard</h1>
-      <ComplianceIssues />
+      <Button variant="primary" onClick={() => setShowTemplatePicker(true)}>
+        Browse Templates
+      </Button>
+      <TemplatePickerModal
+        show={showTemplatePicker}
+        onHide={() => setShowTemplatePicker(false)}
+      />
     </div>
   );
 };
