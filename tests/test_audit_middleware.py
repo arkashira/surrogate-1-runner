@@ -1,32 +1,24 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from flask import Flask, g
-from middleware.audit_middleware import audit_log_middleware
+from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
+from audit_middleware import audit_logging_middleware
 
 class TestAuditMiddleware(unittest.TestCase):
     def setUp(self):
-        self.app = Flask(__name__)
-        self.client = self.app.test_client()
+        self.app = FastAPI()
+        self.app.add_middleware(audit_logging_middleware)
+        self.client = TestClient(self.app)
 
-        @self.app.route('/test_endpoint')
-        @audit_log_middleware()
-        def test_endpoint():
-            return 'OK', 200
+    @patch('audit_middleware.audit_logger')
+    def test_audit_logging_middleware(self, mock_audit_logger):
+        mock_logger = MagicMock()
+        mock_audit_logger.return_value = mock_logger
 
-    @patch('middleware.audit_middleware.audit_logger')
-    def test_audit_log_middleware(self, mock_audit_logger):
-        with self.app.test_request_context('/test_endpoint', headers={
-            'X-Request-ID': 'test_request_id',
-            'X-Tunnel-Used': 'true'
-        }):
-            g.user = MagicMock(id='test_user_id')
-            response = self.client.get('/test_endpoint?model=test_model')
+        response = self.client.get("/", headers={"X-Service-Type": "GPT-4"})
 
-            mock_audit_logger.log_request.assert_called_once_with(
-                request_id='test_request_id',
-                user_id='test_user_id',
-                model='test_model',
-                endpoint='/test_endpoint',
-                tunnel_used=True,
-                response_status=200
-            )
+        mock_logger.log_request.assert_called_once_with("testclient", "GPT-4")
+        self.assertEqual(response.status_code, 404)
+
+if __name__ == '__main__':
+    unittest.main()
