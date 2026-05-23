@@ -1,43 +1,64 @@
 import unittest
-from datetime import datetime, timedelta
-from src.session_manager import SessionManager
+from unittest.mock import patch, MagicMock
+import json
+import os
+from session_manager import SessionManager
 
 class TestSessionManager(unittest.TestCase):
+
     def setUp(self):
-        self.session_manager = SessionManager(timeout_minutes=1)
+        self.session_manager = SessionManager()
+        self.test_session_data = {
+            'name': 'test-session',
+            'provider': 'test-provider',
+            'api_key': 'test-api-key',
+            'config': {'key': 'value'}
+        }
+        self.test_session_id = 'unique-session-id'
+        self.session_file_path = '/tmp/sessions.json'
 
-    def test_add_session(self):
-        self.session_manager.add_session('session1', 'user1', 'node1')
-        self.assertIn('session1', self.session_manager.sessions)
+    @patch('session_manager.uuid.uuid4')
+    @patch('session_manager.open', create=True)
+    def test_create_session_returns_201_with_unique_session_id(self, mock_open, mock_uuid):
+        mock_uuid.return_value = self.test_session_id
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
 
-    def test_update_activity(self):
-        self.session_manager.add_session('session1', 'user1', 'node1')
-        old_activity = self.session_manager.sessions['session1']['last_activity']
-        self.session_manager.update_activity('session1')
-        new_activity = self.session_manager.sessions['session1']['last_activity']
-        self.assertNotEqual(old_activity, new_activity)
+        response = self.session_manager.create_session(self.test_session_data)
 
-    def test_get_active_sessions(self):
-        self.session_manager.add_session('session1', 'user1', 'node1')
-        active_sessions = self.session_manager.get_active_sessions()
-        self.assertIn('session1', active_sessions)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['session_id'], self.test_session_id)
 
-        # Simulate timeout
-        self.session_manager.sessions['session1']['last_activity'] = datetime.now() - timedelta(minutes=2)
-        active_sessions = self.session_manager.get_active_sessions()
-        self.assertNotIn('session1', active_sessions)
-        self.assertEqual(self.session_manager.sessions['session1']['status'], 'timed_out')
+    @patch('session_manager.open', create=True)
+    def test_session_data_is_persisted_to_disk_in_json_format(self, mock_open):
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
 
-    def test_terminate_session(self):
-        self.session_manager.add_session('session1', 'user1', 'node1')
-        self.assertTrue(self.session_manager.terminate_session('session1'))
-        self.assertEqual(self.session_manager.sessions['session1']['status'], 'terminated')
+        self.session_manager.create_session(self.test_session_data)
 
-    def test_get_session(self):
-        self.session_manager.add_session('session1', 'user1', 'node1')
-        session = self.session_manager.get_session('session1')
-        self.assertIsNotNone(session)
-        self.assertEqual(session['user'], 'user1')
+        mock_open.assert_called_once_with(self.session_file_path, 'w')
+        mock_file.write.assert_called_once_with(json.dumps([self.test_session_data], indent=4))
+
+    @patch('session_manager.open', create=True)
+    def test_duplicate_session_names_return_409_error(self, mock_open):
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file.read.return_value = json.dumps([self.test_session_data])
+
+        response = self.session_manager.create_session(self.test_session_data)
+
+        self.assertEqual(response.status_code, 409)
+
+    @patch('session_manager.open', create=True)
+    def test_created_session_appears_in_get_sessions_list(self, mock_open):
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file.read.return_value = json.dumps([self.test_session_data])
+
+        self.session_manager.create_session(self.test_session_data)
+        sessions = self.session_manager.get_sessions()
+
+        self.assertIn(self.test_session_data, sessions)
 
 if __name__ == '__main__':
     unittest.main()
