@@ -1,143 +1,146 @@
-import logging
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
-import time
-import json
-from collections import defaultdict
+"""
+Error analysis and recovery utilities for the surrogate-1 parser.
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+This module provides:
+* A decorator `recoverable` that wraps parsing functions to catch common
+  parsing errors, log them with context, and return `None` for the failed
+  record instead of raising.
+* Helper functions to identify, log, and attempt simple recovery from
+  common errors such as missing keys, type mismatches, and malformed JSON.
+* A small recovery strategy that can be extended by the caller.
+
+The goal is to allow the parser to continue processing a stream of
+records without losing the rest of the data.
+"""
+
+import json
+import logging
+import re
+from functools import wraps
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TypeVar
+
+# Configure a module-level logger. In production this should be
+# configured by the application entry point, but we provide a sane
+# default for tests and standalone usage.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
-@dataclass
-class ErrorScenario:
-    error_type: str
-    description: str
-    recovery_options: List[str]
-    frequency: int = 0
+T = TypeVar("T")
 
-class ErrorAnalyzer:
-    def __init__(self):
-        self.error_scenarios = {
-            "malformed_json": ErrorScenario(
-                error_type="Malformed JSON",
-                description="The input data is not valid JSON.",
-                recovery_options=[
-                    "Skip the malformed record and continue processing.",
-                    "Log the error and retry with a corrected input.",
-                ],
-            ),
-            "missing_required_field": ErrorScenario(
-                error_type="Missing Required Field",
-                description="A required field is missing in the input data.",
-                recovery_options=[
-                    "Skip the record and continue processing.",
-                    "Log the error and notify the data provider.",
-                ],
-            ),
-            "invalid_data_type": ErrorScenario(
-                error_type="Invalid Data Type",
-                description="The data type of a field is invalid.",
-                recovery_options=[
-                    "Convert the data type if possible.",
-                    "Skip the record and continue processing.",
-                ],
-            ),
-            "network_timeout": ErrorScenario(
-                error_type="Network Timeout",
-                description="A network request timed out.",
-                recovery_options=[
-                    "Retry the request with exponential backoff.",
-                    "Log the error and continue processing.",
-                ],
-            ),
-            "rate_limit_exceeded": ErrorScenario(
-                error_type="Rate Limit Exceeded",
-                description="The API rate limit has been exceeded.",
-                recovery_options=[
-                    "Wait for the rate limit to reset.",
-                    "Distribute requests more evenly over time.",
-                ],
-            ),
-            "authentication_failed": ErrorScenario(
-                error_type="Authentication Failed",
-                description="Authentication credentials are invalid or missing.",
-                recovery_options=[
-                    "Verify and update the authentication credentials.",
-                    "Log the error and stop processing until credentials are corrected.",
-                ],
-            ),
-            "data_integrity_check_failed": ErrorScenario(
-                error_type="Data Integrity Check Failed",
-                description="The data failed an integrity check.",
-                recovery_options=[
-                    "Skip the record and continue processing.",
-                    "Log the error and notify the data provider.",
-                ],
-            ),
-            "unsupported_operation": ErrorScenario(
-                error_type="Unsupported Operation",
-                description="An unsupported operation was attempted.",
-                recovery_options=[
-                    "Skip the operation and continue processing.",
-                    "Log the error and notify the system administrator.",
-                ],
-            ),
-        }
-        self.error_stats = defaultdict(int)
 
-    def analyze_error(self, error_message: str) -> Optional[ErrorScenario]:
-        for error_type, scenario in self.error_scenarios.items():
-            if error_type in error_message.lower():
-                self.error_stats[error_type] += 1
-                return scenario
-        return None
+# --------------------------------------------------------------------------- #
+# Common error identification utilities
+# --------------------------------------------------------------------------- #
+def identify_error(e: Exception) -> str:
+    """
+    Return a human‑readable description of the error type.
+    """
+    if isinstance(e, json.JSONDecodeError):
+        return "Malformed JSON"
+    if isinstance(e, KeyError):
+        return f"Missing key: {e.args[0]}"
+    if isinstance(e, ValueError):
+        return f"Value error: {e}"
+    if isinstance(e, TypeError):
+        return f"Type error: {e}"
+    return f"Unhandled exception: {type(e).__name__}"
 
-    def get_common_errors(self, threshold: int = 5) -> List[Tuple[str, int]]:
-        return [(error_type, count) for error_type, count in self.error_stats.items() if count >= threshold]
 
-    def log_error(self, error_message: str) -> None:
-        scenario = self.analyze_error(error_message)
-        if scenario:
-            logger.error(f"Error detected: {scenario.error_type} - {scenario.description}")
-            logger.info(f"Recovery options: {', '.join(scenario.recovery_options)}")
-        else:
-            logger.error(f"Unknown error detected: {error_message}")
+def log_error(e: Exception, context: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Log the error with context information.
+    """
+    msg = f"Parsing error: {identify_error(e)}"
+    if context:
+        msg += f" | Context: {context}"
+    logger.error(msg, exc_info=e)
 
-    def process_data_stream(self, data_stream: List[Dict]) -> None:
-        start_time = time.time()
-        for record in data_stream:
-            try:
-                # Simulate processing the record
-                self.process_record(record)
-            except Exception as e:
-                self.log_error(str(e))
-        end_time = time.time()
-        logger.info(f"Processing time: {end_time - start_time} seconds")
 
-    def process_record(self, record: Dict) -> None:
-        # Simulate processing a record
-        pass
+# --------------------------------------------------------------------------- #
+# Recovery strategies
+# --------------------------------------------------------------------------- #
+def recover_missing_key(data: Dict[str, Any], key: str, default: Any = None) -> Dict[str, Any]:
+    """
+    If a required key is missing, insert a default value.
+    """
+    if key not in data:
+        logger.warning(f"Missing key '{key}'. Inserting default value: {default}")
+        data[key] = default
+    return data
 
-    def generate_error_report(self) -> Dict:
-        return {
-            "error_stats": dict(self.error_stats),
-            "common_errors": self.get_common_errors(),
-            "total_errors": sum(self.error_stats.values()),
-        }
 
-def main():
-    analyzer = ErrorAnalyzer()
-    # Simulate a data stream
-    data_stream = [
-        {"data": "valid_data"},
-        {"data": "invalid_data"},
-        {"data": "missing_field"},
-        {"data": "invalid_type"},
-    ]
-    analyzer.process_data_stream(data_stream)
-    report = analyzer.generate_error_report()
-    print(json.dumps(report, indent=2))
+def recover_type_mismatch(value: Any, expected_type: type, default: Any = None) -> Any:
+    """
+    Attempt to coerce a value to the expected type. If coercion fails,
+    return a default.
+    """
+    try:
+        return expected_type(value)
+    except Exception:
+        logger.warning(
+            f"Type mismatch: cannot convert {value!r} to {expected_type.__name__}. "
+            f"Using default {default!r}"
+        )
+        return default
 
-if __name__ == "__main__":
-    main()
+
+# --------------------------------------------------------------------------- #
+# Decorator for recoverable parsing functions
+# --------------------------------------------------------------------------- #
+def recoverable(parser_func: Callable[..., T]) -> Callable[..., Optional[T]]:
+    """
+    Decorator that wraps a parsing function to catch common errors,
+    log them, and return None instead of propagating the exception.
+
+    The wrapped function should accept a single argument `record` (dict)
+    and return a parsed object or raise an exception on failure.
+    """
+
+    @wraps(parser_func)
+    def wrapper(record: Dict[str, Any]) -> Optional[T]:
+        try:
+            return parser_func(record)
+        except Exception as e:
+            log_error(e, context={"record_id": record.get("id")})
+            # Attempt simple recovery for known error types
+            if isinstance(e, KeyError):
+                # Insert missing key with None and retry
+                missing_key = e.args[0]
+                record = recover_missing_key(record, missing_key)
+                try:
+                    return parser_func(record)
+                except Exception as retry_e:
+                    log_error(retry_e, context={"record_id": record.get("id")})
+            elif isinstance(e, ValueError):
+                # Try to coerce problematic fields if possible
+                # (Assuming parser_func uses a known schema; this is a placeholder)
+                pass
+            # If recovery fails, return None to signal a skipped record
+            return None
+
+    return wrapper
+
+
+# --------------------------------------------------------------------------- #
+# Example usage: process a stream of records
+# --------------------------------------------------------------------------- #
+def process_records(
+    records: Iterable[Dict[str, Any]],
+    parser_func: Callable[[Dict[str, Any]], T],
+) -> List[Tuple[Optional[T], Dict[str, Any]]]:
+    """
+    Process an iterable of raw records, applying the parser_func to each.
+    Returns a list of tuples (parsed_object_or_None, original_record).
+    Records that fail to parse are logged and skipped (None returned).
+    """
+    wrapped_parser = recoverable(parser_func)
+    results: List[Tuple[Optional[T], Dict[str, Any]]] = []
+
+    for record in records:
+        parsed = wrapped_parser(record)
+        results.append((parsed, record))
+
+    return results
