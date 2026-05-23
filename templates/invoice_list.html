@@ -1,0 +1,32 @@
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Invoices</h1>
+  <form method="GET" action="{% url 'invoice_list' %}">
+    <input type="text" name="vendor" placeholder="Vendor" value="{{ vendor_filter }}">
+    <input type="text" name="date" placeholder="Date" value="{{ date_filter }}">
+    <input type="text" name="amount" placeholder="Amount" value="{{ amount_filter }}">
+    <input type="submit" value="Filter">
+  </form>
+  <ul>
+    {% for invoice in invoices %}
+      <li>
+        <h2>{{ invoice.vendor }}</h2>
+        <p>Date: {{ invoice.date }}</p>
+        <p>Amount: {{ invoice.amount }}</p>
+        <p>Status: {{ invoice.paid }}</p>
+        <p>Notes: {{ invoice.notes }}</p>
+        <form method="POST" action="{% url 'invoice_update' invoice.id %}">
+          {% csrf_token %}
+          <input type="checkbox" name="paid" {% if invoice.paid %}checked{% endif %}>
+          <label for="paid">Paid</label>
+          <textarea name="notes">{{ invoice.notes }}</textarea>
+          <input type="submit" value="Update">
+        </form>
+      </li>
+    {% empty %}
+      No invoices found.
+    {% endfor %}
+  </ul>
+{% endblock %}
