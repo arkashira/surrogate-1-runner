@@ -1,17 +1,24 @@
+name: Format Code
 
-# Quick Start Guide for surrogate-1
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-This guide provides a step-by-step process to set up and run the surrogate-1 sidecar alongside your test suite, with a focus on debugging flaky CI runs.
+jobs:
+  format:
+    runs-on: ubuntu-latest
 
-## Prerequisites
-
-- A GitHub account
-- A repository containing your project
-- Docker installed on your machine
-
-## Setup
-
-1. Navigate to your repository on GitHub
-2. Click on `Actions` in the left sidebar
-3. Click on `Set up a workflow yourself`
-4. Paste the following YAML workflow file into the text area:
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install surrogate
+    - name: Run surrogate format
+      run: surrogate format
