@@ -1,95 +1,101 @@
-import json
+from fastapi import APIRouter, Request, HTTPException, Header
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional
+import logging
 import time
-from typing import List, Dict, Any, Optional
-
-from fastapi import APIRouter, Request, Response, status, Query
-from pydantic import BaseModel, Field, validator
 
 router = APIRouter()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ---------- Pydantic models ----------
-class MetricPoint(BaseModel):
-    metric: str = Field(..., description="Metric name, e.g. `my.app.latency`")
-    points: List[List[float]] = Field(
-        ..., description="[[timestamp, value], …] – timestamp is epoch seconds"
-    )
-    tags: List[str] = Field(default_factory=list, description="Datadog tags")
-
-    @validator("points")
-    def _check_points(cls, v):
-        if not all(isinstance(p, list) and len(p) == 2 for p in v):
-            raise ValueError("Each point must be a [timestamp, value] list")
-        return v
+# Mock Datadog API key for validation
+VALID_API_KEY = "1234567890abcdef1234567890abcdef"
 
 
-class SubmitMetricsRequest(BaseModel):
-    series: List[MetricPoint] = Field(..., description="List of metric series")
+# ============== Data Models (from Candidate 2's strength) ==============
+class DatadogMetricPoint(BaseModel):
+    """Represents a single metric data point"""
+    timestamp: int = Field(..., description="Unix timestamp")
+    value: float = Field(..., description="Metric value")
 
 
-# ---------- Helpers ----------
-def _simulate_latency() -> None:
-    """Tiny delay to make the mock feel realistic without hurting startup time."""
-    time.sleep(0.01)
+class DatadogMetricSeries(BaseModel):
+    """Represents a metric series in Datadog's format"""
+    metric: str = Field(..., min_length=1, description="Metric name")
+    points: List[DatadogMetricPoint] = Field(..., min_length=1, description="List of metric points")
+    tags: Optional[List[str]] = Field(default=None, description="Metric tags")
+    type: str = Field(default="gauge", description="Metric type (gauge, count, rate)")
+    host: Optional[str] = Field(default=None, description="Host name")
 
 
-# ---------- Endpoints ----------
-@router.post(
-    "/api/v1/series",
-    status_code=status.HTTP_202_ACCEPTED,
-    summary="Mock Datadog metric ingestion endpoint",
-    response_model=Dict[str, str],
-)
-async def submit_metrics(request: Request) -> Response:
+class DatadogMetricsRequest(BaseModel):
+    """Request body for metrics API"""
+    series: List[DatadogMetricSeries] = Field(..., min_length=1, description="List of metric series")
+
+
+# ============== API Endpoints ==============
+@router.post("/api/v1/metrics")
+async def post_metrics(request: Request, dd_api_key: str = Header(None)):
     """
-    Accept a batch of metric series and pretend to ingest them.
-    Returns **202 Accepted** with a tiny JSON payload so callers can
-    verify they received a proper response.
+    Handle POST /api/v1/metrics
+    
+    Validates API key and metric payload, returns 202 Accepted on success.
     """
-    _simulate_latency()
+    # ---- API Key Validation (from Candidate 1) ----
+    if dd_api_key != VALID_API_KEY:
+        logger.info(f"POST /api/v1/metrics - 401 Unauthorized - Invalid API key")
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    
+    # ---- Parse and Validate Payload (from Candidate 2's strength) ----
     try:
-        payload: Dict[str, Any] = await request.json()
-        # Let Pydantic do the heavy lifting
-        SubmitMetricsRequest(**payload)
-    except Exception as exc:
-        return Response(
-            content=json.dumps({"error": str(exc)}),
-            media_type="application/json",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
-    return Response(
-        content=json.dumps({"status": "queued"}),
-        media_type="application/json",
-        status_code=status.HTTP_202_ACCEPTED,
+        body = await request.json()
+        metrics_request = DatadogMetricsRequest(**body)
+    except Exception as e:
+        logger.info(f"POST /api/v1/metrics - 400 Bad Request - {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {str(e)}")
+    
+    # ---- Process Metrics (additional validation) ----
+    for idx, series in enumerate(metrics_request.series):
+        if not series.metric or not series.metric.strip():
+            logger.info(f"POST /api/v1/metrics - 400 Bad Request - Empty metric name at index {idx}")
+            raise HTTPException(status_code=400, detail=f"series[{idx}].metric is required")
+        
+        if not series.points:
+            logger.info(f"POST /api/v1/metrics - 400 Bad Request - Empty points at index {idx}")
+            raise HTTPException(status_code=400, detail=f"series[{idx}].points is required")
+    
+    # ---- Success Response (202 Accepted per requirements) ----
+    logger.info(f"POST /api/v1/metrics - 202 Accepted - {len(metrics_request.series)} series processed")
+    
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "accepted",
+            "series_count": len(metrics_request.series),
+            "processed_at": int(time.time())
+        }
     )
 
 
-@router.get(
-    "/api/v1/query",
-    summary="Mock Datadog metric query endpoint",
-    response_model=Dict[str, Any],
-)
-async def query_metrics(
-    from_ts: int = Query(..., alias="from", description="Start epoch seconds"),
-    to: int = Query(..., description="End epoch seconds"),
-    query: str = Query(..., description="Datadog‑style query string"),
-) -> Response:
+@router.get("/api/v1/metrics")
+async def get_metrics(dd_api_key: str = Header(None)):
     """
-    Return a deterministic empty time‑series result.
-    The shape matches Datadog’s real API so downstream code can parse it unchanged.
+    Handle GET /api/v1/metrics - Returns sample metrics
     """
-    _simulate_latency()
-    result = {
-        "status": "ok",
-        "res_type": "time_series",
-        "series": [],
-        "from": from_ts,
-        "to": to,
-        "query": query,
+    if dd_api_key != VALID_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    
+    return {
+        "series": [
+            {
+                "metric": "system.load.1",
+                "points": [{"timestamp": int(time.time()), "value": 0.5}],
+                "tags": ["host:example"],
+                "type": "gauge",
+                "host": "example"
+            }
+        ]
     }
-    return Response(
-        content=json.dumps(result),
-        media_type="application/json",
-        status_code=status.HTTP_200_OK,
-    )
