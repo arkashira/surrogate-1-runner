@@ -1,0 +1,7 @@
+{
+    "thresholds": {
+        "service1": 100.0,
+        "service2": 200.0
+    },
+    "alerts": []
+}

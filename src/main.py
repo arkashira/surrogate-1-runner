@@ -1,11 +1,23 @@
-from forecasting import ForecastModel
+import json
+from cost_alerts import CostAlert
 
 def main():
-    historical_data = [100, 105, 110, 115, 120, 125, 130, 135, 140, 145]
-    model = ForecastModel(historical_data)
-    model.train()
-    forecast = model.predict(30)
-    model.plot_forecast(forecast)
+    cost_alert = CostAlert()
 
-if __name__ == '__main__':
+    # Example usage
+    cost_alert.set_threshold("service3", 300.0)
+
+    current_costs = {
+        "service1": 150.0,
+        "service2": 250.0,
+        "service3": 350.0
+    }
+
+    alerts = cost_alert.check_costs(current_costs)
+    print("Alerts:", alerts)
+
+    recent_alerts = cost_alert.get_alerts(hours=1)
+    print("Recent Alerts:", recent_alerts)
+
+if __name__ == "__main__":
     main()
