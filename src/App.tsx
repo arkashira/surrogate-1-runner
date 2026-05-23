@@ -1,17 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
-import { SurrogateProvider } from './contexts/SurrogateContext';
+import RootCauseView from './components/RootCauseView';
 
 const App: React.FC = () => {
   return (
-    <SurrogateProvider>
-      <Router>
-        <Switch>
-          <Route path="/" component={Dashboard} />
-        </Switch>
-      </Router>
-    </SurrogateProvider>
+    <Router>
+      <Switch>
+        <Route path="/alerts/:alertId/root-cause" component={RootCauseView} />
+        {/* Other routes */}
+      </Switch>
+    </Router>
   );
 };
 

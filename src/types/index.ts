@@ -1,9 +1,8 @@
-export interface Finding {
-  id: string;
-  title: string;
-  rule: string;
-  severity: string;
+export type TimeRange = 'lastHour' | 'lastDay';
+
+export interface ResourceBreakdown {
   resourceType: string;
-  date: string;
-  description: string;
+  cost: number;
+  percentage: number;
+  resourceId: string;
 }

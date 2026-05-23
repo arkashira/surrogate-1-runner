@@ -1,14 +1,16 @@
 import axios from 'axios';
-import { Finding } from '../types';
+import { ResourceBreakdown, TimeRange } from '../types';
 
-const API_BASE_URL = 'https://api.example.com';
+const API_BASE_URL = 'https://api.axentx.com';
 
-export const getFindings = async (): Promise<Finding[]> => {
-  const response = await axios.get(`${API_BASE_URL}/findings`);
-  return response.data;
-};
-
-export const getFindingById = async (id: string): Promise<Finding> => {
-  const response = await axios.get(`${API_BASE_URL}/findings/${id}`);
-  return response.data;
+export const fetchRootCauseData = async (alertId: string, timeRange: TimeRange): Promise<ResourceBreakdown[]> => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/alerts/${alertId}/root-cause`, {
+      params: { timeRange },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch root cause data:', error);
+    throw error;
+  }
 };
