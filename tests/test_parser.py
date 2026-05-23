@@ -1,17 +1,18 @@
 import unittest
-from parser import parse_data
-from error_handling import handle_error
+from io import BytesIO
+from src.parser import parse_stream, parse_string
 
-class TestParser(unittest.TestCase):
-    def test_parse_data(self):
-        # test parsing logic here
-        pass
+class TestStreamParser(unittest.TestCase):
+    def test_parse_small_input(self):
+        data = "small input data"
+        result = parse_string(data)
+        self.assertEqual(result, data.encode('utf-8'))
 
-    def test_handle_error(self):
-        # test error handling logic here
-        e = Exception("Test error")
-        result = handle_error(e, "Test context")
-        self.assertIn("Test error", result)
+    def test_parse_large_input(self):
+        large_data = "A" * (10 * 1024 * 1024)  # 10 MB
+        stream = BytesIO(large_data.encode('utf-8'))
+        result = parse_stream(stream)
+        self.assertEqual(result, large_data.encode('utf-8'))
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
