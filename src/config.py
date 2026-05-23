@@ -1,12 +1,20 @@
 import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()  # Load .env in dev
+# ----------------------------------------------------------------------
+# Telemetry
+# ----------------------------------------------------------------------
+TELEMETRY_DIR = Path(
+    os.getenv("AXENTX_TELEMETRY_DIR", "/var/log/axentx/telemetry")
+)
+TELEMETRY_DIR.mkdir(parents=True, exist_ok=True)
 
-class Config:
-    FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret")
-    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
-    STRIPE_CLIENT_ID = os.getenv("STRIPE_CLIENT_ID")
-    STRIPE_CLIENT_SECRET = os.getenv("STRIPE_CLIENT_SECRET")
-    DATA_LAKE_PATH = os.getenv("DATA_LAKE_PATH", "/data/stripe")
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+PERF_LOG_REPORT_INTERVAL = float(
+    os.getenv("PERF_LOG_REPORT_INTERVAL", "60")  # seconds
+)
+
+# ----------------------------------------------------------------------
+# Throttling
+# ----------------------------------------------------------------------
+THROTTLE_REFRESH_HZ = int(os.getenv("AXENTX_THROTTLE_REFRESH_HZ", "120"))
+THROTTLE_FACTOR = float(os.getenv("AXENTX_THROTTLE_FACTOR", "0.5"))  # 0‑1 scale
