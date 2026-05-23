@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://axentx.com/schemas/operating_mode/v1.0/schema.json",
+  "title": "IEC 61850 Operating Mode Schema",
+  "description": "Versioned JSON schema (v1.0) representing the 10 IEC 61850 logical nodes required for operating‑mode representation.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "LN0": { "$ref": "#/definitions/logicalNode" },
+    "LN1": { "$ref": "#/definitions/logicalNode" },
+    "LN2": { "$ref": "#/definitions/logicalNode" },
+    "LN3": { "$ref": "#/definitions/logicalNode" },
+    "LN4": { "$ref": "#/definitions/logicalNode" },
+    "LN5": { "$ref": "#/definitions/logicalNode" },
+    "LN6": { "$ref": "#/definitions/logicalNode" },
+    "LN7": { "$ref": "#/definitions/logicalNode" },
+    "LN8": { "$ref": "#/definitions/logicalNode" },
+    "LN9": { "$ref": "#/definitions/logicalNode" }
+  },
+  "required": ["LN0", "LN1", "LN2", "LN3", "LN4", "LN5", "LN6", "LN7", "LN8", "LN9"],
+  "definitions": {
+    "logicalNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["automatic", "manual", "standby"]
+        },
+        "status": {
+          "type": "boolean"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["mode", "status", "timestamp"]
+    }
+  }
+}
