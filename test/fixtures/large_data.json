@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": "1",
+      "text": "This is a sample text entry in a very large JSON file. It contains multiple entries to test the parser's ability to handle large inputs efficiently.",
+      "metadata": {
+        "source": "sample",
+        "timestamp": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "2",
+      "text": "Another sample text entry. This one is slightly longer to ensure the parser can handle varying lengths of text data.",
+      "metadata": {
+        "source": "sample",
+        "timestamp": "2023-01-01T00:00:01Z"
+      }
+    },
+    // Add more entries to make the file large enough (1GB+)
+    // ...
+  ]
+}
