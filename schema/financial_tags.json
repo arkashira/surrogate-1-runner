@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Financial Tags Schema",
+  "type": "object",
+  "properties": {
+    "revenue": {
+      "type": ["number", "null"],
+      "description": "Extracted revenue amount in USD"
+    },
+    "expense": {
+      "type": ["number", "null"],
+      "description": "Extracted expense amount in USD"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["cloud_infrastructure"],
+      "description": "Type of source system"
+    },
+    "extracted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of extraction"
+    },
+    "error": {
+      "type": ["string", "null"],
+      "description": "Error message if extraction failed"
+    },
+    "validation_error": {
+      "type": ["string", "null"],
+      "description": "Schema validation error message"
+    }
+  },
+  "required": ["source_type", "extracted_at"],
+  "additionalProperties": false
+}
