@@ -1,5 +1,2 @@
-gpt4:
-  api_key: ${GPT4_API_KEY}
-  validation:
-    required: true
-    pattern: ^[a-zA-Z0-9_-]{32}$
+> source "$(dirname "$0")/load_config.sh"
+>
