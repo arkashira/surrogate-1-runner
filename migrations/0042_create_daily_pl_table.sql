@@ -1,0 +1,5 @@
+CREATE TABLE daily_pl (
+    id SERIAL PRIMARY KEY,
+    date DATE NOT NULL UNIQUE,
+    pl DECIMAL(10, 2) NOT NULL
+);
