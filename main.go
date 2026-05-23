@@ -1,24 +1,19 @@
+
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/axentx/surrogate-1/pkg/metrics"
+	"github.com/gorilla/mux"
+	"github.com/axentx/surrogate-1/pkg/api"
 )
 
 func main() {
-	mux := metrics.NewExporter().ServeMux()
-	http.Handle("/metrics", mux)
+	router := mux.NewRouter()
+	router.Use(api.ErrorHandler)
 
-	go func() {
-		for {
-			metrics.Collect(context.Background())
-			time.Sleep(1 * time.Second)
-		}
-	}()
+	router.HandleFunc("/api/v1/gpu", api.AllocateGPU).Methods("GET")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
