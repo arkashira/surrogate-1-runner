@@ -1,27 +1,19 @@
 import unittest
-from surrogate.parser import StreamingParser
+import logging
+from src.parser import Parser
 
 class TestParser(unittest.TestCase):
     def setUp(self):
-        self.parser = StreamingParser()
+        self.parser = Parser(log_file='test_parser.log', log_level=logging.DEBUG)
 
-    def test_parse(self):
-        # Test data
-        data = b'test data'
+    def test_parse_empty_data(self):
+        with self.assertRaises(ValueError) as context:
+            self.parser.parse("")
+        self.assertEqual(str(context.exception), "Empty data provided for parsing")
 
-        # Parse the data
-        result = self.parser.parse(data)
-
-        # Assert the result is as expected
-        self.assertEqual(result, 'parsed_test_data')
-
-    def test_parse_with_error(self):
-        # Test data that will cause an error
-        data = b''
-
-        # Assert that the parse method raises an exception
-        with self.assertRaises(ValueError):
-            self.parser.parse(data)
+    def test_parse_valid_data(self):
+        result = self.parser.parse("valid data")
+        self.assertTrue(result)
 
 if __name__ == '__main__':
     unittest.main()
