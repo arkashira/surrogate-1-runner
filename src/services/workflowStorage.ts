@@ -1,24 +1,32 @@
-import { EncryptionService } from './encryptionService';
+import { Workflow } from './types/workflow';
+import * as LocalForage from 'localforage';
 
-export class WorkflowStorage {
-  private encryptionService: EncryptionService;
-  private storage: Storage;
+class WorkflowStorage {
+  private db: LocalForage;
 
-  constructor(key: string, iv: string) {
-    this.encryptionService = new EncryptionService(key, iv);
-    this.storage = localStorage;
+  constructor() {
+    this.db = LocalForage.createInstance({
+      name: 'workflows',
+    });
   }
 
-  saveWorkflow(workflow: string): void {
-    const encryptedWorkflow = this.encryptionService.encrypt(workflow);
-    this.storage.setItem('workflow', encryptedWorkflow);
+  async saveWorkflow(workflow: Workflow): Promise<void> {
+    await this.db.set(workflow.id, workflow);
   }
 
-  getWorkflow(): string {
-    const encryptedWorkflow = this.storage.getItem('workflow');
-    if (encryptedWorkflow) {
-      return this.encryptionService.decrypt(encryptedWorkflow);
-    }
-    return '';
+  async getWorkflow(id: string): Promise<Workflow | null> {
+    return await this.db.get(id);
+  }
+
+  async deleteWorkflow(id: string): Promise<void> {
+    await this.db.removeItem(id);
+  }
+
+  async getAllWorkflows(): Promise<Workflow[]> {
+    const keys = await this.db.keys();
+    const workflows: Workflow[] = await Promise.all(keys.map((key) => this.db.get(key)));
+    return workflows;
   }
 }
+
+export default new WorkflowStorage();
