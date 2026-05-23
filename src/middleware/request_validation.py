@@ -1,43 +1,44 @@
-from flask import request, jsonify
-from functools import wraps
+import os
+from fastapi import Request, HTTPException, status
 
-def validate_component_filters(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        brand = request.args.get('brand')
-        min_price = request.args.get('min_price')
-        max_price = request.args.get('max_price')
-        min_benchmark = request.args.get('min_benchmark')
+# ----------------------------------------------------------------------
+# Configuration
+# ----------------------------------------------------------------------
+# The API key is taken from the environment – never commit a real key.
+DATADOG_API_KEY = os.getenv("DATADOG_API_KEY", "fallback-for-local-dev")
 
-        if brand and not isinstance(brand, str):
-            return jsonify({'error': 'Brand must be a string'}), 400
+# ----------------------------------------------------------------------
+# Individual validators
+# ----------------------------------------------------------------------
+async def _validate_api_key(request: Request) -> None:
+    """Raise 401 if the X‑API‑KEY header is missing or wrong."""
+    api_key = request.headers.get("X-API-KEY")
+    if not api_key or api_key != DATADOG_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
 
-        if min_price:
-            try:
-                min_price = float(min_price)
-                if min_price < 0:
-                    return jsonify({'error': 'Minimum price must be a positive number'}), 400
-            except ValueError:
-                return jsonify({'error': 'Minimum price must be a number'}), 400
+async def _validate_content_type(request: Request) -> None:
+    """Raise 415 if the request is not JSON."""
+    content_type = request.headers.get("Content-Type")
+    if not content_type or content_type != "application/json":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Content-Type must be application/json",
+        )
 
-        if max_price:
-            try:
-                max_price = float(max_price)
-                if max_price < 0:
-                    return jsonify({'error': 'Maximum price must be a positive number'}), 400
-            except ValueError:
-                return jsonify({'error': 'Maximum price must be a number'}), 400
+# ----------------------------------------------------------------------
+# Middleware entry point
+# ----------------------------------------------------------------------
+async def request_validation_middleware(request: Request, call_next):
+    """
+    FastAPI “http” middleware that runs the two checks before the request
+    reaches any route handler.
+    """
+    await _validate_api_key(request)
+    await _validate_content_type(request)
 
-        if min_benchmark:
-            try:
-                min_benchmark = float(min_benchmark)
-                if min_benchmark < 0:
-                    return jsonify({'error': 'Minimum benchmark score must be a positive number'}), 400
-            except ValueError:
-                return jsonify({'error': 'Minimum benchmark score must be a number'}), 400
-
-        if min_price and max_price and min_price > max_price:
-            return jsonify({'error': 'Minimum price cannot be greater than maximum price'}), 400
-
-        return f(*args, **kwargs)
-    return decorated_function
+    # If we get here the request is authorised and correctly typed.
+    response = await call_next(request)
+    return response
