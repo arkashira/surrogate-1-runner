@@ -1,14 +1,20 @@
-from prometheus_client import Counter, Histogram
+from prometheus_client import Gauge, start_http_server
+import psutil
+import time
 
-# Create a histogram to track ingestion duration
-INGESTION_DURATION = Histogram(
-    'ingestion_duration_seconds',
-    'Time spent processing ingestion',
-    buckets=[0.1, 0.5, 1, 2.5, 5, 10, 15, 20, 30, 60, 120, 180, 300, 600]
-)
+# Create a gauge metric for memory usage
+memory_usage = Gauge('surrogate_parser_memory_bytes', 'Memory usage of the parser in bytes')
 
-# Create a counter to track ingestion failures
-INGESTION_FAILURES = Counter(
-    'ingestion_failures_total',
-    'Total number of ingestion failures'
-)
+def update_metrics():
+    while True:
+        # Get the current process memory usage
+        process = psutil.Process()
+        mem_info = process.memory_info()
+        memory_usage.set(mem_info.rss)
+
+        # Sleep for 5 seconds
+        time.sleep(5)
+
+# Start the Prometheus HTTP server on port 8000
+start_http_server(8000)
+update_metrics()

@@ -1,10 +1,14 @@
-from fastapi import FastAPI
-from src.api.transcription import router as transcription_router
+import threading
+from metrics import update_metrics
 
-app = FastAPI()
+def main():
+    # Start the metrics update thread
+    metrics_thread = threading.Thread(target=update_metrics)
+    metrics_thread.daemon = True
+    metrics_thread.start()
 
-app.include_router(transcription_router)
+    # Your existing code here
+    # ...
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    main()
