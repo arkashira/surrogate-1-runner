@@ -1,2 +1,9 @@
-// Centralised configuration for the CostAlert feature
-export const ALERT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+export const config = {
+  get(key: string): any {
+    // Implement config getter logic
+    const defaultConfig = {
+      'parser.streaming.enabled': true
+    };
+    return defaultConfig[key] || process.env[key.toUpperCase()];
+  }
+};

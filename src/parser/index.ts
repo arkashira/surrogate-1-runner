@@ -1,9 +1,18 @@
+import { config } from '../config';
 import { StreamingParser } from './streaming';
+import { LegacyBatchParser } from './legacy';
 
 export class Parser {
-  async parse(): Promise<void> {
-    throw new Error('Not implemented');
+  private parser: StreamingParser | LegacyBatchParser;
+
+  constructor() {
+    const isStreamingEnabled = config.get('parser.streaming.enabled') ||
+                              process.env.PARSER_STREAMING_ENABLED === 'true';
+
+    this.parser = isStreamingEnabled ? new StreamingParser() : new LegacyBatchParser();
+  }
+
+  public parse(data: string): any {
+    return this.parser.parse(data);
   }
 }
-
-export { StreamingParser };
