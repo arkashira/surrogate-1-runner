@@ -1,30 +1,22 @@
-import logging
-from logging.handlers import RotatingFileHandler
+from .streaming import StreamBuffer
 
 class Parser:
-    def __init__(self, log_file='parser.log', log_level=logging.INFO):
-        self.logger = logging.getLogger('Parser')
-        self.logger.setLevel(log_level)
+    def __init__(self, input_stream):
+        self.input_stream = input_stream
 
-        # Create a rotating file handler
-        handler = RotatingFileHandler(log_file, maxBytes=1024*1024, backupCount=5)
-        handler.setLevel(log_level)
+    def parse(self):
+        stream_buffer = StreamBuffer()
+        for chunk in self.input_stream:
+            for sub_chunk in stream_buffer.write(chunk):
+                # Process each sub_chunk here
+                print(f"Parsing chunk: {sub_chunk}")
+        stream_buffer.close()
+        for remaining in stream_buffer:
+            print(f"Parsing remaining: {remaining}")
 
-        # Create a formatter and set it for the handler
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-
-        # Add the handler to the logger
-        self.logger.addHandler(handler)
-
-    def parse(self, data):
-        try:
-            # Simulate parsing operation
-            if not data:
-                raise ValueError("Empty data provided for parsing")
-            # Add your parsing logic here
-            self.logger.info("Parsing operation completed successfully")
-            return True
-        except Exception as e:
-            self.logger.error(f"Error during parsing: {str(e)}")
-            raise
+# Example usage
+if __name__ == "__main__":
+    # Simulate a large input stream
+    large_input = io.BytesIO(b'x' * 10 * 1024 * 1024 * 1024)  # 10GB of 'x'
+    parser = Parser(large_input)
+    parser.parse()
