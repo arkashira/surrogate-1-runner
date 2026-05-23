@@ -1,0 +1,44 @@
+name: HelmGuard
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+
+jobs:
+  helmguard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run HelmGuard
+        id: helmguard
+        uses: helmguard/helmguard-action@v1
+        with:
+          # Path to the primary values file relative to the repo root
+          values-file: 'values.yaml'
+          # Optional path to an extra values file; leave empty if not used
+          extra-values-file: ''
+
+      - name: Comment token report
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'helmguard-report.txt';
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              const body = `### HelmGuard Token Report\n\`\`\`\n${report}\n\`\`\``;
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              console.log('No HelmGuard report found.');
+            }
