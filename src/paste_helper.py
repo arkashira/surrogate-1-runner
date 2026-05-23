@@ -1,123 +1,148 @@
-import os
-import logging
-import threading
-import time
-from typing import Callable, Any
+"""
+paste_helper.py
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+Utility helpers for performing clipboard-paste operations during CI runs.
+
+The module provides a thin wrapper around `subprocess.run` that:
+  * Executes the supplied paste command (e.g. `pbpaste` on macOS).
+  * Logs a warning if the command fails due to a timeout or a non-zero
+    exit status.
+  * Sets the environment variable `PASTE_CASCADE_DETECTED` to `"1"`
+    when such a failure is observed, allowing downstream steps to react.
+
+The implementation is deliberately lightweight and has no external
+dependencies beyond the Python standard library.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import platform
+import subprocess
+from typing import List, Optional
+
+# --------------------------------------------------------------------------- #
+# Logging configuration – the caller (CI runner) is expected to configure the
+# root logger.  We obtain a module-level logger for fine-grained control.
+# --------------------------------------------------------------------------- #
 logger = logging.getLogger(__name__)
 
-# Environment flag used by downstream CI steps
-PASTE_CASCADE_ENV_VAR = "PASTE_CASCADE_DETECTED"
+# --------------------------------------------------------------------------- #
+# Public API
+# --------------------------------------------------------------------------- #
+__all__ = ["run_paste", "PASTE_CASCADE_DETECTED"]
 
-class PasteTimeoutError(RuntimeError):
-    """Raised when a paste operation exceeds the allowed time."""
 
-def _run_with_timeout(func: Callable, timeout: float, *args, **kwargs) -> Any:
+# The name of the environment flag that downstream steps watch.
+PASTE_CASCADE_DETECTED = "PASTE_CASCADE_DETECTED"
+
+
+def _set_cascade_flag() -> None:
     """
-    Executes ``func`` in a separate thread and raises :class:`PasteTimeoutError`
-    if it does not complete within ``timeout`` seconds.
+    Set the cascade-detected environment flag.
 
-    This helper works on macOS 12+ where the GIL does not block native
-    ``CGEvent``/``AX`` calls.
+    The flag is set to the string `"1"` (truthy) and is added to the
+    current process environment as well as `os.environ` so that any
+    subsequently spawned subprocesses inherit it.
     """
-    result = {}
-    exc = {}
+    os.environ[PASTE_CASCADE_DETECTED] = "1"
+    logger.debug("Environment flag %s set to '1'", PASTE_CASCADE_DETECTED)
 
-    def target():
-        try:
-            result["value"] = func(*args, **kwargs)
-        except Exception as e:
-            exc["error"] = e
-
-    thread = threading.Thread(target=target, daemon=True)
-    thread.start()
-    thread.join(timeout)
-
-    if thread.is_alive():
-        raise PasteTimeoutError(f"Paste operation timed out after {timeout}s")
-    if "error" in exc:
-        raise exc["error"]
-    return result.get("value")
-
-def detect_paste_cascade_error(ax_call_result, cg_event_result):
+def run_paste(
+    command: List[str],
+    *,
+    timeout: Optional[int] = 30,
+    capture_output: bool = True,
+    check: bool = False,
+) -> subprocess.CompletedProcess:
     """
-    Detects paste cascade errors based on the results of AX and CGEvent calls.
-    
-    Args:
-    ax_call_result (dict): The result of the AX call.
-    cg_event_result (dict): The result of the CGEvent call.
-    
-    Returns:
-    bool: True if a paste cascade error is detected, False otherwise.
-    """
-    if ax_call_result.get('error_code') or cg_event_result.get('error_code'):
-        return True
-    if ax_call_result.get('timeout') or cg_event_result.get('timeout'):
-        return True
-    return False
+    Execute a paste-related command and handle cascade errors.
 
-def log_warning_and_set_flag(error_message):
-    """
-    Logs a warning message and sets the PASTE_CASCADE_DETECTED flag in the environment.
-    
-    Args:
-    error_message (str): The error message to log.
-    """
-    logger.warning(error_message)
-    os.environ[PASTE_CASCADE_ENV_VAR] = '1'
+    Parameters
+    ----------
+    command:
+        The command to execute, expressed as a list of strings (e.g.
+        `["pbpaste"]` on macOS).
+    timeout:
+        Maximum number of seconds to allow the command to run. `None` means
+        no timeout. The default of 30 s matches the CI expectations.
+    capture_output:
+        If `True` (default), `stdout` and `stderr` are captured.
+    check:
+        If `True`, a non-zero return code raises `CalledProcessError`.
+        The wrapper catches the exception to emit the cascade flag.
 
-def detect_paste_cascade(func: Callable, timeout: float = 5.0, *args, **kwargs) -> Any:
-    """
-    Wrapper for AX or CGEvent paste calls.
+    Returns
+    -------
+    subprocess.CompletedProcess
+        The result object from `subprocess.run`.  When a cascade error is
+        detected, the `returncode` will be non-zero (or `-9` for a timeout).
 
-    - Executes ``func`` with a timeout.
-    - On timeout or any exception, logs a warning and sets the
-      ``PASTE_CASCADE_DETECTED`` environment variable.
-    - Returns the original function's result on success.
-
-    This function is intended to be used in CI pipelines where a paste
-    cascade (e.g., repeated failures) should abort further steps.
+    Side Effects
+    ------------
+    * Logs a warning when a timeout or error code is observed.
+    * Sets the `PASTE_CASCADE_DETECTED` environment flag.
     """
+    # Guard against running on unsupported platforms – the feature is only
+    # required on macOS 12+ but we fail gracefully elsewhere.
+    current_system = platform.system()
+    if current_system != "Darwin":
+        logger.debug(
+            "paste_helper.run_paste called on non-macOS platform (%s); proceeding without cascade detection.",
+            current_system,
+        )
+        # Still run the command; cascade detection is a macOS-specific concern.
+        return subprocess.run(
+            command,
+            timeout=timeout,
+            capture_output=capture_output,
+            check=check,
+            text=True,
+        )
+
     try:
-        return _run_with_timeout(func, timeout, *args, **kwargs)
-    except (PasteTimeoutError, Exception) as e:
-        logger.warning("Paste cascade detected: %s", e)
-        os.environ[PASTE_CASCADE_ENV_VAR] = '1'
-        # Re-raise to allow callers to handle the failure if they wish
-        raise
+        logger.debug("Executing paste command: %s with timeout=%s", command, timeout)
+        result = subprocess.run(
+            command,
+            timeout=timeout,
+            capture_output=capture_output,
+            check=check,
+            text=True,
+        )
+        # If `check` is False we still need to treat non-zero exit codes as
+        # cascade errors per the acceptance criteria.
+        if result.returncode != 0:
+            logger.warning(
+                "Paste operation failed with exit code %s. Command: %s",
+                result.returncode,
+                command,
+            )
+            _set_cascade_flag()
+        else:
+            logger.debug("Paste operation succeeded. Command: %s", command)
+        return result
 
-def ax_paste(*args, **kwargs):
-    """
-    Perform a paste using the Accessibility (AX) API.
-    This function is wrapped with ``detect_paste_cascade`` to provide
-    robust error handling.
-    """
-    from .ax_interface import perform_ax_paste  # local module providing the real call
-    return detect_paste_cascade(perform_ax_paste, *args, **kwargs)
-
-def cg_event_paste(*args, **kwargs):
-    """
-    Perform a paste using the CoreGraphics (CGEvent) API.
-    Wrapped with ``detect_paste_cascade``.
-    """
-    from .cg_event_interface import perform_cg_event_paste
-    return detect_paste_cascade(perform_cg_event_paste, *args, **kwargs)
-
-def wrap_paste_call(ax_call, cg_event_call):
-    """
-    Wraps the paste call with error detection and logging.
-    
-    Args:
-    ax_call (function): The AX call function.
-    cg_event_call (function): The CGEvent call function.
-    
-    Returns:
-    tuple: The results of the AX and CGEvent calls.
-    """
-    ax_call_result = ax_call()
-    cg_event_result = cg_event_call()
-    if detect_paste_cascade_error(ax_call_result, cg_event_result):
-        log_warning_and_set_flag('Paste cascade error detected')
-    return ax_call_result, cg_event_result
+    except subprocess.TimeoutExpired as exc:
+        logger.warning(
+            "Paste operation timed out after %s seconds. Command: %s",
+            exc.timeout,
+            command,
+        )
+        _set_cascade_flag()
+        # Re-raise a CompletedProcess-like object for callers that expect it.
+        return subprocess.CompletedProcess(
+            args=exc.cmd,
+            returncode=-9,  # Conventional code for timeout.
+            stdout=exc.stdout,
+            stderr=exc.stderr,
+        )
+    except subprocess.CalledProcessError as exc:
+        # This block is only hit when `check=True`.
+        logger.warning(
+            "Paste operation raised CalledProcessError (exit %s). Command: %s",
+            exc.returncode,
+            command,
+        )
+        _set_cascade_flag()
+        raise  # Preserve original semantics for callers that rely on the exception.
