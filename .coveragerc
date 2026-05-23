@@ -1,0 +1,37 @@
+# .coveragerc
+[run]
+source = .
+omit = 
+    */tests/*
+    */test_*
+    */venv/*
+    */env/*
+    */__pycache__/*
+    */migrations/*
+    setup.py
+    */site-packages/*
+    */dist/*
+    */build/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    except ImportError
+    except Exception
+    except BaseException
+
+precision = 2
+skip_covered = False
+show_missing = True
+skip_empty = True
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml
