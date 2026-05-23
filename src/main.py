@@ -1,10 +1,10 @@
-import os
-import subprocess
-from walkthrough import main as walkthrough_main
+from fastapi import FastAPI
+from src.api.transcription import router as transcription_router
 
-def main():
-    walkthrough_main()
-    # Rest of the main application code
+app = FastAPI()
+
+app.include_router(transcription_router)
 
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
