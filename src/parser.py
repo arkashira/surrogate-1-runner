@@ -1,25 +1,13 @@
-import io
+import memory_management
 
-CHUNK_SIZE = 64 * 1024  # 64 KB
+class DataParser:
+    def __init__(self):
+        self.memory_manager = memory_management.MemoryManager()
 
-class StreamParser:
-    def __init__(self, stream):
-        self.stream = stream
+    def process_stream(self, data_stream):
+        for chunk in self.memory_manager.stream_chunks(data_stream):
+            self.parse_chunk(chunk)
 
-    def parse(self):
-        result = []
-        while True:
-            chunk = self.stream.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            # Process the chunk here (for simplicity, just append it to the result)
-            result.append(chunk)
-        return b''.join(result)
-
-def parse_stream(stream):
-    parser = StreamParser(stream)
-    return parser.parse()
-
-def parse_string(data):
-    stream = io.BytesIO(data.encode('utf-8'))
-    return parse_stream(stream)
+    def parse_chunk(self, chunk):
+        # Implement chunk parsing logic here
+        pass
