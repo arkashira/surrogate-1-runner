@@ -1,19 +1,11 @@
-from fastapi import FastAPI
-from src.middleware.request_validation import request_validation_middleware
-from src.routes.metrics import router as metrics_router
+from forecasting import ForecastModel
 
-app = FastAPI(
-    title="Surrogate Datadog API",
-    version="1.0.0",
-    description="A tiny mock of Datadog’s metric ingestion endpoint."
-)
+def main():
+    historical_data = [100, 105, 110, 115, 120, 125, 130, 135, 140, 145]
+    model = ForecastModel(historical_data)
+    model.train()
+    forecast = model.predict(30)
+    model.plot_forecast(forecast)
 
-# Global middleware – runs for *every* request.
-app.middleware("http")(request_validation_middleware)
-
-# Mount the router under the required prefix.
-app.include_router(metrics_router, prefix="/api/v2")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == '__main__':
+    main()

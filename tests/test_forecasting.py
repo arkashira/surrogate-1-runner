@@ -1,24 +1,28 @@
 import unittest
-import pandas as pd
-from datetime import datetime, timedelta
-from src.cloud_optimize.forecasting import Forecasting
+import numpy as np
+from src.forecasting import ForecastModel
 
-class TestForecasting(unittest.TestCase):
+class TestForecastModel(unittest.TestCase):
     def setUp(self):
-        # Create sample historical data
-        self.historical_data = [
-            {'date': '2023-01-01', 'cost': 100},
-            {'date': '2023-01-02', 'cost': 150},
-            {'date': '2023-01-03', 'cost': 200},
-            {'date': '2023-01-04', 'cost': 250},
-            {'date': '2023-01-05', 'cost': 300},
-        ]
-        self.forecasting = Forecasting(self.historical_data)
+        self.historical_data = [100, 105, 110, 115, 120, 125, 130, 135, 140, 145]
+        self.model = ForecastModel(self.historical_data)
+        self.model.train()
 
-    def test_forecast_costs(self):
-        forecast_df = self.forecasting.forecast_costs(days=5)
-        self.assertEqual(len(forecast_df), 5)
-        self.assertTrue(all(forecast_df['cost'] > 0))
+    def test_train(self):
+        self.assertIsNotNone(self.model.model.coef_)
+        self.assertIsNotNone(self.model.model.intercept_)
+
+    def test_predict(self):
+        forecast = self.model.predict(5)
+        self.assertEqual(len(forecast), 5)
+        self.assertTrue(all(isinstance(x, np.float64) for x in forecast))
+
+    def test_plot_forecast(self):
+        forecast = self.model.predict(5)
+        try:
+            self.model.plot_forecast(forecast)
+        except Exception as e:
+            self.fail(f"plot_forecast raised an exception: {e}")
 
 if __name__ == '__main__':
     unittest.main()
