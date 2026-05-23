@@ -1,89 +1,57 @@
-class AudioGainControlService {
-  constructor(meetingPlatformAPI) {
-    this.meetingPlatformAPI = meetingPlatformAPI;
+/**
+ * AudioGainControlService
+ *
+ * Provides helper functions to interact with the backend API for
+ * retrieving and updating audio gain settings for a meeting.
+ *
+ * Assumptions:
+ * - The backend exposes the following endpoints:
+ *   GET   /api/meetings/:meetingId/audio-gain
+ *   POST  /api/meetings/:meetingId/audio-gain
+ *   The POST body should be JSON: { gain: number }
+ * - All responses are JSON with a `gain` field.
+ */
+
+const API_BASE = '/api/meetings';
+
+/**
+ * Fetch the current audio gain setting for a meeting.
+ *
+ * @param {string} meetingId
+ * @returns {Promise<number>} The current gain value.
+ */
+export const getGainSettings = async (meetingId) => {
+  const response = await fetch(`${API_BASE}/${meetingId}/audio-gain`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch gain setting: ${response.status}`);
   }
-
-  /**
-   * Configure audio gain settings for a meeting
-   * @param {string} meetingId - The ID of the meeting
-   * @param {Object} settings - Audio gain configuration
-   * @param {number} settings.inputGain - Input gain level (0-100)
-   * @param {number} settings.outputGain - Output gain level (0-100)
-   * @param {boolean} settings.autoGain - Whether to enable auto gain control
-   * @returns {Promise<Object>} Updated meeting data with audio settings
-   */
-  async configureAudioGain(meetingId, settings) {
-    // Validate input settings
-    if (typeof settings.inputGain !== 'undefined' && 
-        (settings.inputGain < 0 || settings.inputGain > 100)) {
-      throw new Error('Input gain must be between 0 and 100');
-    }
-
-    if (typeof settings.outputGain !== 'undefined' && 
-        (settings.outputGain < 0 || settings.outputGain > 100)) {
-      throw new Error('Output gain must be between 0 and 100');
-    }
-
-    // Apply settings through meeting platform API
-    const result = await this.meetingPlatformAPI.applyAudioGainSettings(
-      meetingId, 
-      settings
-    );
-
-    return result;
+  const data = await response.json();
+  if (typeof data.gain !== 'number') {
+    throw new Error('Invalid gain data received');
   }
+  return data.gain;
+};
 
-  /**
-   * Get current audio gain settings for a meeting
-   * @param {string} meetingId - The ID of the meeting
-   * @returns {Promise<Object>} Current audio gain settings
-   */
-  async getAudioGainSettings(meetingId) {
-    const meeting = await this.meetingPlatformAPI.getMeeting(meetingId);
-    return meeting.audioGainSettings || {};
+/**
+ * Update the audio gain setting for a meeting.
+ *
+ * @param {string} meetingId
+ * @param {number} gain
+ * @returns {Promise<void>}
+ */
+export const setGainSettings = async (meetingId, gain) => {
+  const response = await fetch(`${API_BASE}/${meetingId}/audio-gain`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gain }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to set gain setting: ${response.status}`);
   }
-
-  /**
-   * Reset audio gain settings to defaults
-   * @param {string} meetingId - The ID of the meeting
-   * @returns {Promise<Object>} Updated meeting data with default settings
-   */
-  async resetAudioGainSettings(meetingId) {
-    const result = await this.meetingPlatformAPI.applyAudioGainSettings(
-      meetingId, 
-      {
-        inputGain: 50,
-        outputGain: 50,
-        autoGain: true
-      }
-    );
-
-    return result;
-  }
-
-  /**
-   * Validate audio gain settings before applying
-   * @param {Object} settings - Audio gain configuration to validate
-   * @returns {Object} Validation result
-   */
-  validateSettings(settings) {
-    const errors = [];
-
-    if (typeof settings.inputGain !== 'undefined' && 
-        (settings.inputGain < 0 || settings.inputGain > 100)) {
-      errors.push('Input gain must be between 0 and 100');
-    }
-
-    if (typeof settings.outputGain !== 'undefined' && 
-        (settings.outputGain < 0 || settings.outputGain > 100)) {
-      errors.push('Output gain must be between 0 and 100');
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors: errors
-    };
-  }
-}
-
-module.exports = AudioGainControlService;
+  // Optionally, we could return the updated value:
+  // const data = await response.json();
+  // return data.gain;
+};
