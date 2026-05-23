@@ -1,0 +1,25 @@
+version: 1.0
+dataset:
+  name: "axentx/surrogate-1-training-pairs"
+  shard_id: 0
+  shard_count: 16
+  stream:
+    enabled: true
+    batch_size: 1000
+  normalize:
+    enabled: true
+    schema: "default"
+  dedup:
+    enabled: true
+    store: "md5"
+    url: "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs/resolve/main/md5_store.json"
+  upload:
+    enabled: true
+    url: "https://huggingface.co/datasets/axentx/surrogate-1-training-pairs"
+    token: ""
+workflow:
+  schedule: "0 */2 * * *"
+  concurrency: 16
+logging:
+  level: "INFO"
+  file: "surrogate.log"
