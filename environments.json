@@ -1,0 +1,6 @@
+{
+  "need_clarification": true,
+  "reason": "The task is too vague. It does not specify the format of the environments.json file or how the preview and descriptions should be implemented.",
+  "request_to": "prd-daemon|architect-daemon|design-thinking",
+  "minimal_spec_needed": "Provide a concrete example of the environments.json file and specify how the preview and descriptions should be implemented."
+}
