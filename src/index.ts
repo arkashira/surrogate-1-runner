@@ -1,18 +1,7 @@
-import { workflowEngine } from './services/workflowEngine';
+import { registerParser } from './guard';
 
-(async () => {
-  await workflowEngine.init();
+// Simulate loading JSON and XML parsers
+registerParser('json');
+registerParser('xml');
 
-  // Example usage
-  const wf = {
-    id: 'demo',
-    name: 'Demo Workflow',
-    steps: [{ id: 's1', type: 'http', config: {} }],
-  };
-  await workflowEngine.addWorkflow(wf);
-  const results = await workflowEngine.executeWorkflow('demo');
-  console.log('Workflow results:', results);
-
-  // Auto‑sync when back online
-  window.addEventListener('online', () => workflowEngine.syncResultsWhenOnline());
-})();
+// Rest of the bootstrap code...
